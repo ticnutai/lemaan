@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { Check, Eye, RotateCcw, Timer, X } from "lucide-react";
+import { ArrowLeft, Check, Eye, RotateCcw, Timer, X } from "lucide-react";
 import { db } from "../db";
+import { buildChildrenMap, collectDescendantIds, selectableCategories } from "../features/study/categoryTree";
+import PageBanner from "../components/PageBanner";
+import QuestionCard, { hasOptions, isSelectionCorrect } from "../components/QuestionCard";
 import type { Card } from "../features/study/types";
 
 function shuffle<T>(arr: T[]): T[] {
@@ -20,24 +23,13 @@ export default function QuizPage() {
   const [quiz, setQuiz] = useState<Card[] | null>(null);
   const [index, setIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
+  const [selected, setSelected] = useState<number | null>(null);
   const [score, setScore] = useState({ correct: 0, incorrect: 0 });
   const [deadline, setDeadline] = useState(0);
   const [now, setNow] = useState(Date.now());
 
-  const categories = useLiveQuery(() => db.categories.orderBy("sortOrder").toArray(), []);
-
-  const childIds = useMemo(() => {
-    if (!categoryId || !categories) return null;
-    const ids = new Set<string>([categoryId]);
-    let grew = true;
-    while (grew) {
-      grew = false;
-      for (const c of categories) {
-        if (c.parentId && ids.has(c.parentId) && !ids.has(c.id)) { ids.add(c.id); grew = true; }
-      }
-    }
-    return ids;
-  }, [categoryId, categories]);
+  const categories = useLiveQuery(() => db.categories.toArray(), []);
+  const options = useMemo(() => (categories ? selectableCategories(categories) : []), [categories]);
 
   // Single 1s tick, only while a quiz is running — torn down when it ends.
   const running = quiz !== null && index < quiz.length && now < deadline;
@@ -48,34 +40,45 @@ export default function QuizPage() {
   }, [running]);
 
   const start = async () => {
-    let cards = await db.cards.toArray();
-    if (childIds) cards = cards.filter((c) => c.categoryId && childIds.has(c.categoryId));
+    let cards: Card[];
+    if (categoryId && categories) {
+      const ids = collectDescendantIds(categoryId, buildChildrenMap(categories));
+      cards = await db.cards.where("categoryId").anyOf([...ids]).toArray();
+    } else {
+      cards = await db.cards.toArray();
+    }
     setQuiz(shuffle(cards).slice(0, count));
     setIndex(0);
     setRevealed(false);
+    setSelected(null);
     setScore({ correct: 0, incorrect: 0 });
-    const d = Date.now() + minutes * 60000;
-    setDeadline(d);
+    setDeadline(Date.now() + minutes * 60000);
     setNow(Date.now());
   };
 
-  const grade = (correct: boolean) => {
+  const next = (correct: boolean) => {
     setScore((s) => ({ correct: s.correct + (correct ? 1 : 0), incorrect: s.incorrect + (correct ? 0 : 1) }));
     setRevealed(false);
+    setSelected(null);
     setIndex((i) => i + 1);
+  };
+
+  const selectOption = (i: number) => {
+    setSelected(i);
+    setRevealed(true);
   };
 
   if (quiz === null) {
     return (
       <div className="max-w-2xl mx-auto space-y-6 animate-fade-in">
-        <h2 className="font-display text-3xl font-bold flex items-center gap-3"><Timer className="h-7 w-7 text-gold" /> מבחן מתוזמן</h2>
+        <PageBanner icon={Timer} title="בניית מבחנים" subtitle="מבחן מתוזמן — בחר נושא, מספר שאלות וזמן, וקבל ציון בסוף." />
         <div className="card-panel space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-1">מסכת</label>
+            <label className="block text-sm font-medium mb-1">נושא</label>
             <select className="input" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
               <option value="">כל המאגר</option>
-              {categories?.map((c) => (
-                <option key={c.id} value={c.id}>{c.parentId ? "— " : ""}{c.name}</option>
+              {options.map((c) => (
+                <option key={c.id} value={c.id}>{c.depth ? "— " : ""}{c.name}</option>
               ))}
             </select>
           </div>
@@ -113,6 +116,8 @@ export default function QuizPage() {
   }
 
   const current = quiz[index];
+  const withOptions = hasOptions(current);
+  const selectionCorrect = selected !== null && isSelectionCorrect(current, selected);
   const mm = Math.floor(timeLeft / 60000);
   const ss = Math.floor((timeLeft % 60000) / 1000).toString().padStart(2, "0");
 
@@ -122,23 +127,28 @@ export default function QuizPage() {
         <span className="text-sm text-muted-foreground">שאלה {index + 1} מתוך {quiz.length}</span>
         <span className={`font-mono text-lg font-bold ${timeLeft < 60000 ? "text-destructive" : "text-gold"}`}>{mm}:{ss}</span>
       </div>
-      <div className="card-panel gold-frame min-h-[220px] flex flex-col">
-        <p className="text-lg font-medium leading-relaxed flex-1">{current.question}</p>
-        {revealed && (
-          <div className="mt-4 pt-4 border-t animate-slide-in-down">
-            <p className="text-sm text-muted-foreground mb-1">תשובה:</p>
-            <p className="leading-relaxed">{current.answer}</p>
-          </div>
-        )}
-      </div>
+
+      <QuestionCard card={current} revealed={revealed} selected={selected} onSelect={selectOption} />
+
       {!revealed ? (
-        <button className="btn-primary w-full h-12" onClick={() => setRevealed(true)}><Eye className="h-4 w-4" /> הצג תשובה</button>
+        !withOptions && (
+          <button className="btn-primary w-full h-12" onClick={() => setRevealed(true)}><Eye className="h-4 w-4" /> הצג תשובה</button>
+        )
+      ) : withOptions ? (
+        <div className="space-y-2">
+          <p className={`text-center text-sm font-medium ${selectionCorrect ? "text-gold" : "text-destructive"}`}>
+            {selectionCorrect ? "תשובה נכונה!" : "תשובה שגויה"}
+          </p>
+          <button className="btn h-12 w-full bg-gradient-gold text-navy shadow-gold hover:opacity-90" onClick={() => next(selectionCorrect)}>
+            <ArrowLeft className="h-4 w-4" /> הבא
+          </button>
+        </div>
       ) : (
         <div className="grid grid-cols-2 gap-2">
-          <button className="btn h-12 bg-destructive text-destructive-foreground hover:opacity-90" onClick={() => grade(false)}>
+          <button className="btn h-12 bg-destructive text-destructive-foreground hover:opacity-90" onClick={() => next(false)}>
             <X className="h-4 w-4" /> טעיתי
           </button>
-          <button className="btn h-12 bg-gradient-gold text-navy shadow-gold hover:opacity-90" onClick={() => grade(true)}>
+          <button className="btn h-12 bg-gradient-gold text-navy shadow-gold hover:opacity-90" onClick={() => next(true)}>
             <Check className="h-4 w-4" /> ידעתי
           </button>
         </div>

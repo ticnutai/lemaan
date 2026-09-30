@@ -1,4 +1,4 @@
-export type CardType = "flashcard" | "multiple" | "boolean";
+export type CardType = "flashcard" | "multiple" | "boolean" | "combo";
 
 export interface SrsState {
   ease: number;

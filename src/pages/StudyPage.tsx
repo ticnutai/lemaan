@@ -1,9 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
-import { Check, Eye, RotateCcw, X } from "lucide-react";
+import { BookOpen, Check, ChevronLeft, Eye, Play, RotateCcw, Timer, X } from "lucide-react";
 import { db } from "../db";
 import { applyReview, buildStudyQueue, type SrsAlgorithm } from "../features/study/srs";
+import { buildChildrenMap, collectDescendantIds } from "../features/study/categoryTree";
+import { SEDARIM } from "../features/study/shas";
+import type { Category } from "../features/study/types";
+import QuestionCard, { hasOptions, isSelectionCorrect } from "../components/QuestionCard";
 import type { Card } from "../features/study/types";
+
+const CORPUS_TABS = ["ש\"ס", "משנה", "חומש", "תנ\"ך"];
 
 const QUALITY_BUTTONS: { q: 0 | 3 | 4 | 5; label: string; cls: string }[] = [
   { q: 0, label: "שכחתי", cls: "bg-destructive text-destructive-foreground hover:opacity-90" },
@@ -13,39 +20,49 @@ const QUALITY_BUTTONS: { q: 0 | 3 | 4 | 5; label: string; cls: string }[] = [
 ];
 
 export default function StudyPage() {
-  const [categoryId, setCategoryId] = useState<string>("");
+  const [openSeder, setOpenSeder] = useState<string | null>(null);
+  const [sessionTitle, setSessionTitle] = useState("");
   const [queue, setQueue] = useState<Card[] | null>(null);
   const [index, setIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
+  const [selected, setSelected] = useState<number | null>(null);
   const [sessionStats, setSessionStats] = useState({ correct: 0, incorrect: 0 });
   const shownAt = useRef(Date.now());
 
-  const categories = useLiveQuery(() => db.categories.orderBy("sortOrder").toArray(), []);
+  const categories = useLiveQuery(() => db.categories.toArray(), []);
   const algorithm = useLiveQuery(async () => ((await db.settings.get("srs-algo"))?.value ?? "sm2") as SrsAlgorithm, []);
 
-  const childIds = useMemo(() => {
-    if (!categoryId || !categories) return null;
-    const ids = new Set<string>([categoryId]);
-    let grew = true;
-    while (grew) {
-      grew = false;
-      for (const c of categories) {
-        if (c.parentId && ids.has(c.parentId) && !ids.has(c.id)) {
-          ids.add(c.id);
-          grew = true;
-        }
-      }
-    }
-    return ids;
-  }, [categoryId, categories]);
+  /** Sedarim and their masechtot, straight from the data. Hierarchy: ש"ס → סדר → מסכת → דף. */
+  const sedarim = useMemo(() => {
+    if (!categories) return [];
+    const shasRoot = categories.find((c) => c.parentId === null && c.name === 'ש"ס');
+    if (!shasRoot) return [];
+    const childrenMap = buildChildrenMap(categories);
+    const order = new Map(SEDARIM.map((s, i) => [s.name, i]));
+    const sederNodes = (childrenMap.get(shasRoot.id) ?? [])
+      .slice()
+      .sort((a, b) => (order.get(a.name) ?? 99) - (order.get(b.name) ?? 99));
+    return sederNodes.map((seder) => ({
+      name: seder.name,
+      masechtot: (childrenMap.get(seder.id) ?? [])
+        .slice()
+        .sort((a: Category, b: Category) => a.name.localeCompare(b.name, "he")),
+    }));
+  }, [categories]);
 
-  const startSession = async () => {
-    let cards = await db.cards.toArray();
-    if (childIds) cards = cards.filter((c) => c.categoryId && childIds.has(c.categoryId));
-    const q = buildStudyQueue(cards).slice(0, 30);
-    setQueue(q);
+  const startSession = async (catId: string | null, title: string) => {
+    let cards: Card[];
+    if (catId && categories) {
+      const ids = collectDescendantIds(catId, buildChildrenMap(categories));
+      cards = await db.cards.where("categoryId").anyOf([...ids]).toArray();
+    } else {
+      cards = await db.cards.toArray();
+    }
+    setSessionTitle(title);
+    setQueue(buildStudyQueue(cards).slice(0, 30));
     setIndex(0);
     setRevealed(false);
+    setSelected(null);
     setSessionStats({ correct: 0, incorrect: 0 });
     shownAt.current = Date.now();
   };
@@ -56,8 +73,8 @@ export default function StudyPage() {
     shownAt.current = Date.now();
   }, [index]);
 
-  const grade = async (quality: 0 | 3 | 4 | 5) => {
-    if (!current || algorithm === undefined) return;
+  const grade = async (quality: 0 | 1 | 2 | 3 | 4 | 5) => {
+    if (!current) return;
     const correct = quality >= 3;
     const srs = applyReview(current, quality, algorithm ?? "sm2");
     await db.transaction("rw", db.cards, db.reviewLogs, async () => {
@@ -80,34 +97,106 @@ export default function StudyPage() {
     });
     setSessionStats((s) => ({ correct: s.correct + (correct ? 1 : 0), incorrect: s.incorrect + (correct ? 0 : 1) }));
     setRevealed(false);
+    setSelected(null);
     setIndex((i) => i + 1);
   };
 
-  // ---- session not started ----
+  // ---------------- hub ----------------
   if (queue === null) {
     return (
-      <div className="max-w-2xl mx-auto space-y-6 animate-fade-in">
-        <h2 className="font-display text-3xl font-bold">חזרה חכמה</h2>
-        <div className="card-panel space-y-4">
-          <label className="block text-sm font-medium">בחר מסכת (או הכל)</label>
-          <select className="input" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-            <option value="">כל המאגר</option>
-            {categories?.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.parentId ? "— " : ""}{c.name}
-              </option>
-            ))}
-          </select>
-          <button className="btn-gold w-full" onClick={startSession}>התחל סשן חזרה</button>
-          <p className="text-xs text-muted-foreground">
-            הסדר נקבע לפי אלגוריתם חזרה מרווחת ({algorithm === "fsrs" ? "FSRS" : "SM-2"}) — שאלות שקשות לך או שעבר זמנן מופיעות קודם.
-          </p>
+      <div className="max-w-3xl mx-auto space-y-5 animate-fade-in">
+        {/* Corpus pill tabs like the original */}
+        <div className="card-panel p-2 flex gap-2">
+          {CORPUS_TABS.map((tab, i) => (
+            <button
+              key={tab}
+              disabled={i > 0}
+              title={i > 0 ? "בקרוב" : undefined}
+              className={
+                i === 0
+                  ? "flex-1 h-12 rounded-lg bg-gradient-navy text-primary-foreground font-bold flex items-center justify-center gap-2 shadow-elegant"
+                  : "flex-1 h-12 rounded-lg text-muted-foreground font-medium flex items-center justify-center gap-2 opacity-50 cursor-not-allowed"
+              }
+            >
+              <BookOpen className="h-4 w-4" />
+              {tab}
+            </button>
+          ))}
         </div>
+
+        {/* Practice mode cards */}
+        <div className="gold-frame p-4 grid md:grid-cols-2 gap-4 bg-secondary/50">
+          <button
+            onClick={() => startSession(null, "תרגול כללי")}
+            className="rounded-lg bg-gradient-navy text-primary-foreground p-5 text-right shadow-elegant hover:opacity-95 transition-opacity flex items-center justify-between gap-3"
+          >
+            <div>
+              <h3 className="font-display text-xl font-bold">תרגול כללי</h3>
+              <p className="text-sm opacity-80 mt-1">חזרה חכמה על כל המאגר לפי דחיפות</p>
+            </div>
+            <span className="h-12 w-12 rounded-full bg-gradient-gold shadow-gold flex items-center justify-center shrink-0">
+              <Play className="h-5 w-5 text-navy" />
+            </span>
+          </button>
+          <Link
+            to="/quiz"
+            className="rounded-lg bg-card border p-5 text-right shadow-elegant hover:border-gold transition-colors flex items-center justify-between gap-3"
+          >
+            <div>
+              <h3 className="font-display text-xl font-bold">תרגול מבחנים</h3>
+              <p className="text-sm text-muted-foreground mt-1">מבחן מתוזמן עם ציון בסוף</p>
+            </div>
+            <span className="h-12 w-12 rounded-full border-2 border-gold/70 bg-secondary flex items-center justify-center shrink-0">
+              <Timer className="h-5 w-5 text-gold" />
+            </span>
+          </Link>
+        </div>
+
+        {/* Sedarim */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          {sedarim.map((seder) => (
+            <button
+              key={seder.name}
+              disabled={seder.masechtot.length === 0}
+              onClick={() => setOpenSeder(openSeder === seder.name ? null : seder.name)}
+              className={
+                openSeder === seder.name
+                  ? "card-panel py-4 text-center border-gold shadow-gold"
+                  : "card-panel py-4 text-center hover:border-gold transition-colors disabled:opacity-40"
+              }
+            >
+              <BookOpen className="h-5 w-5 mx-auto text-gold mb-1.5" />
+              <div className="font-bold">{seder.name}</div>
+              <div className="text-xs text-muted-foreground mt-0.5">{seder.masechtot.length} מסכתות</div>
+            </button>
+          ))}
+        </div>
+
+        {/* Masechtot of the open seder */}
+        {openSeder && (
+          <div className="gold-frame bg-card p-4 animate-slide-in-down">
+            <h3 className="font-bold mb-3 text-lg">סדר {openSeder}</h3>
+            <div className="flex flex-wrap gap-2">
+              {sedarim
+                .find((s) => s.name === openSeder)
+                ?.masechtot.map((m) => (
+                  <button
+                    key={m.id}
+                    onClick={() => startSession(m.id, m.name)}
+                    className="btn-outline rounded-full hover:border-gold hover:bg-secondary"
+                  >
+                    {m.name}
+                    <ChevronLeft className="h-3.5 w-3.5 text-gold" />
+                  </button>
+                ))}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
 
-  // ---- session finished ----
+  // ---------------- finished ----------------
   if (!current) {
     const total = sessionStats.correct + sessionStats.incorrect;
     return (
@@ -118,37 +207,46 @@ export default function StudyPage() {
           <p className="text-muted-foreground">ענית נכון על {sessionStats.correct} מתוך {total} שאלות</p>
         </div>
         <button className="btn-primary" onClick={() => setQueue(null)}>
-          <RotateCcw className="h-4 w-4" /> סשן חדש
+          <RotateCcw className="h-4 w-4" /> חזרה לתרגול
         </button>
       </div>
     );
   }
 
-  // ---- active card ----
+  // ---------------- active card ----------------
+  const withOptions = hasOptions(current);
+  const selectionCorrect = selected !== null && isSelectionCorrect(current, selected);
+
   return (
     <div className="max-w-2xl mx-auto space-y-4 animate-fade-in">
       <div className="flex items-center justify-between text-sm text-muted-foreground">
-        <span>שאלה {index + 1} מתוך {queue.length}</span>
-        <span>{current.masechta}{current.daf ? ` · ${current.daf}` : ""}</span>
+        <span>{sessionTitle} · שאלה {index + 1} מתוך {queue.length}</span>
+        <span>{current.masechta}{current.daf ? ` · דף ${current.daf}` : ""}</span>
       </div>
       <div className="h-2 rounded-full bg-muted overflow-hidden">
         <div className="h-full bg-gradient-gold transition-all" style={{ width: `${(index / queue.length) * 100}%` }} />
       </div>
 
-      <div className="card-panel gold-frame min-h-[220px] flex flex-col">
-        <p className="text-lg font-medium leading-relaxed flex-1">{current.question}</p>
-        {revealed && (
-          <div className="mt-4 pt-4 border-t animate-slide-in-down">
-            <p className="text-sm text-muted-foreground mb-1">תשובה:</p>
-            <p className="leading-relaxed">{current.answer}</p>
-          </div>
-        )}
-      </div>
+      <QuestionCard card={current} revealed={revealed} selected={selected} onSelect={(i) => { setSelected(i); setRevealed(true); }} />
 
       {!revealed ? (
-        <button className="btn-primary w-full h-12" onClick={() => setRevealed(true)}>
-          <Eye className="h-4 w-4" /> הצג תשובה
-        </button>
+        !withOptions && (
+          <button className="btn-primary w-full h-12" onClick={() => setRevealed(true)}>
+            <Eye className="h-4 w-4" /> הצג תשובה
+          </button>
+        )
+      ) : withOptions ? (
+        <div className="space-y-2">
+          <p className={`text-center text-sm font-medium ${selectionCorrect ? "text-gold" : "text-destructive"}`}>
+            {selectionCorrect ? "תשובה נכונה!" : "תשובה שגויה"}
+          </p>
+          <button
+            className="btn h-12 w-full bg-gradient-gold text-navy shadow-gold hover:opacity-90"
+            onClick={() => grade(selectionCorrect ? 4 : 0)}
+          >
+            <Check className="h-4 w-4" /> הבא
+          </button>
+        </div>
       ) : (
         <div className="grid grid-cols-4 gap-2">
           {QUALITY_BUTTONS.map(({ q, label, cls }) => (

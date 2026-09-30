@@ -2,6 +2,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { TrendingUp } from "lucide-react";
 import { db } from "../db";
+import PageBanner from "../components/PageBanner";
 
 function dayKey(ts: number): string {
   const d = new Date(ts);
@@ -54,9 +55,7 @@ export default function StatsPage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
-      <h2 className="font-display text-3xl font-bold flex items-center gap-3">
-        <TrendingUp className="h-7 w-7 text-gold" /> סטטיסטיקות
-      </h2>
+      <PageBanner icon={TrendingUp} title="התקדמות" subtitle="עקוב אחר ההתקדמות שלך וקבל תובנות מתקדמות." />
 
       <div className="grid grid-cols-2 gap-4">
         <div className="card-panel text-center">

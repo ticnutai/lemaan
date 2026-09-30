@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import { CalendarClock, CheckCircle2, Download, Flame, GraduationCap, Library } from "lucide-react";
 import { db } from "../db";
-import { importShasDataset, type ImportProgress } from "../db/importShas";
+import { importLibrary, type ImportProgress } from "../db/importLibrary";
 
 function startOfDay(ts: number): number {
   const d = new Date(ts);
@@ -36,7 +36,7 @@ export default function Dashboard() {
     const all = await db.reviewLogs.toArray();
     return new Set(all.map((l) => startOfDay(l.at)));
   }, []);
-  const imported = useLiveQuery(async () => (await db.settings.get("shas-import-done"))?.value === "1", []);
+  const imported = useLiveQuery(async () => (await db.settings.get("library-import-done"))?.value === "1", []);
 
   const streak = useStreak(logDays);
   const todayCorrect = todayLogs?.filter((l) => l.correct).length ?? 0;
@@ -45,7 +45,7 @@ export default function Dashboard() {
     setImporting(true);
     setImportError(null);
     try {
-      await importShasDataset(setProgress);
+      await importLibrary(setProgress);
     } catch (e) {
       setImportError(e instanceof Error ? e.message : "שגיאה בייבוא");
     } finally {
@@ -63,9 +63,12 @@ export default function Dashboard() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 animate-fade-in">
-      <header>
-        <h2 className="font-display text-3xl font-bold">ברוך הבא</h2>
-        <p className="text-muted-foreground mt-1">מה נלמד היום?</p>
+      <header className="text-center py-6">
+        <h2 className="font-display text-5xl font-extrabold text-gold leading-tight drop-shadow-sm">
+          לְמַעַן תִּהְיֶה תּוֹרַת ה' בְּפִיךָ
+        </h2>
+        <p className="text-2xl font-bold mt-3">מערכת לימוד וחזרות</p>
+        <p className="text-muted-foreground mt-1">עקוב אחר ההתקדמות שלך וקבל תובנות מתקדמות</p>
       </header>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -86,7 +89,7 @@ export default function Dashboard() {
         <div className="card-panel gold-frame space-y-3">
           <h3 className="font-semibold text-lg">ייבוא מאגר השאלות</h3>
           <p className="text-sm text-muted-foreground">
-            טרם יובא מאגר השו"ת של הש"ס (כ־2,000 זוגות שאלה ותשובה לפי מסכתות). הייבוא רץ פעם אחת ונשמר מקומית במכשיר.
+            טרם יובא המאגר המלא (כ־22,700 שאלות: ש"ס, תנ"ך, נביאים וכתובים וטור). הייבוא רץ פעם אחת ונשמר מקומית במכשיר.
           </p>
           {importError && <p className="text-sm text-destructive">{importError}</p>}
           <button className="btn-gold" onClick={runImport} disabled={importing}>

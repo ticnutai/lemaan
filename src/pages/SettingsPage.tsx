@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { AlertTriangle, Brain, Download, Settings, Upload } from "lucide-react";
 import { db, setSetting } from "../db";
+import PageBanner from "../components/PageBanner";
 import type { SrsAlgorithm } from "../features/study/srs";
 
 export default function SettingsPage() {
@@ -65,9 +66,7 @@ export default function SettingsPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 animate-fade-in">
-      <h2 className="font-display text-3xl font-bold flex items-center gap-3">
-        <Settings className="h-7 w-7 text-gold" /> הגדרות
-      </h2>
+      <PageBanner icon={Settings} title="הגדרות" subtitle="אלגוריתם החזרה, גיבוי ושחזור נתונים." />
 
       <div className="card-panel space-y-3">
         <h3 className="font-semibold flex items-center gap-2"><Brain className="h-4 w-4 text-gold" /> אלגוריתם חזרה מרווחת</h3>

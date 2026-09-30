@@ -1,9 +1,11 @@
 import { useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import Fuse from "fuse.js";
-import { Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { HelpCircle, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import PageBanner from "../components/PageBanner";
 import { db } from "../db";
 import { defaultSrs } from "../features/study/srs";
+import { buildChildrenMap, collectDescendantIds, selectableCategories } from "../features/study/categoryTree";
 import { uid, formatDate } from "../lib/utils";
 import type { Card } from "../features/study/types";
 
@@ -22,11 +24,15 @@ export default function QuestionsPage() {
   const [page, setPage] = useState(0);
   const [editor, setEditor] = useState<EditorState | null>(null);
 
-  const categories = useLiveQuery(() => db.categories.orderBy("sortOrder").toArray(), []);
+  const categories = useLiveQuery(() => db.categories.toArray(), []);
+  const options = useMemo(() => (categories ? selectableCategories(categories) : []), [categories]);
   const cards = useLiveQuery(async () => {
-    if (categoryFilter) return db.cards.where("categoryId").equals(categoryFilter).toArray();
+    if (categoryFilter && categories) {
+      const ids = collectDescendantIds(categoryFilter, buildChildrenMap(categories));
+      return db.cards.where("categoryId").anyOf([...ids]).toArray();
+    }
     return db.cards.toArray();
-  }, [categoryFilter]);
+  }, [categoryFilter, categories]);
 
   const fuse = useMemo(
     () => (cards ? new Fuse(cards, { keys: ["question", "answer", "masechta"], threshold: 0.35, ignoreLocation: true }) : null),
@@ -63,7 +69,7 @@ export default function QuestionsPage() {
         categoryId: editor.categoryId || null,
         deckIds: [],
         tags: [],
-        masechta: categories?.find((c) => c.id === editor.categoryId)?.name ?? null,
+        masechta: options.find((c) => c.id === editor.categoryId)?.name ?? null,
         daf: null,
         createdAt: now,
         updatedAt: now,
@@ -82,8 +88,8 @@ export default function QuestionsPage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-4 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <h2 className="font-display text-3xl font-bold">ניהול שאלות</h2>
+      <PageBanner icon={HelpCircle} title="בניית שאלות" subtitle="יצירה, עריכה וחיפוש של שאלות במאגר." />
+      <div className="flex justify-end">
         <button className="btn-gold" onClick={() => setEditor({ id: null, question: "", answer: "", categoryId: categoryFilter })}>
           <Plus className="h-4 w-4" /> שאלה חדשה
         </button>
@@ -101,8 +107,8 @@ export default function QuestionsPage() {
         </div>
         <select className="input w-52" value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); setPage(0); }}>
           <option value="">כל המסכתות</option>
-          {categories?.map((c) => (
-            <option key={c.id} value={c.id}>{c.parentId ? "— " : ""}{c.name}</option>
+          {options.map((c) => (
+            <option key={c.id} value={c.id}>{c.depth ? "— " : ""}{c.name}</option>
           ))}
         </select>
       </div>
@@ -116,8 +122,8 @@ export default function QuestionsPage() {
           <textarea className="input min-h-20" placeholder="תשובה" value={editor.answer} onChange={(e) => setEditor({ ...editor, answer: e.target.value })} />
           <select className="input" value={editor.categoryId} onChange={(e) => setEditor({ ...editor, categoryId: e.target.value })}>
             <option value="">ללא מסכת</option>
-            {categories?.map((c) => (
-              <option key={c.id} value={c.id}>{c.parentId ? "— " : ""}{c.name}</option>
+            {options.map((c) => (
+              <option key={c.id} value={c.id}>{c.depth ? "— " : ""}{c.name}</option>
             ))}
           </select>
           <div className="flex gap-2">

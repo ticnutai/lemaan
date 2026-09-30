@@ -4,7 +4,16 @@ import { ChevronDown, ChevronLeft, FolderTree, Pencil, Plus, Trash2 } from "luci
 import { Link } from "react-router-dom";
 import { db } from "../db";
 import { uid } from "../lib/utils";
+import { selectableCategories } from "../features/study/categoryTree";
+import PageBanner from "../components/PageBanner";
 import type { Category } from "../features/study/types";
+
+/** Category names in the imported library are full paths ("עבודה זרה · יז.") — show only the leaf. */
+function leafName(name: string, depth: number): string {
+  if (depth === 0) return name;
+  const parts = name.split(" · ");
+  return parts[parts.length - 1] || name;
+}
 
 interface TreeNode extends Category {
   children: TreeNode[];
@@ -17,7 +26,8 @@ export default function CategoriesPage() {
   const [newName, setNewName] = useState("");
   const [newParent, setNewParent] = useState("");
 
-  const categories = useLiveQuery(() => db.categories.orderBy("sortOrder").toArray(), []);
+  const categories = useLiveQuery(() => db.categories.toArray(), []);
+  const parentOptions = useMemo(() => (categories ? selectableCategories(categories) : []), [categories]);
   const counts = useLiveQuery(async () => {
     const map = new Map<string, number>();
     await db.cards.each((c) => {
@@ -92,7 +102,7 @@ export default function CategoriesPage() {
         ) : (
           <span className="w-4" />
         )}
-        <span className="font-medium flex-1">{node.name}</span>
+        <span className="font-medium flex-1">{leafName(node.name, depth)}</span>
         <span className="text-xs text-muted-foreground">{node.totalCount}</span>
         <span className="hidden group-hover:flex gap-1">
           <Link to={`/study`} className="btn-ghost h-7 px-2 text-xs">חזרה</Link>
@@ -106,16 +116,14 @@ export default function CategoriesPage() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-4 animate-fade-in">
-      <h2 className="font-display text-3xl font-bold flex items-center gap-3">
-        <FolderTree className="h-7 w-7 text-gold" /> מסכתות וקטגוריות
-      </h2>
+      <PageBanner icon={FolderTree} title="קטגוריות" subtitle="יצירה, סידור וניהול של עץ הקטגוריות ותתי־הקטגוריות." />
 
       <div className="card-panel flex gap-2">
         <input className="input flex-1" placeholder="שם קטגוריה חדשה" value={newName} onChange={(e) => setNewName(e.target.value)} />
         <select className="input w-48" value={newParent} onChange={(e) => setNewParent(e.target.value)}>
           <option value="">רמה ראשית</option>
-          {categories?.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
+          {parentOptions.map((c) => (
+            <option key={c.id} value={c.id}>{c.depth ? "— " : ""}{c.name}</option>
           ))}
         </select>
         <button className="btn-primary" onClick={addCategory}><Plus className="h-4 w-4" /> הוספה</button>
