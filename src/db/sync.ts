@@ -3,8 +3,9 @@
 // Enter the same code on another device to pull the snapshot there.
 import { db, setSetting } from "./index";
 
-const SUPABASE_URL = "https://gvrqhsssxcuunxmhlstm.supabase.co";
-const SUPABASE_KEY = "sb_publishable_BKOVZ3xo-EZUX9u53aXZVQ_wg7DnQGk";
+const SUPABASE_URL = "https://insvegfuiketekxncsgq.supabase.co";
+const SUPABASE_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imluc3ZlZ2Z1aWtldGVreG5jc2dxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA3OTI1NzEsImV4cCI6MjEwNjM2ODU3MX0.wZiIIxrZnVTt0zMEYZhMIkqkNjwDIaEoW-fP2Taw4do";
 const ENDPOINT = `${SUPABASE_URL}/rest/v1/lemaan_sync`;
 
 const HEADERS = {
