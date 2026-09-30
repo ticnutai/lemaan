@@ -1,4 +1,5 @@
 import { HashRouter, Routes, Route } from "react-router-dom";
+import { ThemeProvider } from "./theme/ThemeProvider";
 import Layout from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
 import StudyPage from "./pages/StudyPage";
@@ -15,6 +16,7 @@ import SettingsPage from "./pages/SettingsPage";
 // so no per-platform router switching is needed.
 export default function App() {
   return (
+    <ThemeProvider>
     <HashRouter>
       <Routes>
         <Route element={<Layout />}>
@@ -31,5 +33,6 @@ export default function App() {
         </Route>
       </Routes>
     </HashRouter>
+    </ThemeProvider>
   );
 }

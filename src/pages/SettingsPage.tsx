@@ -4,6 +4,8 @@ import { AlertTriangle, Brain, Cloud, CloudDownload, CloudUpload, Copy, Download
 import { db, setSetting } from "../db";
 import { getSyncCode, pullSnapshot, pushSnapshot } from "../db/sync";
 import PageBanner from "../components/PageBanner";
+import ThemeStudio from "../components/ThemeStudio";
+import AccountSection from "../components/AccountSection";
 import type { SrsAlgorithm } from "../features/study/srs";
 
 export default function SettingsPage() {
@@ -99,7 +101,11 @@ export default function SettingsPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 animate-fade-in">
-      <PageBanner icon={Settings} title="הגדרות" subtitle="אלגוריתם החזרה, גיבוי ושחזור נתונים." />
+      <PageBanner icon={Settings} title="הגדרות" subtitle="ערכות נושא, אלגוריתם החזרה, גיבוי ושחזור נתונים." />
+
+      <AccountSection />
+
+      <ThemeStudio />
 
       <div className="card-panel space-y-3">
         <h3 className="font-semibold flex items-center gap-2"><Brain className="h-4 w-4 text-gold" /> אלגוריתם חזרה מרווחת</h3>

@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useRef } from "react";
 import { NavLink, Outlet } from "react-router-dom";
+import { useTheme } from "../theme/ThemeProvider";
 import { CalendarDays, FolderTree, GraduationCap, HelpCircle, Home, Layers, LineChart, Moon, Settings, Sparkles, Sun, Target, Timer } from "lucide-react";
 import { cn } from "../lib/utils";
 
@@ -17,13 +18,11 @@ const nav = [
 ];
 
 export default function Layout() {
-  const [theme, setTheme] = useState(() => localStorage.getItem("theme") ?? "royal-navy");
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    document.documentElement.classList.toggle("dark", theme === "midnight-gold");
-    localStorage.setItem("theme", theme);
-  }, [theme]);
+  // ניהול הערכה נמצא ב-ThemeProvider בלבד; הכפתור כאן רק מחליף בהיר/כהה
+  const { themeId, setTheme } = useTheme();
+  const lastLight = useRef(themeId !== "midnight-gold" ? themeId : "royal-navy");
+  if (themeId !== "midnight-gold") lastLight.current = themeId;
+  const isDark = themeId === "midnight-gold";
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -40,10 +39,10 @@ export default function Layout() {
         </div>
         <button
           className="h-9 w-9 rounded-full border border-gold/60 bg-card flex items-center justify-center hover:bg-secondary transition-colors"
-          title={theme === "royal-navy" ? "מצב כהה" : "מצב בהיר"}
-          onClick={() => setTheme(theme === "royal-navy" ? "midnight-gold" : "royal-navy")}
+          title={isDark ? "מצב בהיר" : "מצב כהה"}
+          onClick={() => setTheme(isDark ? lastLight.current : "midnight-gold")}
         >
-          {theme === "royal-navy" ? <Moon className="h-4 w-4 text-gold" /> : <Sun className="h-4 w-4 text-gold" />}
+          {isDark ? <Sun className="h-4 w-4 text-gold" /> : <Moon className="h-4 w-4 text-gold" />}
         </button>
       </header>
 
