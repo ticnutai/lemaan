@@ -1,0 +1,111 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Design system — all colors HSL */
+
+@layer base {
+  /* ============ THEME: Royal Navy (default) ============ */
+  :root,
+  [data-theme="royal-navy"] {
+    --background: 40 33% 98%;
+    --foreground: 220 60% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 60% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 60% 12%;
+    --primary: 220 65% 14%;
+    --primary-foreground: 40 50% 96%;
+    --secondary: 40 30% 95%;
+    --secondary-foreground: 220 60% 14%;
+    --muted: 40 25% 94%;
+    --muted-foreground: 220 15% 40%;
+    --accent: 42 60% 52%;
+    --accent-foreground: 220 60% 12%;
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 42 55% 60%;
+    --input: 42 40% 75%;
+    --ring: 42 60% 52%;
+    --gold: 42 70% 50%;
+    --gold-soft: 42 60% 65%;
+    --navy: 220 65% 14%;
+    --navy-soft: 220 50% 25%;
+    --gradient-gold: linear-gradient(135deg, hsl(42 75% 55%), hsl(38 65% 45%));
+    --gradient-navy: linear-gradient(135deg, hsl(220 65% 14%), hsl(220 50% 22%));
+    --shadow-elegant: 0 4px 20px -4px hsl(220 65% 14% / 0.15);
+    --shadow-gold: 0 4px 16px -4px hsl(42 70% 50% / 0.35);
+    --radius: 0.75rem;
+  }
+
+  /* ============ THEME: Midnight Gold (dark) ============ */
+  [data-theme="midnight-gold"] {
+    --background: 220 50% 8%;
+    --foreground: 40 40% 95%;
+    --card: 220 45% 12%;
+    --card-foreground: 40 40% 95%;
+    --popover: 220 45% 12%;
+    --popover-foreground: 40 40% 95%;
+    --primary: 42 70% 55%;
+    --primary-foreground: 220 60% 10%;
+    --secondary: 220 40% 16%;
+    --secondary-foreground: 40 40% 95%;
+    --muted: 220 35% 18%;
+    --muted-foreground: 40 20% 70%;
+    --accent: 42 70% 55%;
+    --accent-foreground: 220 60% 10%;
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 42 50% 45%;
+    --input: 220 35% 22%;
+    --ring: 42 70% 55%;
+    --gold: 42 75% 58%;
+    --gold-soft: 42 60% 70%;
+    --navy: 220 50% 8%;
+    --navy-soft: 220 40% 16%;
+    --gradient-gold: linear-gradient(135deg, hsl(42 80% 60%), hsl(38 70% 48%));
+    --gradient-navy: linear-gradient(135deg, hsl(220 50% 8%), hsl(220 45% 14%));
+    --shadow-elegant: 0 4px 20px -4px hsl(0 0% 0% / 0.5);
+    --shadow-gold: 0 4px 16px -4px hsl(42 70% 50% / 0.4);
+    --radius: 0.75rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    direction: rtl;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+}
+
+@layer components {
+  .gold-frame {
+    @apply border border-gold/60 rounded-lg shadow-elegant;
+  }
+  .card-panel {
+    @apply bg-card text-card-foreground rounded-lg border shadow-elegant p-5;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-10 px-4;
+  }
+  .btn-primary {
+    @apply btn bg-primary text-primary-foreground hover:bg-primary/90;
+  }
+  .btn-gold {
+    @apply btn bg-gradient-gold text-navy shadow-gold hover:opacity-90;
+  }
+  .btn-outline {
+    @apply btn border border-input bg-transparent hover:bg-secondary;
+  }
+  .btn-ghost {
+    @apply btn hover:bg-secondary;
+  }
+  .input {
+    @apply flex h-10 w-full rounded-md border border-input bg-card px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring;
+  }
+}

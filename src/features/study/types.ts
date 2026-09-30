@@ -1,0 +1,78 @@
+export type CardType = "flashcard" | "multiple" | "boolean";
+
+export interface SrsState {
+  ease: number;
+  interval: number; // days
+  repetitions: number;
+  dueAt: number;
+  lastReviewedAt: number | null;
+  stability: number;
+  difficulty: number;
+  lapses: number;
+}
+
+export interface CardStats {
+  totalReviews: number;
+  correct: number;
+  incorrect: number;
+}
+
+export interface Card {
+  id: string;
+  type: CardType;
+  question: string;
+  answer: string; // flashcard answer / boolean explanation
+  options: string[]; // multiple choice
+  correctIndices: number[]; // multiple choice
+  correct: boolean | null; // boolean type
+  categoryId: string | null;
+  deckIds: string[];
+  tags: string[];
+  masechta: string | null;
+  daf: string | null;
+  createdAt: number;
+  updatedAt: number;
+  srs: SrsState;
+  stats: CardStats;
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  parentId: string | null;
+  color: string | null;
+  sortOrder: number;
+}
+
+export interface Deck {
+  id: string;
+  name: string;
+  color: string | null;
+  categoryIds: string[];
+  includeSubCategories: boolean;
+  createdAt: number;
+}
+
+export interface ReviewLog {
+  id?: number;
+  cardId: string;
+  at: number;
+  quality: 0 | 1 | 2 | 3 | 4 | 5;
+  correct: boolean;
+  durationMs: number;
+}
+
+export type GoalType = "daily_reviews" | "daily_cards" | "success_rate" | "streak";
+
+export interface Goal {
+  id: string;
+  type: GoalType;
+  target: number;
+  title: string;
+  createdAt: number;
+}
+
+export interface Setting {
+  key: string;
+  value: string;
+}
