@@ -1,34 +1,26 @@
 import { useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { ChevronDown, ChevronLeft, FolderTree, Pencil, Plus, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { ChevronLeft, Folder, FolderTree, GraduationCap, Home, Pencil, Plus, Trash2 } from "lucide-react";
 import { db } from "../db";
 import { uid } from "../lib/utils";
-import { selectableCategories } from "../features/study/categoryTree";
+import { buildChildrenMap } from "../features/study/categoryTree";
 import PageBanner from "../components/PageBanner";
 import type { Category } from "../features/study/types";
 
 /** Category names in the imported library are full paths ("עבודה זרה · יז.") — show only the leaf. */
-function leafName(name: string, depth: number): string {
-  if (depth === 0) return name;
+function leafName(name: string): string {
   const parts = name.split(" · ");
   return parts[parts.length - 1] || name;
 }
 
-interface TreeNode extends Category {
-  children: TreeNode[];
-  cardCount: number;
-  totalCount: number;
-}
-
 export default function CategoriesPage() {
-  const [open, setOpen] = useState<Set<string>>(new Set());
+  const [path, setPath] = useState<Category[]>([]);
   const [newName, setNewName] = useState("");
-  const [newParent, setNewParent] = useState("");
 
   const categories = useLiveQuery(() => db.categories.toArray(), []);
-  const parentOptions = useMemo(() => (categories ? selectableCategories(categories) : []), [categories]);
-  const counts = useLiveQuery(async () => {
+
+  const directCounts = useLiveQuery(async () => {
     const map = new Map<string, number>();
     await db.cards.each((c) => {
       if (c.categoryId) map.set(c.categoryId, (map.get(c.categoryId) ?? 0) + 1);
@@ -36,106 +28,145 @@ export default function CategoriesPage() {
     return map;
   }, []);
 
-  const tree = useMemo(() => {
-    if (!categories) return [];
-    const nodes = new Map<string, TreeNode>();
-    for (const c of categories) nodes.set(c.id, { ...c, children: [], cardCount: counts?.get(c.id) ?? 0, totalCount: 0 });
-    const roots: TreeNode[] = [];
-    for (const n of nodes.values()) {
-      if (n.parentId && nodes.has(n.parentId)) nodes.get(n.parentId)!.children.push(n);
-      else roots.push(n);
-    }
-    const sum = (n: TreeNode): number => {
-      n.totalCount = n.cardCount + n.children.reduce((a, c) => a + sum(c), 0);
-      n.children.sort((a, b) => a.name.localeCompare(b.name, "he"));
-      return n.totalCount;
-    };
-    roots.forEach(sum);
-    return roots;
-  }, [categories, counts]);
+  const childrenMap = useMemo(() => (categories ? buildChildrenMap(categories) : new Map()), [categories]);
 
-  const toggle = (id: string) => {
-    setOpen((s) => {
-      const next = new Set(s);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
+  /** Total (recursive) card count per category. */
+  const totalCounts = useMemo(() => {
+    const totals = new Map<string, number>();
+    if (!categories || !directCounts) return totals;
+    const compute = (id: string): number => {
+      if (totals.has(id)) return totals.get(id)!;
+      let sum = directCounts.get(id) ?? 0;
+      for (const child of childrenMap.get(id) ?? []) sum += compute(child.id);
+      totals.set(id, sum);
+      return sum;
+    };
+    for (const c of categories) compute(c.id);
+    return totals;
+  }, [categories, directCounts, childrenMap]);
+
+  const current = path[path.length - 1] ?? null;
+  const folders: Category[] = useMemo(() => {
+    const list: Category[] = childrenMap.get(current?.id ?? null) ?? [];
+    return [...list].sort(
+      (a, b) => (totalCounts.get(b.id) ?? 0) - (totalCounts.get(a.id) ?? 0) || a.name.localeCompare(b.name, "he")
+    );
+  }, [childrenMap, current, totalCounts]);
 
   const addCategory = async () => {
     if (!newName.trim()) return;
     await db.categories.add({
       id: uid(),
-      name: newName.trim(),
-      parentId: newParent || null,
+      name: current ? `${current.name} · ${newName.trim()}` : newName.trim(),
+      parentId: current?.id ?? null,
       color: null,
-      sortOrder: (categories?.length ?? 0) + 1,
+      sortOrder: folders.length + 1,
     });
     setNewName("");
   };
 
   const rename = async (c: Category) => {
-    const name = prompt("שם חדש:", c.name);
-    if (name?.trim()) await db.categories.update(c.id, { name: name.trim() });
+    const name = prompt("שם חדש:", leafName(c.name));
+    if (name?.trim()) {
+      const prefix = current ? `${current.name} · ` : "";
+      await db.categories.update(c.id, { name: prefix + name.trim() });
+    }
   };
 
-  const remove = async (node: TreeNode) => {
-    if (node.children.length) {
+  const remove = async (c: Category) => {
+    if ((childrenMap.get(c.id) ?? []).length > 0) {
       alert("יש למחוק תחילה את תתי־הקטגוריות.");
       return;
     }
-    if (!confirm(`למחוק את "${node.name}"? ${node.cardCount ? `${node.cardCount} שאלות יישארו ללא מסכת.` : ""}`)) return;
+    const count = totalCounts.get(c.id) ?? 0;
+    if (!confirm(`למחוק את "${leafName(c.name)}"? ${count ? `${count} שאלות יישארו ללא קטגוריה.` : ""}`)) return;
     await db.transaction("rw", db.categories, db.cards, async () => {
-      await db.cards.where("categoryId").equals(node.id).modify({ categoryId: null });
-      await db.categories.delete(node.id);
+      await db.cards.where("categoryId").equals(c.id).modify({ categoryId: null });
+      await db.categories.delete(c.id);
     });
   };
 
-  const renderNode = (node: TreeNode, depth: number) => (
-    <div key={node.id}>
-      <div className="flex items-center gap-2 rounded-md px-2 py-2 hover:bg-secondary group" style={{ paddingRight: depth * 20 + 8 }}>
-        {node.children.length > 0 ? (
-          <button onClick={() => toggle(node.id)} className="text-muted-foreground">
-            {open.has(node.id) ? <ChevronDown className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-          </button>
-        ) : (
-          <span className="w-4" />
-        )}
-        <span className="font-medium flex-1">{leafName(node.name, depth)}</span>
-        <span className="text-xs text-muted-foreground">{node.totalCount}</span>
-        <span className="hidden group-hover:flex gap-1">
-          <Link to={`/study`} className="btn-ghost h-7 px-2 text-xs">חזרה</Link>
-          <button className="btn-ghost h-7 w-7 p-0" onClick={() => rename(node)}><Pencil className="h-3.5 w-3.5" /></button>
-          <button className="btn-ghost h-7 w-7 p-0 text-destructive" onClick={() => remove(node)}><Trash2 className="h-3.5 w-3.5" /></button>
-        </span>
-      </div>
-      {open.has(node.id) && node.children.map((c) => renderNode(c, depth + 1))}
-    </div>
-  );
-
   return (
-    <div className="max-w-3xl mx-auto space-y-4 animate-fade-in">
+    <div className="max-w-4xl mx-auto space-y-4 animate-fade-in">
       <PageBanner icon={FolderTree} title="קטגוריות" subtitle="יצירה, סידור וניהול של עץ הקטגוריות ותתי־הקטגוריות." />
 
-      <div className="card-panel flex gap-2">
-        <input className="input flex-1" placeholder="שם קטגוריה חדשה" value={newName} onChange={(e) => setNewName(e.target.value)} />
-        <select className="input w-48" value={newParent} onChange={(e) => setNewParent(e.target.value)}>
-          <option value="">רמה ראשית</option>
-          {parentOptions.map((c) => (
-            <option key={c.id} value={c.id}>{c.depth ? "— " : ""}{c.name}</option>
-          ))}
-        </select>
-        <button className="btn-primary" onClick={addCategory}><Plus className="h-4 w-4" /> הוספה</button>
+      {/* Breadcrumb */}
+      <div className="card-panel py-2.5 flex items-center gap-1 text-sm overflow-x-auto">
+        <button className="btn-ghost h-8 px-2.5 gap-1.5 shrink-0" onClick={() => setPath([])}>
+          <Home className="h-3.5 w-3.5 text-gold" /> בית
+        </button>
+        {path.map((c, i) => (
+          <span key={c.id} className="flex items-center gap-1 shrink-0">
+            <ChevronLeft className="h-3.5 w-3.5 text-muted-foreground" />
+            <button className="btn-ghost h-8 px-2.5" onClick={() => setPath(path.slice(0, i + 1))}>
+              {leafName(c.name)}
+            </button>
+          </span>
+        ))}
       </div>
 
-      <div className="card-panel">
-        {tree.length === 0 ? (
-          <p className="text-muted-foreground text-sm">אין קטגוריות עדיין — ייבא את המאגר מדף הבית או צור קטגוריה.</p>
-        ) : (
-          tree.map((n) => renderNode(n, 0))
-        )}
+      {/* Add */}
+      <div className="card-panel py-3 flex gap-2">
+        <input
+          className="input flex-1"
+          placeholder={current ? `תיקייה חדשה בתוך "${leafName(current.name)}"` : "קטגוריה ראשית חדשה"}
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && addCategory()}
+        />
+        <button className="btn-primary" onClick={addCategory}>
+          <Plus className="h-4 w-4" /> הוספה
+        </button>
       </div>
+
+      {/* Folder grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        {folders.map((folder) => {
+          const total = totalCounts.get(folder.id) ?? 0;
+          const hasChildren = (childrenMap.get(folder.id) ?? []).length > 0;
+          return (
+            <div
+              key={folder.id}
+              className="card-panel p-3 group relative hover:border-gold transition-colors cursor-pointer"
+              onClick={() => hasChildren && setPath([...path, folder])}
+            >
+              <div className="flex flex-col items-center text-center gap-1.5 py-2">
+                <div className="relative">
+                  <Folder className="h-10 w-10 text-gold fill-gold/20" />
+                  {total > 0 && (
+                    <span className="absolute -top-1.5 -left-2 text-[10px] font-bold bg-gradient-navy text-primary-foreground rounded-full px-1.5 py-0.5 min-w-[20px]">
+                      {total.toLocaleString()}
+                    </span>
+                  )}
+                </div>
+                <span className="font-medium text-sm leading-tight">{leafName(folder.name)}</span>
+                <span className="text-[11px] text-muted-foreground">
+                  {hasChildren ? `${(childrenMap.get(folder.id) ?? []).length} תיקיות` : "ללא תתי־תיקיות"}
+                </span>
+              </div>
+              <div className="absolute top-2 left-2 hidden group-hover:flex gap-1" onClick={(e) => e.stopPropagation()}>
+                <button className="btn-ghost h-7 w-7 p-0" title="שינוי שם" onClick={() => rename(folder)}>
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
+                <button className="btn-ghost h-7 w-7 p-0 text-destructive" title="מחיקה" onClick={() => remove(folder)}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {folders.length === 0 && (
+        <div className="card-panel border-dashed text-center py-10 text-muted-foreground">
+          <Folder className="h-8 w-8 mx-auto mb-2 opacity-50" />
+          אין תתי־תיקיות כאן. {current && (totalCounts.get(current.id) ?? 0) > 0 && (
+            <Link to="/study" className="text-gold font-medium inline-flex items-center gap-1">
+              <GraduationCap className="h-4 w-4" /> אפשר לתרגל את השאלות שבתיקייה
+            </Link>
+          )}
+        </div>
+      )}
     </div>
   );
 }

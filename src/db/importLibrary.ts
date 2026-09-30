@@ -78,6 +78,42 @@ export async function importLibrary(onProgress?: (p: ImportProgress) => void): P
   const catIdByName = new Map<string, string>();
   for (const c of seedCats) if (!catIdByName.has(c.name)) catIdByName.set(c.name, c.id);
 
+  /** Hebrew numeral for a daf number (2..176), e.g. 17 → "יז". */
+  const hebrewDaf = (n: number): string => {
+    const hundreds = ["", "ק"];
+    const tens = ["", "י", "כ", "ל", "מ", "נ", "ס", "ע", "פ", "צ"];
+    const ones = ["", "א", "ב", "ג", "ד", "ה", "ו", "ז", "ח", "ט"];
+    let s = hundreds[Math.floor(n / 100)] ?? "";
+    const rest = n % 100;
+    if (rest === 15) return s + "טו";
+    if (rest === 16) return s + "טז";
+    return s + tens[Math.floor(rest / 10)] + ones[rest % 10];
+  };
+
+  const catIds = new Set(seedCats.map((c) => c.id));
+  const shasRootId = seedCats.find((c) => c.parentId === null && c.name === 'ש"ס')?.id ?? null;
+  const NAME_ALIASES: Record<string, string> = { "נידה": "נדה", "תלמוד בבלי": 'ש"ס' };
+
+  /** Resolve a card's category: exact cat: tag (name/id/alias), else masechta+daf, else masechta. */
+  const resolveCategory = (s: SeedCard): string | null => {
+    const catTag = s.tags?.find((t) => t.startsWith("cat:"));
+    if (catTag) {
+      const key = catTag.slice(4);
+      const direct = catIdByName.get(key) ?? catIdByName.get(NAME_ALIASES[key] ?? "");
+      if (direct) return direct;
+      if (catIds.has(key)) return key;
+      if (key === "תלמוד בבלי" && shasRootId) return shasRootId;
+    }
+    const masechta = NAME_ALIASES[s.masechta?.trim() ?? ""] ?? s.masechta?.trim();
+    if (!masechta) return null;
+    const dafNum = typeof s.daf === "number" ? s.daf : parseInt(String(s.daf ?? ""), 10);
+    if (Number.isFinite(dafNum) && dafNum > 1) {
+      const byDaf = catIdByName.get(`${masechta} · ${hebrewDaf(dafNum)}.`);
+      if (byDaf) return byDaf;
+    }
+    return catIdByName.get(masechta) ?? null;
+  };
+
   const decks: Deck[] = seedDecks.map((d) => ({
     id: d.id,
     name: d.name,
@@ -96,8 +132,7 @@ export async function importLibrary(onProgress?: (p: ImportProgress) => void): P
     const question = s.question?.trim();
     if (!question) continue;
 
-    const catTag = s.tags?.find((t) => t.startsWith("cat:"));
-    const categoryId = catTag ? catIdByName.get(catTag.slice(4)) ?? null : null;
+    const categoryId = resolveCategory(s);
 
     const dedupeKey = `${categoryId ?? ""}|${question}`;
     if (seen.has(dedupeKey)) continue;

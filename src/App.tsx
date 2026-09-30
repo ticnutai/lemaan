@@ -2,6 +2,7 @@ import { HashRouter, Routes, Route } from "react-router-dom";
 import Layout from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
 import StudyPage from "./pages/StudyPage";
+import CalendarPage from "./pages/CalendarPage";
 import QuestionsPage from "./pages/QuestionsPage";
 import CategoriesPage from "./pages/CategoriesPage";
 import QuizPage from "./pages/QuizPage";
@@ -17,6 +18,7 @@ export default function App() {
         <Route element={<Layout />}>
           <Route path="/" element={<Dashboard />} />
           <Route path="/study" element={<StudyPage />} />
+          <Route path="/calendar" element={<CalendarPage />} />
           <Route path="/questions" element={<QuestionsPage />} />
           <Route path="/categories" element={<CategoriesPage />} />
           <Route path="/quiz" element={<QuizPage />} />
