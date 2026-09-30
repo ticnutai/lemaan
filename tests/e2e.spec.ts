@@ -44,10 +44,9 @@ test("T01 — האפליקציה נטענת (מהירות טעינה ראשונ�
   });
 });
 
-test("T02 — ייבוא מלא של המאגר (מהירות עליית הנתונים)", async () => {
-  await expect(page.getByRole("button", { name: "ייבוא המאגר" })).toBeVisible();
+test("T02 — ייבוא אוטומטי של המאגר (מהירות עליית הנתונים)", async () => {
+  // הייבוא מתחיל לבד בכניסה הראשונה — מודדים עד שכל המאגר נטען.
   await timed("T02_import_22699_ms", 120_000, async () => {
-    await page.getByRole("button", { name: "ייבוא המאגר" }).click();
     await expect(page.getByText("22699").first()).toBeVisible({ timeout: 110_000 });
   });
 });
@@ -55,7 +54,7 @@ test("T02 — ייבוא מלא של המאגר (מהירות עליית הנת�
 test("T03 — נתוני הבית נכונים אחרי ייבוא", async () => {
   await expect(page.getByText("שאלות במאגר")).toBeVisible();
   await expect(page.getByText("22699").first()).toBeVisible();
-  await expect(page.getByRole("button", { name: "ייבוא המאגר" })).toHaveCount(0);
+  await expect(page.getByText("טוען את מאגר השאלות")).toHaveCount(0);
 });
 
 test("T04 — עמוד בניית שאלות: טעינה וחיפוש (מהירות שאילתות)", async () => {

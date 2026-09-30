@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import { CalendarClock, CheckCircle2, Download, Flame, GraduationCap, Library } from "lucide-react";
@@ -54,6 +54,16 @@ export default function Dashboard() {
     }
   };
 
+  // ייבוא אוטומטי בכניסה הראשונה — שהמערכת לעולם לא תיראה ריקה.
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (imported === false && !importing && !autoStarted.current) {
+      autoStarted.current = true;
+      runImport();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imported]);
+
   const stats = [
     { label: "שאלות במאגר", value: totalCards ?? "…", icon: Library, gold: false },
     { label: "ממתינות לחזרה", value: dueCount ?? "…", icon: CalendarClock, gold: true },
@@ -87,9 +97,9 @@ export default function Dashboard() {
 
       {imported === false && (
         <div className="card-panel gold-frame space-y-3">
-          <h3 className="font-semibold text-lg">ייבוא מאגר השאלות</h3>
+          <h3 className="font-semibold text-lg">טוען את מאגר השאלות…</h3>
           <p className="text-sm text-muted-foreground">
-            טרם יובא המאגר המלא (כ־22,700 שאלות: ש"ס, תנ"ך, נביאים וכתובים וטור). הייבוא רץ פעם אחת ונשמר מקומית במכשיר.
+            כ־22,700 שאלות (ש"ס, תנ"ך, נביאים וכתובים וטור) נטענות כעת פעם אחת ונשמרות מקומית במכשיר.
           </p>
           {importError && <p className="text-sm text-destructive">{importError}</p>}
           <button className="btn-gold" onClick={runImport} disabled={importing}>
