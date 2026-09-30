@@ -25,6 +25,10 @@ npm run dev            # http://localhost:5010
 npm run build          # בניית web
 npm run desktop:dev    # אפליקציית דסקטופ (Tauri, דורש Rust)
 npm run desktop:build  # מתקין NSIS ל-Windows (src-tauri/target/release/bundle)
+
+# אנדרואיד (דורש Android SDK + JDK):
+npm run build && npx cap sync android
+cd android && ./gradlew assembleDebug   # APK ב-app/build/outputs/apk/debug
 ```
 
 ## מה יש
@@ -34,8 +38,11 @@ npm run desktop:build  # מתקין NSIS ל-Windows (src-tauri/target/release/bu
 - לוח חזרות עברי (hebcal) עם ממתינות/בוצעו לכל יום
 - סייר קטגוריות בסגנון תיקיות עם ספירות
 - בניית שאלות: חיפוש עמום, עריכה, ייצוא Word/Excel
-- סטטיסטיקות, גיבוי/שחזור JSON, שתי ערכות נושא, עטיפת Tauri לדסקטופ
+- סטטיסטיקות, גיבוי/שחזור JSON, שתי ערכות נושא
+- אפליקציית דסקטופ (Tauri) ואפליקציית אנדרואיד (Capacitor)
+- סנכרון ענן בין מכשירים (src/db/sync.ts): תמונת-מצב דחוסה בפרויקט Supabase
+  ייעודי "lemaan", ממוענת בקוד סנכרון אקראי; משיכה מחליפה את הנתונים המקומיים
 
-## שלבים הבאים
-- אנדרואיד (Capacitor או Tauri Mobile)
-- סנכרון Supabase כמודול נפרד ב-src/db/sync
+## שלבים הבאים (אופציונלי)
+- חתימת release ל-APK (העלאה ל-Play דורשת keystore)
+- אייקון מותאם לאפליקציות (כרגע ברירת מחדל)
