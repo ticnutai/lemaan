@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import { BookOpen, Check, ChevronLeft, Eye, Play, RotateCcw, Timer, X } from "lucide-react";
 import { db } from "../db";
@@ -31,6 +31,30 @@ export default function StudyPage() {
 
   const categories = useLiveQuery(() => db.categories.toArray(), []);
   const algorithm = useLiveQuery(async () => ((await db.settings.get("srs-algo"))?.value ?? "sm2") as SrsAlgorithm, []);
+
+  // Arriving from a deck's "תרגול" button (/study?deck=<id>): start that session once.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const deckStarted = useRef(false);
+  useEffect(() => {
+    const deckId = searchParams.get("deck");
+    if (!deckId || !categories || deckStarted.current) return;
+    deckStarted.current = true;
+    (async () => {
+      const deck = await db.decks.get(deckId);
+      if (!deck) return;
+      const childrenMap = buildChildrenMap(categories);
+      const ids = new Set<string>();
+      for (const catId of deck.categoryIds) {
+        if (deck.includeSubCategories) for (const id of collectDescendantIds(catId, childrenMap)) ids.add(id);
+        else ids.add(catId);
+      }
+      const cards = ids.size ? await db.cards.where("categoryId").anyOf([...ids]).toArray() : [];
+      setSessionTitle(deck.name);
+      setQueue(buildStudyQueue(cards).slice(0, 30));
+      setIndex(0);
+      setSearchParams({}, { replace: true });
+    })();
+  }, [searchParams, categories, setSearchParams]);
 
   /** Sedarim and their masechtot, straight from the data. Hierarchy: ש"ס → סדר → מסכת → דף. */
   const sedarim = useMemo(() => {

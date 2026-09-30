@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import Fuse from "fuse.js";
-import { HelpCircle, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { FileSpreadsheet, FileText, HelpCircle, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import PageBanner from "../components/PageBanner";
+import { exportQuestionsDocx, exportQuestionsXlsx } from "../lib/export";
 import { db } from "../db";
 import { defaultSrs } from "../features/study/srs";
 import { buildChildrenMap, collectDescendantIds, selectableCategories } from "../features/study/categoryTree";
@@ -46,6 +47,9 @@ export default function QuestionsPage() {
   }, [cards, search, fuse]);
 
   const visible = filtered.slice(0, (page + 1) * PAGE_SIZE);
+  const exportTitle = categoryFilter
+    ? `שאלות-${options.find((c) => c.id === categoryFilter)?.name ?? ""}`
+    : "שאלות-למען";
 
   const save = async () => {
     if (!editor || !editor.question.trim()) return;
@@ -89,7 +93,23 @@ export default function QuestionsPage() {
   return (
     <div className="max-w-4xl mx-auto space-y-4 animate-fade-in">
       <PageBanner icon={HelpCircle} title="בניית שאלות" subtitle="יצירה, עריכה וחיפוש של שאלות במאגר." />
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        <button
+          className="btn-outline"
+          disabled={filtered.length === 0 || filtered.length > 3000}
+          title={filtered.length > 3000 ? "סנן לפחות מ־3,000 שאלות לפני ייצוא" : "ייצוא ל-Word"}
+          onClick={() => exportQuestionsDocx(filtered, exportTitle)}
+        >
+          <FileText className="h-4 w-4" /> Word
+        </button>
+        <button
+          className="btn-outline"
+          disabled={filtered.length === 0}
+          title="ייצוא ל-Excel"
+          onClick={() => exportQuestionsXlsx(filtered, exportTitle)}
+        >
+          <FileSpreadsheet className="h-4 w-4" /> Excel
+        </button>
         <button className="btn-gold" onClick={() => setEditor({ id: null, question: "", answer: "", categoryId: categoryFilter })}>
           <Plus className="h-4 w-4" /> שאלה חדשה
         </button>

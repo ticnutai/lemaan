@@ -3,6 +3,8 @@ import Layout from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
 import StudyPage from "./pages/StudyPage";
 import CalendarPage from "./pages/CalendarPage";
+import DecksPage from "./pages/DecksPage";
+import GoalsPage from "./pages/GoalsPage";
 import QuestionsPage from "./pages/QuestionsPage";
 import CategoriesPage from "./pages/CategoriesPage";
 import QuizPage from "./pages/QuizPage";
@@ -19,6 +21,8 @@ export default function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/study" element={<StudyPage />} />
           <Route path="/calendar" element={<CalendarPage />} />
+          <Route path="/decks" element={<DecksPage />} />
+          <Route path="/goals" element={<GoalsPage />} />
           <Route path="/questions" element={<QuestionsPage />} />
           <Route path="/categories" element={<CategoriesPage />} />
           <Route path="/quiz" element={<QuizPage />} />

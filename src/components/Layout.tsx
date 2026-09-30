@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
-import { CalendarDays, FolderTree, GraduationCap, HelpCircle, Home, LineChart, Moon, Settings, Sparkles, Sun, Timer } from "lucide-react";
+import { CalendarDays, FolderTree, GraduationCap, HelpCircle, Home, Layers, LineChart, Moon, Settings, Sparkles, Sun, Target, Timer } from "lucide-react";
 import { cn } from "../lib/utils";
 
 const nav = [
@@ -8,6 +8,8 @@ const nav = [
   { to: "/study", label: "תרגול", icon: GraduationCap },
   { to: "/calendar", label: "חזרות", icon: CalendarDays },
   { to: "/quiz", label: "מבחנים", icon: Timer },
+  { to: "/decks", label: "חפיסות", icon: Layers },
+  { to: "/goals", label: "יעדים", icon: Target },
   { to: "/questions", label: "בניית שאלות", icon: HelpCircle },
   { to: "/categories", label: "קטגוריות", icon: FolderTree },
   { to: "/stats", label: "התקדמות", icon: LineChart },
