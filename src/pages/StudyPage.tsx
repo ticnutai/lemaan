@@ -245,7 +245,18 @@ export default function StudyPage() {
     <div className="max-w-2xl mx-auto space-y-4 animate-fade-in">
       <div className="flex items-center justify-between text-sm text-muted-foreground">
         <span>{sessionTitle} · שאלה {index + 1} מתוך {queue.length}</span>
-        <span>{current.masechta}{current.daf ? ` · דף ${current.daf}` : ""}</span>
+        <span className="flex items-center gap-1.5">
+          {current.masechta}{current.daf ? ` · דף ${current.daf}` : ""}
+          {current.masechta && current.daf && (
+            <Link
+              to={`/shas?he=${encodeURIComponent(current.masechta)}&daf=${encodeURIComponent(current.daf)}`}
+              className="text-gold hover:underline font-medium"
+              title="פתיחת הדף בגמרא"
+            >
+              (לגמרא)
+            </Link>
+          )}
+        </span>
       </div>
       <div className="h-2 rounded-full bg-muted overflow-hidden">
         <div className="h-full bg-gradient-gold transition-all" style={{ width: `${(index / queue.length) * 100}%` }} />

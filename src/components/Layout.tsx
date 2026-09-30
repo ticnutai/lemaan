@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { useTheme } from "../theme/ThemeProvider";
-import { CalendarDays, FolderTree, GraduationCap, HelpCircle, Home, Layers, LineChart, Moon, Settings, Sparkles, Sun, Target, Timer } from "lucide-react";
+import { CalendarDays, FolderTree, GraduationCap, HelpCircle, Home, Landmark, Layers, LineChart, Moon, Settings, Sparkles, Sun, Target, Timer } from "lucide-react";
 import { cn } from "../lib/utils";
 
 const nav = [
@@ -9,6 +9,7 @@ const nav = [
   { to: "/study", label: "תרגול", icon: GraduationCap },
   { to: "/calendar", label: "חזרות", icon: CalendarDays },
   { to: "/quiz", label: "מבחנים", icon: Timer },
+  { to: "/shas", label: 'הש"ס', icon: Landmark },
   { to: "/decks", label: "חפיסות", icon: Layers },
   { to: "/goals", label: "יעדים", icon: Target },
   { to: "/questions", label: "בניית שאלות", icon: HelpCircle },

@@ -127,6 +127,14 @@ test("T11 — כפתורי ייצוא זמינים", async () => {
   await expect(page.getByRole("button", { name: "Excel" })).toBeEnabled({ timeout: 10_000 });
 });
 
+test("T13 — הש\"ס המקומי: טעינת דף גמרא עם מפרשים", async () => {
+  await page.goto("/#/shas?m=Chagigah&a=3a");
+  await timed("T13_gemara_load_ms", 15_000, async () => {
+    await expect(page.getByText(/חגיגה · דף/)).toBeVisible({ timeout: 14_000 });
+    await expect(page.getByText("רש\"י").first()).toBeVisible();
+  });
+});
+
 test("T12 — סנכרון ענן: העלאה אמיתית (מהירות עליית נתונים לענן)", async () => {
   await page.goto("/#/settings");
   await timed("T12_cloud_push_ms", 60_000, async () => {
