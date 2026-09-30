@@ -1,13 +1,46 @@
 import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { AlertTriangle, Brain, Download, Settings, Upload } from "lucide-react";
+import { AlertTriangle, Brain, Cloud, CloudDownload, CloudUpload, Copy, Download, Settings, Upload } from "lucide-react";
 import { db, setSetting } from "../db";
+import { getSyncCode, pullSnapshot, pushSnapshot } from "../db/sync";
 import PageBanner from "../components/PageBanner";
 import type { SrsAlgorithm } from "../features/study/srs";
 
 export default function SettingsPage() {
   const [busy, setBusy] = useState(false);
+  const [codeInput, setCodeInput] = useState("");
+  const [syncMsg, setSyncMsg] = useState("");
   const algorithm = useLiveQuery(async () => ((await db.settings.get("srs-algo"))?.value ?? "sm2") as SrsAlgorithm, []);
+  const syncCode = useLiveQuery(async () => (await db.settings.get("sync-code"))?.value as string | undefined, []);
+
+  const doPush = async () => {
+    setBusy(true);
+    setSyncMsg("");
+    try {
+      await getSyncCode();
+      const { sizeKb } = await pushSnapshot();
+      setSyncMsg(`הנתונים הועלו לענן (${sizeKb.toLocaleString()}KB).`);
+    } catch (e) {
+      setSyncMsg(e instanceof Error ? e.message : "שגיאה בהעלאה");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const doPull = async () => {
+    if (!confirm("משיכה מהענן תחליף את כל הנתונים במכשיר הזה. להמשיך?")) return;
+    setBusy(true);
+    setSyncMsg("");
+    try {
+      const { updatedAt } = await pullSnapshot(codeInput || undefined);
+      setSyncMsg(`הנתונים נמשכו מהענן (עדכון אחרון: ${new Date(updatedAt).toLocaleString("he-IL")}).`);
+      setCodeInput("");
+    } catch (e) {
+      setSyncMsg(e instanceof Error ? e.message : "שגיאה במשיכה");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const exportBackup = async () => {
     setBusy(true);
@@ -102,6 +135,34 @@ export default function SettingsPage() {
               onChange={(e) => e.target.files?.[0] && importBackup(e.target.files[0])} />
           </label>
         </div>
+      </div>
+
+      <div className="card-panel space-y-3">
+        <h3 className="font-semibold flex items-center gap-2"><Cloud className="h-4 w-4 text-gold" /> סנכרון ענן בין מכשירים</h3>
+        <p className="text-sm text-muted-foreground">
+          העלה את הנתונים מהמכשיר הזה, ובמכשיר השני הדבק את קוד הסנכרון ומשוך. המשיכה מחליפה את הנתונים המקומיים.
+        </p>
+        {syncCode && (
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-muted-foreground">קוד הסנכרון שלך:</span>
+            <code className="rounded bg-muted px-2 py-1 select-all" dir="ltr">{syncCode}</code>
+            <button className="btn-ghost h-7 w-7 p-0" title="העתקה"
+              onClick={() => { navigator.clipboard.writeText(syncCode); setSyncMsg("הקוד הועתק."); }}>
+              <Copy className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
+        <div className="flex flex-wrap gap-2 items-center">
+          <button className="btn-primary" onClick={doPush} disabled={busy}>
+            <CloudUpload className="h-4 w-4" /> העלאה לענן
+          </button>
+          <input className="input w-72" dir="ltr" placeholder="קוד סנכרון ממכשיר אחר (רשות)"
+            value={codeInput} onChange={(e) => setCodeInput(e.target.value)} />
+          <button className="btn-outline" onClick={doPull} disabled={busy}>
+            <CloudDownload className="h-4 w-4" /> משיכה מהענן
+          </button>
+        </div>
+        {syncMsg && <p className="text-sm font-medium">{syncMsg}</p>}
       </div>
 
       <div className="card-panel border-destructive/50 space-y-3">
