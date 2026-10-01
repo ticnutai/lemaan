@@ -92,25 +92,37 @@ export default function AdminPage() {
     setNotes((prev) => prev.map((n) => (n.id === note.id ? { ...n, status } : n)));
   };
 
+  /** הוספת שאלה מהתור למאגר המקומי של המנהל (אם אינה שלו ממילא). */
+  const importToLocal = async (row: SharedRow) => {
+    const c = row.card;
+    const mine = row.email && session?.user.email === row.email;
+    if (mine || !c.question || (await db.cards.get(`shared-${row.id}`))) return;
+    await db.cards.put({
+      id: `shared-${row.id}`,
+      type: (c.type as Card["type"]) ?? "flashcard",
+      question: c.question,
+      answer: c.answer ?? "",
+      options: c.options ?? [],
+      correctIndices: c.correctIndices ?? [],
+      correct: null, categoryId: null, deckIds: [], tags: c.tags ?? [],
+      masechta: c.masechta ?? null, daf: c.daf ?? null, amud: c.amud ?? null,
+      createdAt: Date.now(), updatedAt: Date.now(),
+      srs: defaultSrs(), stats: { totalReviews: 0, correct: 0, incorrect: 0 },
+    });
+  };
+
+  /** אשר לכולם — מופץ אוטומטית לכל מכשיר מחובר. */
   const approveShared = async (row: SharedRow) => {
     await supabase.from("lemaan_shared_questions").update({ status: "approved", approved_at: new Date().toISOString() }).eq("id", row.id);
-    // נכנסת מיד גם למאגר המקומי של המנהל
-    const c = row.card;
-    if (c.question && !(await db.cards.get(`shared-${row.id}`))) {
-      await db.cards.put({
-        id: `shared-${row.id}`,
-        type: (c.type as Card["type"]) ?? "flashcard",
-        question: c.question,
-        answer: c.answer ?? "",
-        options: c.options ?? [],
-        correctIndices: c.correctIndices ?? [],
-        correct: null, categoryId: null, deckIds: [], tags: c.tags ?? [],
-        masechta: c.masechta ?? null, daf: c.daf ?? null, amud: c.amud ?? null,
-        createdAt: Date.now(), updatedAt: Date.now(),
-        srs: defaultSrs(), stats: { totalReviews: 0, correct: 0, incorrect: 0 },
-      });
-    }
+    await importToLocal(row);
     setShared((prev) => prev.map((s) => (s.id === row.id ? { ...s, status: "approved" } : s)));
+  };
+
+  /** הוסף רק אליי — נכנסת למאגר של המנהל בלבד, בלי הפצה. */
+  const adminOnlyShared = async (row: SharedRow) => {
+    await supabase.from("lemaan_shared_questions").update({ status: "admin_only" }).eq("id", row.id);
+    await importToLocal(row);
+    setShared((prev) => prev.map((s) => (s.id === row.id ? { ...s, status: "admin_only" } : s)));
   };
 
   const rejectShared = async (row: SharedRow) => {
@@ -302,8 +314,10 @@ export default function AdminPage() {
       {/* ---- שאלות משתמשים ---- */}
       {tab === "shared" && (
         <div className="gold-frame bg-card p-4 space-y-3">
-          <h3 className="font-bold text-lg">שאלות שהוצעו לספרייה</h3>
-          <p className="text-sm text-muted-foreground">תוכן של משתמשים נשאר פרטי עד שמאשרים אותו כאן; אישור מפיץ את השאלה לכל המכשירים.</p>
+          <h3 className="font-bold text-lg">שאלות ממתינות להחלטה</h3>
+          <p className="text-sm text-muted-foreground">
+            כל שאלה חדשה — של כל משתמש, כולל המנהל — מגיעה לכאן. "אשר לכולם" מפיץ לכל מכשיר; "הוסף רק אליי" מכניס רק למאגר שלך; היוצר תמיד שומר עותק אצלו.
+          </p>
           {shared.length === 0 ? (
             <p className="text-muted-foreground text-center py-6">אין שאלות מוצעות.</p>
           ) : (
@@ -314,7 +328,11 @@ export default function AdminPage() {
                     <span dir="ltr">{s.email}</span>
                     <span>
                       {s.card.masechta ? `${s.card.masechta}${s.card.daf ? ` · דף ${s.card.daf}` : ""} · ` : ""}
-                      {fmtDate(s.created_at)} · {s.status === "pending" ? "ממתינה" : s.status === "approved" ? "אושרה" : "נדחתה"}
+                      {fmtDate(s.created_at)} · {
+                        s.status === "pending" ? "ממתינה" :
+                        s.status === "approved" ? "אושרה לכולם" :
+                        s.status === "admin_only" ? "נוספה רק למנהל" : "נדחתה"
+                      }
                     </span>
                   </div>
                   <p className="text-sm font-medium">{s.card.question}</p>
@@ -322,9 +340,12 @@ export default function AdminPage() {
                     <p className="text-xs text-muted-foreground">{s.card.options!.join(" · ")}</p>
                   )}
                   {s.status === "pending" && (
-                    <div className="flex gap-2">
-                      <button className="btn-primary h-8 text-xs" onClick={() => approveShared(s)}>
-                        <Check className="h-3.5 w-3.5" /> אשר והעבר למאגר
+                    <div className="flex gap-2 flex-wrap">
+                      <button className="btn h-8 text-xs bg-gradient-gold text-navy shadow-gold hover:opacity-90" onClick={() => approveShared(s)}>
+                        <Check className="h-3.5 w-3.5" /> אשר לכולם
+                      </button>
+                      <button className="btn-primary h-8 text-xs" onClick={() => adminOnlyShared(s)}>
+                        <Check className="h-3.5 w-3.5" /> הוסף רק אליי
                       </button>
                       <button className="btn-outline h-8 text-xs" onClick={() => rejectShared(s)}>
                         <X className="h-3.5 w-3.5" /> דחה

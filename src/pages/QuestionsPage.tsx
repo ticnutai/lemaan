@@ -9,7 +9,7 @@ import {
 import PageBanner from "../components/PageBanner";
 import { exportQuestionsDocx, exportQuestionsXlsx } from "../lib/export";
 import { db } from "../db";
-import { suggestToLibrary } from "../db/admin";
+import { submitToReview } from "../db/admin";
 import { useSession } from "../db/useSession";
 import { defaultSrs } from "../features/study/srs";
 import { buildChildrenMap, collectDescendantIds, selectableCategories } from "../features/study/categoryTree";
@@ -63,7 +63,6 @@ export default function QuestionsPage() {
 
   const [form, setForm] = useState<FormState>(emptyForm());
   const [savedFlash, setSavedFlash] = useState(false);
-  const [shareToLibrary, setShareToLibrary] = useState(false);
   const session = useSession();
 
   // ---- רשימה/חיפוש (קיים) ----
@@ -152,8 +151,9 @@ export default function QuestionsPage() {
       stats: { totalReviews: 0, correct: 0, incorrect: 0 },
     };
     await db.cards.add(card);
-    if (shareToLibrary && session) {
-      try { await suggestToLibrary(session, card); } catch { /* אופליין — דילוג שקט */ }
+    // כל שאלה חדשה עוברת לשולחן המנהל — הוא מחליט אם תיכנס לספרייה
+    if (session) {
+      try { await submitToReview(session, card); } catch { /* אופליין — נשארת מקומית בלבד */ }
     }
     setForm(thenAnother ? { ...emptyForm(), type: form.type } : emptyForm());
     if (!thenAnother) setAmud(null);
@@ -448,17 +448,11 @@ export default function QuestionsPage() {
               />
             </details>
 
-            {session && (
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="accent-[hsl(var(--gold))] h-4 w-4"
-                  checked={shareToLibrary}
-                  onChange={(e) => setShareToLibrary(e.target.checked)}
-                />
-                הצע את השאלה לספרייה המרכזית (תישאר פרטית עד אישור המנהל)
-              </label>
-            )}
+            <p className="text-xs text-muted-foreground">
+              {session
+                ? "השאלה תישמר אצלך ותישלח גם לאישור המנהל — הוא יחליט אם תיכנס לספרייה של כולם."
+                : "השאלה תישמר במכשיר זה בלבד; כדי שתגיע לאישור המנהל ולספרייה — התחבר לחשבון."}
+            </p>
             <div className="flex items-center gap-2 flex-wrap">
               <button className="btn-primary h-11" disabled={!formValid} onClick={() => saveNew(false)}>
                 <Save className="h-4 w-4" /> שמור

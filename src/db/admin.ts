@@ -47,8 +47,8 @@ export async function sendQuestionNote(session: Session, card: Card, note: strin
   if (error) throw error;
 }
 
-/** הצעת שאלה לספרייה המרכזית (נשארת פרטית עד אישור מנהל). */
-export async function suggestToLibrary(session: Session, card: Card): Promise<void> {
+/** כל שאלה חדשה נשלחת לשולחן המנהל — הוא מחליט לאן היא נכנסת. */
+export async function submitToReview(session: Session, card: Card): Promise<void> {
   const { error } = await supabase.from("lemaan_shared_questions").insert({
     user_id: session.user.id,
     email: session.user.email ?? null,
@@ -64,9 +64,11 @@ export async function suggestToLibrary(session: Session, card: Card): Promise<vo
 /** משיכת שאלות מאושרות מהספרייה המשותפת אל המאגר המקומי (לכל המשתמשים). */
 export async function pullApprovedQuestions(): Promise<number> {
   const lastPull = (await db.settings.get("shared-pull-at"))?.value ?? "1970-01-01";
+  const { data: auth } = await supabase.auth.getSession();
+  const myId = auth.session?.user.id;
   const { data, error } = await supabase
     .from("lemaan_shared_questions")
-    .select("id, card, approved_at")
+    .select("id, user_id, card, approved_at")
     .eq("status", "approved")
     .gt("approved_at", lastPull)
     .order("approved_at", { ascending: true })
@@ -75,6 +77,7 @@ export async function pullApprovedQuestions(): Promise<number> {
   let added = 0;
   const now = Date.now();
   for (const row of data) {
+    if (row.user_id === myId) continue; // ליוצר כבר יש את המקור המקומי
     const c = row.card as Partial<Card> & { question?: string };
     if (!c?.question) continue;
     const id = `shared-${row.id}`;
