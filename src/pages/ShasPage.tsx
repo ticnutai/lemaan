@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { BookOpen, ChevronLeft, ChevronRight, Landmark } from "lucide-react";
 import PageBanner from "../components/PageBanner";
+import DafPage from "../features/daf/DafPage";
 
 /** מאגר הש"ס המקומי (מהדורת וילנא, ספריא) — 37 מסכתות, עובד אופליין מלא. */
 
@@ -61,7 +62,8 @@ export default function ShasPage() {
   const [index, setIndex] = useState<ShasIndex | null>(null);
   const [amudim, setAmudim] = useState<Record<string, Amud> | null>(null);
   const [openCommentaries, setOpenCommentaries] = useState<Set<string>>(new Set(["rashi", "tosafot"]));
-  const [tzurat, setTzurat] = useState(false); // תצוגת צורת הדף
+  const [tzurat, setTzurat] = useState(false); // תצוגת צורת הדף (מנוע חי)
+  const [printMode, setPrintMode] = useState(false); // דפוס מקורי מעוגן (ברכות)
   const [error, setError] = useState("");
 
   const slug = params.get("m");
@@ -163,17 +165,20 @@ export default function ShasPage() {
           </button>
         </div>
         <div className="flex items-center gap-2">
-          {TZURAT_TRACTATES[slug] ? (
+          <button
+            className={`btn-outline h-9 ${tzurat ? "border-gold text-gold bg-gold/10" : ""}`}
+            title="צורת הדף — גמרא במרכז, רש״י פנימה, תוספות בחוץ; חיפוש, צבעים וגופנים"
+            onClick={() => setTzurat((v) => !v)}
+          >
+            צורת הדף
+          </button>
+          {tzurat && TZURAT_TRACTATES[slug] && (
             <button
-              className={`btn-outline h-9 ${tzurat ? "border-gold text-gold bg-gold/10" : ""}`}
-              title="תצוגת דף וילנא אותנטית — רש״י, תוספות ומסורת הש״ס במקומם"
-              onClick={() => setTzurat((v) => !v)}
+              className={`btn-outline h-9 text-xs ${printMode ? "border-gold text-gold bg-gold/10" : ""}`}
+              title="דפוס וילנא מקורי — שבירת שורות זהה לספר (זמין לברכות)"
+              onClick={() => setPrintMode((v) => !v)}
             >
-              צורת הדף
-            </button>
-          ) : (
-            <button className="btn-outline h-9 opacity-40 cursor-not-allowed" title="צורת הדף זמינה בשלב זה למסכת ברכות; שאר המסכתות בטקסט מסודר">
-              צורת הדף
+              דפוס מקורי
             </button>
           )}
           <h2 className="font-display text-xl font-bold">
@@ -185,7 +190,18 @@ export default function ShasPage() {
       {error && <p className="text-destructive text-sm">{error}</p>}
       {!amudim && !error && <div className="card-panel text-center py-10 text-muted-foreground">טוען את המסכת…</div>}
 
-      {tzurat && TZURAT_TRACTATES[slug] && (
+      {tzurat && !printMode && amud && (
+        <DafPage
+          key={`${slug}-${amudKey}`}
+          gemara={amud.gemara}
+          rashi={amud.commentaries.find((c) => c.key === "rashi")?.segments ?? []}
+          tosafot={amud.commentaries.find((c) => c.key === "tosafot")?.segments ?? []}
+          amud={amudKey.endsWith("b") ? "b" : "a"}
+          title={`${meta.he} דף ${amud.daf} ${amud.amud}`}
+        />
+      )}
+
+      {tzurat && printMode && TZURAT_TRACTATES[slug] && (
         <div className="gold-frame bg-white overflow-hidden">
           <iframe
             key={amudKey}

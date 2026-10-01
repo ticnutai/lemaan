@@ -200,3 +200,15 @@ test("T16 — תוכניות לימוד: יצירה מתבנית, סימון ה�
   await expect(page.getByText("סיכום 7 ימים")).toBeVisible();
   await expect(page.getByText("מפת חום")).toBeVisible();
 });
+
+test("T17 — צורת הדף: מנוע הפריסה מצייר גמרא/רש\"י/תוספות וחיפוש מדגיש", async () => {
+  await page.goto("/#/shas?m=Chagigah&a=12a");
+  await page.getByRole("button", { name: /^צורת הדף/ }).click();
+  const daf = page.locator(".lemaan-daf");
+  await expect(daf.locator('.daf-seg[data-stream="main"]').first()).toBeVisible({ timeout: 15_000 });
+  await expect(daf.locator('.daf-seg[data-stream="inner"]').first()).toBeAttached();
+  await expect(daf.locator('.daf-seg[data-stream="outer"]').first()).toBeAttached();
+  await page.getByPlaceholder(/חיפוש בדף/).fill("אדם הראשון");
+  await expect(page.getByText(/\d+ מופעים/)).toBeVisible();
+  await expect(daf.locator("mark.daf-hit").first()).toBeAttached({ timeout: 10_000 });
+});

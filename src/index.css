@@ -362,3 +362,10 @@
 
 /* טקסט זהב קריא: עוקף את טוני המותג רק עבור טקסט, לא מסגרות וגרדיאנטים */
 .text-gold { color: hsl(var(--gold-ink, 40 70% 34%)); }
+
+/* ===== צורת הדף: גופני וילנא ורש"י (ארוזים מקומית) + הדגשת חיפוש ===== */
+@font-face { font-family: "Vilna"; src: url("/tzurat/assets/fonts/mekorot-vilna/Mekorot-Vilna.ttf") format("truetype"); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: "Rashi"; src: url("/tzurat/assets/fonts/mekorot/Mekorot[wght].ttf") format("truetype"); font-weight: 100 900; font-display: swap; }
+.lemaan-daf .daf-dh { font-weight: 700; }
+.lemaan-daf mark.daf-hit { background: #ffe08a; color: inherit; padding: 0 1px; border-radius: 2px; }
+.lemaan-daf .daf-seg { cursor: text; }
