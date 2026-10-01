@@ -373,4 +373,7 @@
 .lemaan-print .daf-pline { display: block; white-space: nowrap; text-align: right; overflow: visible; }
 .lemaan-print .daf-print-side { text-align: justify; hyphens: none; }
 /* מילה תלויה בסוף העמוד — בצד שמאל כמו בדפוס */
+/* מפרשים בדפוס: דיבור המתחיל באותיות מרובעות; מילה פותחת מוגדלת לא מגדילה את השורה */
+.lemaan-print .daf-print-side b { font-family: Vilna, "Frank Ruhl Libre", serif; font-weight: 700; }
+.lemaan-print .daf-print-side big { font-size: 1.4em; line-height: 0; }
 .lemaan-print .daf-pline.daf-hanging { text-align: left; width: 100%; }

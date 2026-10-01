@@ -57,7 +57,7 @@ async function loadMasechet(slug: string): Promise<Record<string, Amud>> {
 }
 
 /** מסכתות שקיימת להן צורת הדף המלאה (HTML וילנא, ללא פרסומות) בקבצים מקומיים. */
-const TZURAT_TRACTATES: Record<string, string> = { Berakhot: "berakhot" };
+const TZURAT_TRACTATES: Record<string, string> = { Berakhot: "berakhot", Megillah: "megillah" };
 
 export default function ShasPage() {
   const [params, setParams] = useSearchParams();

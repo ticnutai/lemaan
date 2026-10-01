@@ -8,8 +8,9 @@ export interface PrintSlab {
   l: number; t: number; w: number; h: number;
   fs: number; lh: number;
   /** גמרא — שורה-שורה כמו בספר, עם ריווח המילים המדויק של הדפוס (px במידות העמוד) */
-  lines?: { t: string; ws: number; w: number | null }[];
-  text?: string;    // רש"י/תוספות — זורם בתוך הגוש
+  /** ws=null: ריווח לא נמדד — השורה מיושרת לשני הצדדים ברוחב w (כמו בדפוס) */
+  lines?: { t: string; ws: number | null; w: number | null; i?: number }[];
+  text?: string;    // רש"י/תוספות — זורם בתוך הגוש (כשאין שורות)
 }
 export interface PrintLayout {
   page: { w: number; h: number };
@@ -76,15 +77,18 @@ export default function PrintDaf({ layout, width, style, query }: Props) {
     () =>
       layout.slabs.map((slab) => ({
         slab,
-        html:
-          slab.s === "gemara"
-            ? (slab.lines ?? [])
-                .map((line, i, arr) => {
-                  const hanging = slab === lastGemara && i === arr.length - 1 && line.t.trim().split(/\s+/).length <= 2;
-                  return `<span class="daf-seg daf-pline${hanging ? " daf-hanging" : ""}" data-stream="main" data-i="${i}" style="word-spacing:${(line.ws * k).toFixed(2)}px${line.w && !hanging ? `;width:${(line.w * k).toFixed(1)}px` : ""}">${sanitizeSegment(line.t, query)}</span>`;
-                })
-                .join("")
-            : `<span class="daf-seg" data-stream="${slab.s === "rashi" ? "inner" : "outer"}">${sideHtml(slab.text ?? "", query)}</span>`,
+        html: slab.lines
+          ? slab.lines
+              .map((line, i, arr) => {
+                const hanging = slab.s === "gemara" && slab === lastGemara && i === arr.length - 1 && line.t.trim().split(/\s+/).length <= 2;
+                const justify = line.ws == null ? (line.w && !hanging ? "text-align-last:justify" : "") : `word-spacing:${(line.ws * k).toFixed(2)}px`;
+                const width = line.w && !hanging ? `;width:${(line.w * k).toFixed(1)}px` : "";
+                const indent = line.i ? `;margin-right:${(line.i * k).toFixed(1)}px` : "";
+                const stream = slab.s === "gemara" ? "main" : slab.s === "rashi" ? "inner" : "outer";
+                return `<span class="daf-seg daf-pline${hanging ? " daf-hanging" : ""}" data-stream="${stream}" data-i="${i}" style="${justify}${width}${indent}">${sanitizeSegment(line.t, query)}</span>`;
+              })
+              .join("")
+          : `<span class="daf-seg" data-stream="${slab.s === "rashi" ? "inner" : "outer"}">${sideHtml(slab.text ?? "", query)}</span>`,
       })),
     [layout, query, k, lastGemara]
   );
