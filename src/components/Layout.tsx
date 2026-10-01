@@ -1,9 +1,10 @@
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { useTheme } from "../theme/ThemeProvider";
 import { useAutoImport } from "../db/useAutoImport";
 import { useSession } from "../db/useSession";
-import { CalendarDays, FolderTree, GraduationCap, HelpCircle, Home, Landmark, LineChart, Moon, Settings, LayoutGrid, Sparkles, Sun, Target, Timer, UserRound } from "lucide-react";
+import { isAdmin, logAppOpen, pullApprovedQuestions } from "../db/admin";
+import { CalendarDays, FolderTree, GraduationCap, HelpCircle, Home, Landmark, LineChart, Moon, Settings, LayoutGrid, ShieldCheck, Sparkles, Sun, Target, Timer, UserRound } from "lucide-react";
 import { cn } from "../lib/utils";
 
 const nav = [
@@ -28,6 +29,12 @@ export default function Layout() {
   const isDark = themeId === "midnight-gold";
   const { importing, progress } = useAutoImport();
   const session = useSession();
+  // רישום נוכחות ומשיכת שאלות מאושרות — פעם אחת לכל כניסה מחוברת
+  useEffect(() => {
+    if (!session) return;
+    void logAppOpen(session);
+    void pullApprovedQuestions();
+  }, [session]);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -69,7 +76,7 @@ export default function Layout() {
         {/* Right sidebar: label on the right, icon circle on the left, like the original */}
         <aside className="w-52 shrink-0 border-l bg-card flex flex-col">
           <nav className="flex-1 p-3 space-y-1.5 overflow-auto">
-            {nav.map(({ to, label, icon: Icon }) => (
+            {[...nav, ...(isAdmin(session) ? [{ to: "/admin", label: "ניהול", icon: ShieldCheck }] : [])].map(({ to, label, icon: Icon }) => (
               <NavLink
                 key={to}
                 to={to}

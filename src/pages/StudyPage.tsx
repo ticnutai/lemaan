@@ -5,6 +5,8 @@ import {
   BookOpen, Check, ChevronLeft, ChevronRight, Eye, Pause, Play, RotateCcw, Scroll, Timer, Type, X, Zap,
 } from "lucide-react";
 import { db } from "../db";
+import { sendQuestionNote } from "../db/admin";
+import { useSession } from "../db/useSession";
 import { applyReview, buildStudyQueue, type SrsAlgorithm } from "../features/study/srs";
 import { cardsForDeck } from "../features/study/deckCards";
 import { AMUD_LABELS, SEDARIM, hebrewDaf } from "../features/study/shas";
@@ -62,6 +64,10 @@ export default function StudyPage() {
   const decks = useLiveQuery(() => db.decks.toArray(), []);
   const allCards = useLiveQuery(() => db.cards.toArray(), []);
   const algorithm = useLiveQuery(async () => ((await db.settings.get("srs-algo"))?.value ?? "sm2") as SrsAlgorithm, []);
+  const session = useSession();
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [noteText, setNoteText] = useState("");
+  const [noteMsg, setNoteMsg] = useState("");
 
   // שעון הסשן
   useEffect(() => {
@@ -500,16 +506,62 @@ export default function StudyPage() {
         breadcrumb={breadcrumb}
         fontScale={fontScale}
       />
-      {current.masechta && current.daf && (
-        <p className="text-left text-xs">
+      <div className="flex items-center justify-between text-xs">
+        <button
+          className="text-muted-foreground hover:text-gold"
+          onClick={() => { setNoteOpen((v) => !v); setNoteMsg(""); }}
+        >
+          💬 הערה על השאלה
+        </button>
+        {current.masechta && current.daf && (
           <Link
             to={`/shas?he=${encodeURIComponent(current.masechta)}&daf=${encodeURIComponent(current.daf)}`}
             className="text-gold hover:underline"
           >
             פתיחת הדף בגמרא ←
           </Link>
-        </p>
+        )}
+      </div>
+
+      {noteOpen && (
+        <div className="card-panel space-y-2 animate-slide-in-down">
+          {session ? (
+            <>
+              <textarea
+                className="input min-h-16 text-sm"
+                placeholder="מה לא מדויק בשאלה או בתשובה? ההערה תישלח למנהל."
+                value={noteText}
+                onChange={(e) => setNoteText(e.target.value)}
+              />
+              <div className="flex items-center gap-2">
+                <button
+                  className="btn-primary h-9 text-sm"
+                  disabled={!noteText.trim()}
+                  onClick={async () => {
+                    try {
+                      await sendQuestionNote(session, current, noteText.trim());
+                      setNoteText("");
+                      setNoteOpen(false);
+                      setNoteMsg("✓ ההערה נשלחה — תודה!");
+                      setTimeout(() => setNoteMsg(""), 3000);
+                    } catch {
+                      setNoteMsg("השליחה נכשלה — בדוק חיבור לאינטרנט");
+                    }
+                  }}
+                >
+                  שליחת הערה
+                </button>
+                <button className="btn-ghost h-9 text-sm" onClick={() => setNoteOpen(false)}>ביטול</button>
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              שליחת הערות דורשת חשבון — <Link to="/login" className="text-gold hover:underline">כניסה</Link>.
+            </p>
+          )}
+        </div>
       )}
+      {noteMsg && <p className="text-xs text-gold text-center">{noteMsg}</p>}
 
       {!revealed ? (
         !withOptions && (

@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import Fuse from "fuse.js";
 import {
@@ -8,6 +9,8 @@ import {
 import PageBanner from "../components/PageBanner";
 import { exportQuestionsDocx, exportQuestionsXlsx } from "../lib/export";
 import { db } from "../db";
+import { suggestToLibrary } from "../db/admin";
+import { useSession } from "../db/useSession";
 import { defaultSrs } from "../features/study/srs";
 import { buildChildrenMap, collectDescendantIds, selectableCategories } from "../features/study/categoryTree";
 import { AMUD_LABELS, SEDARIM, hebrewDaf } from "../features/study/shas";
@@ -60,9 +63,17 @@ export default function QuestionsPage() {
 
   const [form, setForm] = useState<FormState>(emptyForm());
   const [savedFlash, setSavedFlash] = useState(false);
+  const [shareToLibrary, setShareToLibrary] = useState(false);
+  const session = useSession();
 
   // ---- רשימה/חיפוש (קיים) ----
+  const [searchParams] = useSearchParams();
   const [search, setSearch] = useState("");
+  // קישור "קבל ופתח לעריכה" מהניהול מגיע עם ?q= — ממלא את החיפוש אוטומטית
+  useEffect(() => {
+    const q = searchParams.get("q");
+    if (q) setSearch(q);
+  }, [searchParams]);
   const [categoryFilter, setCategoryFilter] = useState("");
   const [page, setPage] = useState(0);
   const [editor, setEditor] = useState<{ id: string; question: string; answer: string; categoryId: string } | null>(null);
@@ -141,6 +152,9 @@ export default function QuestionsPage() {
       stats: { totalReviews: 0, correct: 0, incorrect: 0 },
     };
     await db.cards.add(card);
+    if (shareToLibrary && session) {
+      try { await suggestToLibrary(session, card); } catch { /* אופליין — דילוג שקט */ }
+    }
     setForm(thenAnother ? { ...emptyForm(), type: form.type } : emptyForm());
     if (!thenAnother) setAmud(null);
     setSavedFlash(true);
@@ -434,6 +448,17 @@ export default function QuestionsPage() {
               />
             </details>
 
+            {session && (
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="accent-[hsl(var(--gold))] h-4 w-4"
+                  checked={shareToLibrary}
+                  onChange={(e) => setShareToLibrary(e.target.checked)}
+                />
+                הצע את השאלה לספרייה המרכזית (תישאר פרטית עד אישור המנהל)
+              </label>
+            )}
             <div className="flex items-center gap-2 flex-wrap">
               <button className="btn-primary h-11" disabled={!formValid} onClick={() => saveNew(false)}>
                 <Save className="h-4 w-4" /> שמור

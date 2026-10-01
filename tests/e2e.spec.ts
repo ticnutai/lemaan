@@ -167,3 +167,19 @@ test("T14 — לוח הש\"ס: סימון עמוד, חזרה, ומצב בחיר�
   await page.getByRole("button", { name: "איפוס" }).click();
   await expect(page.getByText(/0\/126 עמודים/)).toBeVisible();
 });
+
+test("T15 — ניהול: מוסתר בלי חשבון, כפתור הערה בתרגול מבקש כניסה", async () => {
+  // עמוד הניהול דורש חשבון
+  await page.goto("/#/admin");
+  await expect(page.getByText("נדרשת כניסה לחשבון מנהל.")).toBeVisible();
+  // ואין "ניהול" בסיידבר כשלא מחוברים
+  await expect(page.locator("aside").getByText("ניהול", { exact: true })).toHaveCount(0);
+  // כפתור הערה בסשן תרגול מציג דרישת כניסה
+  await page.goto("/#/study");
+  await page.getByRole("button", { name: /^מועד/ }).click();
+  await page.getByRole("button", { name: /^חגיגה/ }).click();
+  await page.locator(".grid button.card-panel").first().click();
+  await page.getByRole("button", { name: /כל הדף/ }).click();
+  await page.getByRole("button", { name: /הערה על השאלה/ }).click();
+  await expect(page.getByText(/שליחת הערות דורשת חשבון/)).toBeVisible();
+});
