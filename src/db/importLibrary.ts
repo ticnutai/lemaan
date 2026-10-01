@@ -28,6 +28,7 @@ interface SeedCard {
   type?: string;
   masechta?: string | null;
   daf?: number | string | null;
+  amud?: number | string | null;
   createdAt?: number;
   updatedAt?: number;
 }
@@ -153,6 +154,7 @@ export async function importLibrary(onProgress?: (p: ImportProgress) => void): P
       tags: (s.tags ?? []).filter((t) => !t.startsWith("cat:")),
       masechta: s.masechta ?? null,
       daf: s.daf != null ? String(s.daf) : null,
+      amud: s.amud != null ? String(s.amud) : null,
       createdAt: s.createdAt ?? now,
       updatedAt: s.updatedAt ?? now,
       srs: {
@@ -196,4 +198,31 @@ export async function importLibrary(onProgress?: (p: ImportProgress) => void): P
   });
 
   return cards.length;
+}
+
+/**
+ * השלמת שדה amud לכרטיסים שיובאו לפני שהשדה נוסף — רצה פעם אחת.
+ * (בלי זה הדרילדאון עד רמת עמוד לא יציג מונים במכשירים ותיקים.)
+ */
+export async function ensureAmudBackfill(): Promise<void> {
+  if ((await db.settings.get("amud-backfill-done"))?.value) return;
+  if (!(await db.settings.get("library-import-done"))?.value) return; // ימולא בייבוא עצמו
+  try {
+    const res = await fetch(`${import.meta.env.BASE_URL}data/library.json`);
+    if (!res.ok) return;
+    const lib = (await res.json()) as Library;
+    const amudById = new Map<string, string>();
+    for (const s of lib.seed.cards) if (s.id && s.amud != null) amudById.set(s.id, String(s.amud));
+    const updates: { key: string; changes: { amud: string } }[] = [];
+    await db.cards.toCollection().each((c) => {
+      if (c.amud == null) {
+        const a = amudById.get(c.id);
+        if (a) updates.push({ key: c.id, changes: { amud: a } });
+      }
+    });
+    if (updates.length) await db.cards.bulkUpdate(updates);
+    await db.settings.put({ key: "amud-backfill-done", value: "1" });
+  } catch {
+    // אופליין בלי קובץ — ננסה שוב בהפעלה הבאה
+  }
 }

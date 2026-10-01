@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import { CalendarClock, CheckCircle2, Download, Flame, GraduationCap, Library } from "lucide-react";
 import { db } from "../db";
-import { importLibrary, type ImportProgress } from "../db/importLibrary";
+import { ensureAmudBackfill, importLibrary, type ImportProgress } from "../db/importLibrary";
 
 function startOfDay(ts: number): number {
   const d = new Date(ts);
@@ -61,6 +61,7 @@ export default function Dashboard() {
       autoStarted.current = true;
       runImport();
     }
+    if (imported === true) void ensureAmudBackfill();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [imported]);
 

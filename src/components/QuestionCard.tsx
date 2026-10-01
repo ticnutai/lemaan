@@ -10,24 +10,52 @@ export function isSelectionCorrect(card: Card, selected: number): boolean {
   return card.correctIndices.includes(selected);
 }
 
+const OPTION_LETTERS = ["א", "ב", "ג", "ד", "ה", "ו", "ז", "ח"];
+
+const TYPE_LABELS: Record<Card["type"], string> = {
+  combo: "משולבת",
+  multiple: "אמריקאית",
+  boolean: "נכון/לא נכון",
+  flashcard: "כרטיסיה",
+};
+
 interface Props {
   card: Card;
   revealed: boolean;
   selected: number | null;
   onSelect: (index: number) => void;
+  /** פירור דרך בראש הכרטיס, כמו במקור: "חגיגה › יב." */
+  breadcrumb?: string;
+  /** הגדלת גופן השאלה (כפתור T בסרגל) */
+  fontScale?: number;
 }
 
 /**
- * Renders a question: multiple-choice options when the card has them
- * (combo/multiple), otherwise a plain flashcard body. After reveal the
- * correct option is highlighted gold and a wrong selection red.
+ * כרטיס שאלה בסגנון המקור: פירור דרך + תגית סוג בראש, אפשרויות עם
+ * אותיות א-ב-ג-ד. אחרי חשיפה — הנכונה מוזהבת, בחירה שגויה באדום.
  */
-export default function QuestionCard({ card, revealed, selected, onSelect }: Props) {
+export default function QuestionCard({ card, revealed, selected, onSelect, breadcrumb, fontScale = 1 }: Props) {
   const withOptions = hasOptions(card);
 
   return (
-    <div className="card-panel gold-frame min-h-[220px] flex flex-col gap-4">
-      <p className="text-lg font-medium leading-relaxed">{card.question}</p>
+    <div className="space-y-3">
+      <div className="card-panel gold-frame min-h-[180px] flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-2 text-xs">
+          <span className="rounded-full bg-secondary border px-2.5 py-0.5 font-medium text-muted-foreground">
+            {TYPE_LABELS[card.type] ?? "שאלה"}
+          </span>
+          {breadcrumb && <span className="text-muted-foreground">{breadcrumb}</span>}
+        </div>
+        <p className="font-medium leading-relaxed" style={{ fontSize: `${1.125 * fontScale}rem` }}>
+          {card.question}
+        </p>
+        {revealed && card.answer && (
+          <div className="pt-3 border-t animate-slide-in-down mt-auto">
+            <p className="text-sm text-muted-foreground mb-1">{withOptions ? "הסבר:" : "תשובה:"}</p>
+            <p className="leading-relaxed">{card.answer}</p>
+          </div>
+        )}
+      </div>
 
       {withOptions && (
         <div className="space-y-2">
@@ -40,26 +68,23 @@ export default function QuestionCard({ card, revealed, selected, onSelect }: Pro
                 disabled={revealed}
                 onClick={() => onSelect(i)}
                 className={cn(
-                  "w-full text-right rounded-md border px-4 py-3 text-sm transition-colors flex items-center gap-2",
+                  "w-full text-right rounded-lg border bg-card px-3 py-3 transition-colors flex items-center gap-3 shadow-sm",
                   !revealed && "hover:bg-secondary hover:border-gold",
                   revealed && isCorrect && "border-gold bg-gold/15 font-medium",
                   revealed && isSelected && !isCorrect && "border-destructive bg-destructive/10",
                   revealed && !isSelected && !isCorrect && "opacity-60"
                 )}
+                style={{ fontSize: `${0.875 * fontScale}rem` }}
               >
+                <span className="h-7 w-7 shrink-0 rounded-md bg-gradient-navy text-primary-foreground text-sm font-bold flex items-center justify-center">
+                  {OPTION_LETTERS[i] ?? i + 1}
+                </span>
+                <span className="flex-1 leading-snug">{option}</span>
                 {revealed && isCorrect && <Check className="h-4 w-4 shrink-0 text-gold" />}
                 {revealed && isSelected && !isCorrect && <X className="h-4 w-4 shrink-0 text-destructive" />}
-                <span className="flex-1">{option}</span>
               </button>
             );
           })}
-        </div>
-      )}
-
-      {revealed && card.answer && (
-        <div className="pt-4 border-t animate-slide-in-down mt-auto">
-          <p className="text-sm text-muted-foreground mb-1">{withOptions ? "הסבר:" : "תשובה:"}</p>
-          <p className="leading-relaxed">{card.answer}</p>
         </div>
       )}
     </div>

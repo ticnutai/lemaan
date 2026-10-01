@@ -30,6 +30,7 @@ export interface Card {
   tags: string[];
   masechta: string | null;
   daf: string | null;
+  amud: string | null; // "1" = עמוד א', "2" = עמוד ב'
   createdAt: number;
   updatedAt: number;
   srs: SrsState;
@@ -50,6 +51,8 @@ export interface Deck {
   color: string | null;
   categoryIds: string[];
   includeSubCategories: boolean;
+  /** בחירות תוכן למבחן: מסכת שלמה, דף שלם או עמוד ("1"/"2"). */
+  filters?: { masechta: string; daf?: string; amud?: string }[];
   createdAt: number;
 }
 

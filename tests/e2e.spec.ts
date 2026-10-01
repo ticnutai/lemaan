@@ -68,21 +68,24 @@ test("T04 — עמוד בניית שאלות: טעינה וחיפוש (מהיר�
   });
 });
 
-test("T05 — סשן תרגול: שאלה, תשובה, מעבר (מהירות אינטראקציה)", async () => {
+test("T05 — תרגול כללי: סדר ← מסכת ← דף ← עמוד ← סשן (כמו במקור)", async () => {
   await page.goto("/#/study");
-  await page.getByRole("button", { name: /תרגול כללי/ }).click();
-  await expect(page.getByText(/שאלה 1 מתוך/)).toBeVisible({ timeout: 15_000 });
+  // דרילדאון: מועד ← חגיגה ← דף ראשון ← כל הדף
+  await page.getByRole("button", { name: /^מועד/ }).click();
+  await page.getByRole("button", { name: /^חגיגה/ }).click();
+  await page.locator(".grid button.card-panel").first().click();
+  await page.getByRole("button", { name: /כל הדף/ }).click();
+  await expect(page.getByText(/1 \/ \d+ · תרגול חופשי/)).toBeVisible({ timeout: 15_000 });
   await timed("T05_answer_roundtrip_ms", 3_000, async () => {
-    // אמריקאית: בחירת אפשרות → הבא; כרטיסייה: הצג תשובה → דירוג
+    // מצב "מיידי" פעיל כברירת מחדל: בחירת אפשרות עוברת ישר לשאלה הבאה
     const option = page.locator("button.w-full.text-right").first();
     if ((await option.count()) > 0 && (await option.isVisible())) {
       await option.click();
-      await page.getByRole("button", { name: "הבא" }).click();
     } else {
       await page.getByRole("button", { name: "הצג תשובה" }).click();
       await page.locator(".grid.grid-cols-4 button").last().click();
     }
-    await expect(page.getByText(/שאלה 2 מתוך/)).toBeVisible();
+    await expect(page.getByText(/2 \/ \d+/)).toBeVisible();
   });
 });
 
@@ -91,14 +94,17 @@ test("T06 — סייר הקטגוריות מציג ספירות", async () => {
   await expect(page.getByText(/22,?699|שאלות/).first()).toBeVisible({ timeout: 10_000 });
 });
 
-test("T07 — חפיסות: יצירה ותרגול ממנה", async () => {
-  await page.goto("/#/decks");
-  await page.getByPlaceholder(/שם החפיסה/).fill("בדיקה אוטומטית");
-  await page.locator("main .card-panel button.rounded-full").first().click();
-  await page.getByRole("button", { name: "יצירת חפיסה" }).click();
+test("T07 — בניית מבחנים: בחירת תוכן, יצירה ותרגול חופשי", async () => {
+  await page.goto("/#/quiz");
+  await page.getByRole("button", { name: /^מועד/ }).click();
+  // לחיצה על שם מסכת מוסיפה את כולה למבחן
+  await page.getByRole("button", { name: /^חגיגה/ }).first().click();
+  await expect(page.getByText(/\d+ שאלות ייכללו במבחן/)).toBeVisible();
+  await page.getByPlaceholder(/שם המבחן/).fill("בדיקה אוטומטית");
+  await page.getByRole("button", { name: "הוסף מבחן" }).click();
   await expect(page.getByText("בדיקה אוטומטית")).toBeVisible();
-  await page.getByRole("button", { name: "תרגול" }).first().click();
-  await expect(page.getByText(/שאלה 1 מתוך/)).toBeVisible({ timeout: 15_000 });
+  await page.getByRole("link", { name: /תרגול חופשי/ }).first().click();
+  await expect(page.getByText(/1 \/ \d+ · תרגול חופשי/)).toBeVisible({ timeout: 15_000 });
 });
 
 test("T08 — יעדים: הוספה ומד התקדמות", async () => {
@@ -108,10 +114,12 @@ test("T08 — יעדים: הוספה ומד התקדמות", async () => {
   await expect(page.getByText(/\/ 50/)).toBeVisible();
 });
 
-test("T09 — עמוד מבחן נטען ומתחיל", async () => {
-  await page.goto("/#/quiz");
-  await page.getByRole("button", { name: /התחל/ }).first().click();
-  await expect(page.getByText(/שאלה|נותרו|מתוך/).first()).toBeVisible({ timeout: 15_000 });
+test("T09 — תרגול מבחנים בעמוד התרגול: המבחן מ-T07 מופיע ומתחיל", async () => {
+  await page.goto("/#/study");
+  await page.getByRole("button", { name: /תרגול מבחנים/ }).click();
+  await expect(page.getByText("בדיקה אוטומטית")).toBeVisible();
+  await page.getByRole("button", { name: /התחל תרגול/ }).first().click();
+  await expect(page.getByText(/1 \/ \d+/)).toBeVisible({ timeout: 15_000 });
 });
 
 test("T10 — הלוח העברי נטען", async () => {
