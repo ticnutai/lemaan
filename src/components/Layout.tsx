@@ -2,7 +2,8 @@ import { useRef } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { useTheme } from "../theme/ThemeProvider";
 import { useAutoImport } from "../db/useAutoImport";
-import { CalendarDays, FolderTree, GraduationCap, HelpCircle, Home, Landmark, LineChart, Moon, Settings, Sparkles, Sun, Target, Timer } from "lucide-react";
+import { useSession } from "../db/useSession";
+import { CalendarDays, FolderTree, GraduationCap, HelpCircle, Home, Landmark, LineChart, Moon, Settings, Sparkles, Sun, Target, Timer, UserRound } from "lucide-react";
 import { cn } from "../lib/utils";
 
 const nav = [
@@ -25,6 +26,7 @@ export default function Layout() {
   if (themeId !== "midnight-gold") lastLight.current = themeId;
   const isDark = themeId === "midnight-gold";
   const { importing, progress } = useAutoImport();
+  const session = useSession();
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -94,6 +96,34 @@ export default function Layout() {
               </NavLink>
             ))}
           </nav>
+
+          {/* כרטיס חשבון בתחתית הסיידבר — כמו במקור */}
+          <div className="p-3 border-t">
+            <NavLink
+              to="/login"
+              className={({ isActive }) =>
+                cn(
+                  "flex items-center justify-between gap-2 rounded-xl border p-2 transition-colors",
+                  isActive ? "border-gold shadow-gold bg-secondary/60" : "border-gold/40 hover:border-gold hover:bg-secondary"
+                )
+              }
+              title={session ? "החשבון שלי" : "כניסה לחשבון"}
+            >
+              <span className="min-w-0 text-right">
+                {session ? (
+                  <>
+                    <span className="block text-xs font-medium truncate" dir="ltr">{session.user.email}</span>
+                    <span className="block text-[10px] text-gold font-bold">מחובר</span>
+                  </>
+                ) : (
+                  <span className="block text-sm font-medium">כניסה לחשבון</span>
+                )}
+              </span>
+              <span className="h-9 w-9 shrink-0 rounded-full bg-gradient-gold shadow-gold flex items-center justify-center text-navy font-bold">
+                {session ? (session.user.email ?? "?")[0].toUpperCase() : <UserRound className="h-4 w-4" />}
+              </span>
+            </NavLink>
+          </div>
         </aside>
 
         <main className="flex-1 p-6 overflow-auto">
