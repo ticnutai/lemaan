@@ -3,11 +3,34 @@ import { supabase } from "./supabase";
 import { db } from ".";
 import type { Card } from "../features/study/types";
 
-/** שני תפקידים בלבד, קבועים בקוד: המיילים האלו = מנהל, כל השאר = לומדים. */
-export const ADMIN_EMAILS = ["ticnutai@gmail.com", "jj1212t@gmail.com"];
+/** חשבונות המייסד — תמיד מנהלים, מוגנים גם בשרת; שאר המנהלים מנוהלים מהממשק. */
+export const FOUNDER_EMAILS = ["ticnutai@gmail.com", "jj1212t@gmail.com"];
 
-export const isAdmin = (session: Session | null): boolean =>
-  !!session?.user.email && ADMIN_EMAILS.includes(session.user.email);
+export const isFounder = (session: Session | null): boolean =>
+  !!session?.user.email && FOUNDER_EMAILS.includes(session.user.email);
+
+/** בדיקת מנהל מלאה מול השרת (כולל מנהלים שמונו מהממשק). */
+export async function fetchIsAdmin(): Promise<boolean> {
+  const { data, error } = await supabase.rpc("lemaan_am_i_admin");
+  return !error && data === true;
+}
+
+export async function listAdmins(): Promise<string[]> {
+  const { data } = await supabase.from("lemaan_admins").select("email");
+  return (data ?? []).map((r: { email: string }) => r.email);
+}
+
+/** מינוי/הסרת מנהל לפי אימייל; חשבונות המייסד אינם ניתנים להסרה (נאכף גם ב-RLS). */
+export async function setAdminRole(email: string, makeAdmin: boolean, addedBy: string): Promise<void> {
+  if (makeAdmin) {
+    const { error } = await supabase.from("lemaan_admins").upsert({ email, added_by: addedBy });
+    if (error) throw error;
+  } else {
+    if (FOUNDER_EMAILS.includes(email)) throw new Error("חשבון מייסד אינו ניתן להסרה");
+    const { error } = await supabase.from("lemaan_admins").delete().eq("email", email);
+    if (error) throw error;
+  }
+}
 
 /** זיהוי הפלטפורמה לדוחות. */
 export function detectPlatform(): string {

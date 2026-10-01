@@ -6,7 +6,8 @@ import {
 import PageBanner from "../components/PageBanner";
 import { supabase } from "../db/supabase";
 import { db } from "../db";
-import { isAdmin } from "../db/admin";
+import { FOUNDER_EMAILS, listAdmins, setAdminRole } from "../db/admin";
+import { useIsAdmin } from "../db/useIsAdmin";
 import { useSession } from "../db/useSession";
 import { defaultSrs } from "../features/study/srs";
 import type { Card } from "../features/study/types";
@@ -34,7 +35,8 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
 
-  const admin = isAdmin(session);
+  const admin = useIsAdmin(session);
+  const [adminEmails, setAdminEmails] = useState<string[]>([]);
 
   const load = async () => {
     setLoading(true);
@@ -48,6 +50,7 @@ export default function AdminPage() {
         supabase.from("lemaan_shared_questions").select("*").order("created_at", { ascending: false }).limit(300),
       ]);
       setProfiles((p.data as ProfileRow[]) ?? []);
+      try { setAdminEmails(await listAdmins()); } catch { /* ייכשל רק אם אינו מנהל */ }
       setUsage((u.data as UsageRow[]) ?? []);
       setNotes((n.data as NoteRow[]) ?? []);
       setShared((s.data as SharedRow[]) ?? []);
@@ -224,6 +227,31 @@ export default function AdminPage() {
                       <p>כניסות (30 י'): <b className="text-foreground">{u?.opens ?? 0}</b> · ימים: <b className="text-foreground">{u?.days.size ?? 0}</b></p>
                       <p>נראה לאחרונה: {fmtDate(p.last_seen_at)}</p>
                     </div>
+                    {(() => {
+                      const email = p.email ?? "";
+                      const founder = FOUNDER_EMAILS.includes(email);
+                      const isAdm = founder || adminEmails.includes(email);
+                      const toggle = async () => {
+                        try {
+                          await setAdminRole(email, !isAdm, session?.user.email ?? "");
+                          setAdminEmails((prev) => (!isAdm ? [...prev, email] : prev.filter((e) => e !== email)));
+                        } catch (e) {
+                          setMsg(e instanceof Error ? e.message : "שגיאה");
+                        }
+                      };
+                      return (
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className={`text-xs font-bold rounded-full px-2 py-0.5 border ${isAdm ? "bg-gradient-gold text-navy border-transparent" : "text-muted-foreground"}`}>
+                            {founder ? "מנהל ראשי" : isAdm ? "מנהל" : "רגיל"}
+                          </span>
+                          {!founder && email && (
+                            <button className="btn-outline h-7 px-2 text-xs" onClick={toggle}>
+                              {isAdm ? "הסר ניהול" : "הפוך למנהל"}
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })}
