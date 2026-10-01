@@ -14,6 +14,7 @@ import SettingsPage from "./pages/SettingsPage";
 import LoginPage from "./pages/LoginPage";
 import ShasBoardPage from "./pages/ShasBoardPage";
 import AdminPage from "./pages/AdminPage";
+import DafLabPage from "./pages/DafLabPage";
 
 // HashRouter works identically on the web, in Electron and in Capacitor,
 // so no per-platform router switching is needed.
@@ -37,6 +38,7 @@ export default function App() {
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/admin" element={<AdminPage />} />
+          <Route path="/daf-lab" element={<DafLabPage />} />
         </Route>
       </Routes>
     </HashRouter>
