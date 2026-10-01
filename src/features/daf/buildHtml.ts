@@ -70,12 +70,6 @@ export function buildSideHtml(segments: string[], stream: "inner" | "outer", que
     .join("");
 }
 
-/** גמרא לפי שורות הדפוס: כל שורה בלוק אחד — שבירת השורות זהה לספר. */
-export function buildPrintLinesHtml(lines: string[], query = ""): string {
-  return lines
-    .map((line, i) => `<span class="daf-seg daf-pline" data-stream="main" data-i="${i}">${sanitizeSegment(line, query)}</span>`)
-    .join("");
-}
 
 /** טקסט נקי (בלי תגיות) — לספירת מופעים. */
 const plain = (s: string) => unescapeEntities(s).replace(/<[^>]+>/g, "");

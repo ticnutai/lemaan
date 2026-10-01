@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { BookOpen, ChevronLeft, ChevronRight, Landmark } from "lucide-react";
 import PageBanner from "../components/PageBanner";
 import DafPage from "../features/daf/DafPage";
+import type { PrintLayout } from "../features/daf/PrintDaf";
 
 /** מאגר הש"ס המקומי (מהדורת וילנא, ספריא) — 37 מסכתות, עובד אופליין מלא. */
 
@@ -69,7 +70,7 @@ export default function ShasPage() {
     if (on) next.set("v", "daf"); else next.delete("v");
     setParams(next, { replace: true });
   };
-  const [printLines, setPrintLines] = useState<Record<string, string[]> | null>(null); // שורות דפוס למסכת
+  const [printLayouts, setPrintLayouts] = useState<Record<string, PrintLayout> | null>(null); // גיאומטריית דפוס למסכת
   const [error, setError] = useState("");
 
   const slug = params.get("m");
@@ -91,14 +92,14 @@ export default function ShasPage() {
       .catch(() => setError("אינדקס הש\"ס לא נטען"));
   }, []);
 
-  // נתוני שורות דפוס (כשקיימים למסכת) — מאפשרים מצב "דפוס מדויק"
+  // גיאומטריית דפוס (כשקיימת למסכת) — מאפשרת מצב "דפוס מדויק"
   useEffect(() => {
-    setPrintLines(null);
+    setPrintLayouts(null);
     if (!slug || !TZURAT_TRACTATES[slug]) return;
-    fetch(`${import.meta.env.BASE_URL}tzurat/lines/${TZURAT_TRACTATES[slug]}.json`)
+    fetch(`${import.meta.env.BASE_URL}tzurat/print/${TZURAT_TRACTATES[slug]}.json`)
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => setPrintLines(d))
-      .catch(() => setPrintLines(null));
+      .then((d) => setPrintLayouts(d))
+      .catch(() => setPrintLayouts(null));
   }, [slug]);
 
   useEffect(() => {
@@ -205,7 +206,7 @@ export default function ShasPage() {
           tosafot={amud.commentaries.find((c) => c.key === "tosafot")?.segments ?? []}
           amud={amudKey.endsWith("b") ? "b" : "a"}
           title={`${meta.he} דף ${amud.daf} ${amud.amud}`}
-          printLines={printLines?.[amudKey]}
+          printLayout={printLayouts?.[amudKey]}
         />
       )}
 

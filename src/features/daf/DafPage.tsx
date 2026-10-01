@@ -1,7 +1,8 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import dafRenderer from "./vendor/renderer";
 import { Palette, Search, X } from "lucide-react";
-import { buildMainHtml, buildPrintLinesHtml, buildSideHtml, countHits, stripNikud } from "./buildHtml";
+import { buildMainHtml, buildSideHtml, countHits, stripNikud } from "./buildHtml";
+import PrintDaf, { type PrintLayout } from "./PrintDaf";
 import { DEFAULT_DAF_STYLE, FONT_FAMILY, loadDafStyle, saveDafStyle, type DafStyle } from "./dafStyle";
 
 interface Props {
@@ -10,8 +11,8 @@ interface Props {
   tosafot: string[];
   amud: "a" | "b";
   title: string;
-  /** שורות הגמרא כפי שנשברו בדפוס וילנא — מאפשר מצב "דפוס מדויק" */
-  printLines?: string[];
+  /** גיאומטריית הדפוס של העמוד — מאפשרת מצב "דפוס מדויק" */
+  printLayout?: PrintLayout;
 }
 
 type Renderer = ReturnType<typeof dafRenderer>;
@@ -21,7 +22,7 @@ type Renderer = ReturnType<typeof dafRenderer>;
  * בלי OCR. חיפוש מדגיש בכל הזרמים; פאנל עיצוב קובע גופן, גודל וצבעים
  * והפריסה מחושבת מחדש כך שהכל נשאר באותו דף.
  */
-export default function DafPage({ gemara, rashi, tosafot, amud, title, printLines }: Props) {
+export default function DafPage({ gemara, rashi, tosafot, amud, title, printLayout }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<Renderer | null>(null);
   const [style, setStyle] = useState<DafStyle>(DEFAULT_DAF_STYLE);
@@ -49,36 +50,24 @@ export default function DafPage({ gemara, rashi, tosafot, amud, title, printLine
   useEffect(() => {
     const host = hostRef.current;
     if (!host || !styleLoaded) return;
+    // במצב דפוס מדויק הציור הוא גיאומטרי (PrintDaf) — המנוע רץ רק בפריסה חיה
+    if (style.mode === "print" && printLayout) return;
     let cancelled = false;
     host.innerHTML = "";
-    const print = style.mode === "print" && !!printLines?.length;
     const base = 15 * style.scale;
-    // גיאומטריית דפוס וילנא (נמדדה מהדפים המעוגנים): אזור טקסט 434px —
-    // גמרא 40%, רש״י/תוספות ~27% כל אחד; גופן גמרא 12.6px, רש״י 7.7px, תוספות 6.9px.
-    // במצב דפוס הכל נמדד ביחס לרוחב הדף, כך שהשורות נשארות זהות לספר בכל גודל.
-    const pageW = print ? Math.round(width * style.scale) : width;
-    const k = pageW / 434.36;
     const renderer = dafRenderer(host, {
-      contentWidth: `${pageW}px`,
-      mainWidth: print ? "40%" : "50%",
-      padding: print ? { vertical: `${4 * k}px`, horizontal: `${6 * k}px` } : { vertical: "8px", horizontal: "14px" },
-      // במצב דפוס הגופן נעול לווילנא/רש״י המקוריים — כך השורות תואמות לספר
-      fontFamily: print
-        ? { main: FONT_FAMILY.Vilna, inner: FONT_FAMILY.Rashi, outer: FONT_FAMILY.Rashi }
-        : { main: FONT_FAMILY[style.mainFont], inner: FONT_FAMILY[style.sideFont], outer: FONT_FAMILY[style.sideFont] },
+      contentWidth: `${width}px`,
+      mainWidth: "50%",
+      padding: { vertical: "8px", horizontal: "14px" },
+      fontFamily: { main: FONT_FAMILY[style.mainFont], inner: FONT_FAMILY[style.sideFont], outer: FONT_FAMILY[style.sideFont] },
       direction: "rtl",
-      fontSize: print
-        ? { main: `${12.6 * k}px`, side: `${7.4 * k}px` }
-        : { main: `${base}px`, side: `${base * 0.72}px` },
-      lineHeight: print
-        ? { main: `${12.03 * k}px`, side: `${10.6 * k}px` }
-        : { main: `${base * 1.15}px`, side: `${base * 0.72 * 1.33}px` },
+      fontSize: { main: `${base}px`, side: `${base * 0.72}px` },
+      lineHeight: { main: `${base * 1.15}px`, side: `${base * 0.72 * 1.33}px` },
     });
     rendererRef.current = renderer;
     const prep = (segs: string[]) => (style.nikud ? segs : segs.map(stripNikud));
     const q = style.nikud ? query : stripNikud(query);
-    const mainBody = print ? buildPrintLinesHtml(printLines!, q) : buildMainHtml(prep(gemara), q);
-    const main = `<span style="color:${style.colors.main}">${mainBody}</span>`;
+    const main = `<span style="color:${style.colors.main}">${buildMainHtml(prep(gemara), q)}</span>`;
     const inner = `<span style="color:${style.colors.inner}">${buildSideHtml(prep(rashi), "inner", q)}</span>`;
     const outer = `<span style="color:${style.colors.outer}">${buildSideHtml(prep(tosafot), "outer", q)}</span>`;
     // הספרייה דורשת שהגופנים יהיו טעונים לפני חישוב הפריסה
@@ -91,13 +80,24 @@ export default function DafPage({ gemara, rashi, tosafot, amud, title, printLine
       }
     });
     return () => { cancelled = true; };
-  }, [gemara, rashi, tosafot, amud, style, query, width, styleLoaded, printLines]);
+  }, [gemara, rashi, tosafot, amud, style, query, width, styleLoaded, printLayout]);
 
-  const isPrint = style.mode === "print" && !!printLines?.length;
-  const mainForCount = isPrint ? printLines! : gemara;
-  const hits = style.nikud
-    ? countHits(query, mainForCount, rashi, tosafot)
-    : countHits(stripNikud(query), mainForCount.map(stripNikud), rashi.map(stripNikud), tosafot.map(stripNikud));
+  const isPrint = style.mode === "print" && !!printLayout;
+  const printStreams = useMemo(() => {
+    if (!printLayout) return null;
+    const g: string[] = [], r: string[] = [], t: string[] = [];
+    for (const sl of printLayout.slabs) {
+      if (sl.s === "gemara") g.push(...(sl.lines ?? []));
+      else if (sl.s === "rashi") r.push(sl.text ?? "");
+      else t.push(sl.text ?? "");
+    }
+    return { g, r, t };
+  }, [printLayout]);
+  const hits = isPrint && printStreams
+    ? countHits(query, printStreams.g, printStreams.r, printStreams.t)
+    : style.nikud
+      ? countHits(query, gemara, rashi, tosafot)
+      : countHits(stripNikud(query), gemara.map(stripNikud), rashi.map(stripNikud), tosafot.map(stripNikud));
 
   const update = (patch: Partial<DafStyle>) => {
     const next = { ...style, ...patch, colors: { ...style.colors, ...(patch.colors ?? {}) } };
@@ -137,15 +137,15 @@ export default function DafPage({ gemara, rashi, tosafot, amud, title, printLine
           <div className="md:col-span-2 flex items-center gap-2 flex-wrap">
             <span className="font-medium">מצב פריסה:</span>
             <button
-              className={`btn-outline h-8 text-xs ${style.mode === "print" ? "border-gold text-gold bg-gold/10" : ""} ${!printLines?.length ? "opacity-50" : ""}`}
-              disabled={!printLines?.length}
-              title={printLines?.length ? "שורות זהות לדפוס וילנא; הגופן נעול למקורי" : "אין עדיין נתוני שורות דפוס למסכת זו"}
+              className={`btn-outline h-8 text-xs ${style.mode === "print" ? "border-gold text-gold bg-gold/10" : ""} ${!printLayout ? "opacity-50" : ""}`}
+              disabled={!printLayout}
+              title={printLayout ? "העמוד בדיוק כמו בדפוס וילנא; הגופן נעול למקורי" : "אין עדיין נתוני דפוס למסכת זו"}
               onClick={() => update({ mode: "print" })}
             >
-              דפוס מדויק{printLines?.length ? "" : " (לא זמין)"}
+              דפוס מדויק{printLayout ? "" : " (לא זמין)"}
             </button>
             <button
-              className={`btn-outline h-8 text-xs ${style.mode === "live" || !printLines?.length ? "border-gold text-gold bg-gold/10" : ""}`}
+              className={`btn-outline h-8 text-xs ${style.mode === "live" || !printLayout ? "border-gold text-gold bg-gold/10" : ""}`}
               onClick={() => update({ mode: "live" })}
             >
               פריסה חיה
@@ -196,7 +196,11 @@ export default function DafPage({ gemara, rashi, tosafot, amud, title, printLine
         <p className="text-center font-bold mb-1" style={{ color: style.colors.headers, fontFamily: FONT_FAMILY.Vilna }}>
           {title}
         </p>
-        <div ref={hostRef} className="lemaan-daf mx-auto" style={{ width: isPrint ? Math.round(width * style.scale) : width }} dir="rtl" />
+        {isPrint && printLayout ? (
+          <PrintDaf layout={printLayout} width={Math.round(width * style.scale)} style={style} query={query} />
+        ) : (
+          <div ref={hostRef} className="lemaan-daf mx-auto" style={{ width }} dir="rtl" />
+        )}
       </div>
     </div>
   );
