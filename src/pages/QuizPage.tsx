@@ -248,7 +248,8 @@ export default function QuizPage() {
                 <div className="grid grid-cols-2 gap-3">
                   {(["1", "2"] as const).map((a) => {
                     const f: Filter = { masechta, daf: String(daf), amud: a };
-                    const n = a === "1" ? e.a : e.b;
+                    // שאלות בלי תיוג עמוד שייכות לשני העמודים — כמו במקור
+                    const n = (a === "1" ? e.a : e.b) + e.none;
                     return (
                       <button
                         key={a}

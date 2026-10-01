@@ -116,12 +116,15 @@ export default function StudyPage() {
     setClockRunning(true);
   };
 
-  /** תרגול כללי: התחלת סשן מעמוד (או כל הדף) — אצלנו זה באמת מתחיל. */
+  /**
+   * תרגול כללי: התחלת סשן מעמוד (או כל הדף) — אצלנו זה באמת מתחיל.
+   * שאלות בלי תיוג עמוד שייכות לשני העמודים, כמו במקור.
+   */
   const startAmud = async (amud: "1" | "2" | null) => {
     if (!masechta || daf === null) return;
     const dafStr = String(daf);
     const cards = (allCards ?? []).filter(
-      (c) => c.masechta === masechta && c.daf === dafStr && (amud === null || c.amud === amud)
+      (c) => c.masechta === masechta && c.daf === dafStr && (amud === null || c.amud == null || c.amud === amud)
     );
     const amudLabel = amud ? ` · ${AMUD_LABELS[amud]}` : "";
     beginSession(cards, `${masechta} דף ${hebrewDaf(daf)}${amudLabel}`);
@@ -342,6 +345,8 @@ export default function StudyPage() {
             {masechta && daf !== null && (() => {
               const e = counts.get(masechta)?.get(daf) ?? { a: 0, b: 0, none: 0 };
               const total = e.a + e.b + e.none;
+              // שאלות בלי תיוג עמוד נספרות בשני העמודים — כמו במקור
+              const aCount = e.a + e.none, bCount = e.b + e.none;
               return (
                 <div className="space-y-3 animate-slide-in-down">
                   <button className="text-sm text-muted-foreground hover:text-gold flex items-center gap-1" onClick={() => setDaf(null)}>
@@ -350,20 +355,20 @@ export default function StudyPage() {
                   <h3 className="font-bold text-lg">{masechta}, דף {hebrewDaf(daf)} — בחר עמוד</h3>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                     <button
-                      disabled={e.a === 0}
+                      disabled={aCount === 0}
                       onClick={() => startAmud("1")}
                       className="card-panel py-4 text-center hover:border-gold transition-colors disabled:opacity-40"
                     >
                       <div className="font-bold">עמוד א'</div>
-                      <span className="text-xs rounded-full bg-gold/20 text-gold font-bold px-2 py-0.5">{e.a}</span>
+                      <span className="text-xs rounded-full bg-gold/20 text-gold font-bold px-2 py-0.5">{aCount}</span>
                     </button>
                     <button
-                      disabled={e.b === 0}
+                      disabled={bCount === 0}
                       onClick={() => startAmud("2")}
                       className="card-panel py-4 text-center hover:border-gold transition-colors disabled:opacity-40"
                     >
                       <div className="font-bold">עמוד ב'</div>
-                      <span className="text-xs rounded-full bg-gold/20 text-gold font-bold px-2 py-0.5">{e.b}</span>
+                      <span className="text-xs rounded-full bg-gold/20 text-gold font-bold px-2 py-0.5">{bCount}</span>
                     </button>
                     <button
                       onClick={() => startAmud(null)}

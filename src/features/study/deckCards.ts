@@ -1,11 +1,14 @@
 import { buildChildrenMap, collectDescendantIds } from "./categoryTree";
 import type { Card, Category, Deck } from "./types";
 
-/** האם כרטיס עונה על מסנן תוכן של מבחן (מסכת / דף / עמוד). */
+/**
+ * האם כרטיס עונה על מסנן תוכן (מסכת / דף / עמוד).
+ * שאלה בלי תיוג עמוד שייכת לשני העמודים — כמו במקור.
+ */
 export function matchesFilter(c: Card, f: { masechta: string; daf?: string; amud?: string }): boolean {
   if (c.masechta !== f.masechta) return false;
   if (f.daf != null && c.daf !== f.daf) return false;
-  if (f.amud != null && c.amud !== f.amud) return false;
+  if (f.amud != null && c.amud != null && c.amud !== f.amud) return false;
   return true;
 }
 
