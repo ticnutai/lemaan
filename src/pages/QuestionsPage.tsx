@@ -448,11 +448,6 @@ export default function QuestionsPage() {
               />
             </details>
 
-            <p className="text-xs text-muted-foreground">
-              {session
-                ? "השאלה תישמר אצלך ותישלח גם לאישור המנהל — הוא יחליט אם תיכנס לספרייה של כולם."
-                : "השאלה תישמר במכשיר זה בלבד; כדי שתגיע לאישור המנהל ולספרייה — התחבר לחשבון."}
-            </p>
             <div className="flex items-center gap-2 flex-wrap">
               <button className="btn-primary h-11" disabled={!formValid} onClick={() => saveNew(false)}>
                 <Save className="h-4 w-4" /> שמור
