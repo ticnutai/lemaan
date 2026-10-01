@@ -3,7 +3,7 @@ import { NavLink, Outlet } from "react-router-dom";
 import { useTheme } from "../theme/ThemeProvider";
 import { useAutoImport } from "../db/useAutoImport";
 import { useSession } from "../db/useSession";
-import { CalendarDays, FolderTree, GraduationCap, HelpCircle, Home, Landmark, LineChart, Moon, Settings, Sparkles, Sun, Target, Timer, UserRound } from "lucide-react";
+import { CalendarDays, FolderTree, GraduationCap, HelpCircle, Home, Landmark, LineChart, Moon, Settings, LayoutGrid, Sparkles, Sun, Target, Timer, UserRound } from "lucide-react";
 import { cn } from "../lib/utils";
 
 const nav = [
@@ -12,6 +12,7 @@ const nav = [
   { to: "/calendar", label: "חזרות", icon: CalendarDays },
   { to: "/quiz", label: "בניית מבחנים", icon: Timer },
   { to: "/shas", label: 'הש"ס', icon: Landmark },
+  { to: "/shas-board", label: 'לוח הש"ס', icon: LayoutGrid },
   { to: "/goals", label: "יעדים", icon: Target },
   { to: "/questions", label: "בניית שאלות", icon: HelpCircle },
   { to: "/categories", label: "קטגוריות", icon: FolderTree },

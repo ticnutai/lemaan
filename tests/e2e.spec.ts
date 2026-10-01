@@ -149,3 +149,21 @@ test("T12 — סנכרון ענן: העלאה אמיתית (מהירות עלי�
     await expect(page.getByText(/הנתונים הועלו לענן/)).toBeVisible({ timeout: 55_000 });
   });
 });
+
+test("T14 — לוח הש\"ס: סימון עמוד, חזרה, ומצב בחירה", async () => {
+  await page.goto("/#/shas-board");
+  await expect(page.getByText(/5,410/).first()).toBeVisible();
+  // כניסה למסכת ברכות וסימון עמוד ב.
+  await page.getByRole("button", { name: /^ברכות/ }).click();
+  await expect(page.getByText("מסכת ברכות")).toBeVisible();
+  await page.getByRole("button", { name: "ב.", exact: true }).click();
+  await expect(page.getByText(/1\/126 עמודים/)).toBeVisible();
+  // לחיצה שנייה = חזרה נוספת
+  await page.getByRole("button", { name: /^ב\./ }).click();
+  await expect(page.getByText("סך חזרות: 2")).toBeVisible();
+  // מצב בחירה: בחר הכל ואיפוס מחזיר ל-0
+  await page.getByRole("button", { name: "מצב בחירה" }).click();
+  await page.getByRole("button", { name: "בחר הכל במסכת" }).click();
+  await page.getByRole("button", { name: "איפוס" }).click();
+  await expect(page.getByText(/0\/126 עמודים/)).toBeVisible();
+});

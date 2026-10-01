@@ -12,6 +12,7 @@ import ShasPage from "./pages/ShasPage";
 import StatsPage from "./pages/StatsPage";
 import SettingsPage from "./pages/SettingsPage";
 import LoginPage from "./pages/LoginPage";
+import ShasBoardPage from "./pages/ShasBoardPage";
 
 // HashRouter works identically on the web, in Electron and in Capacitor,
 // so no per-platform router switching is needed.
@@ -30,6 +31,7 @@ export default function App() {
           <Route path="/categories" element={<CategoriesPage />} />
           <Route path="/quiz" element={<QuizPage />} />
           <Route path="/shas" element={<ShasPage />} />
+          <Route path="/shas-board" element={<ShasBoardPage />} />
           <Route path="/stats" element={<StatsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/login" element={<LoginPage />} />

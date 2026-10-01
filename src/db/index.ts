@@ -1,5 +1,6 @@
 import Dexie, { type Table } from "dexie";
 import type { Card, Category, Deck, ReviewLog, Goal, Setting } from "../features/study/types";
+import type { ShasAmud, ShasLogRow } from "../features/study/shasBoard";
 
 /**
  * Single local data layer for the whole app (IndexedDB via Dexie).
@@ -14,6 +15,8 @@ class LemaanDB extends Dexie {
   reviewLogs!: Table<ReviewLog, number>;
   goals!: Table<Goal, string>;
   settings!: Table<Setting, string>;
+  shasProgress!: Table<ShasAmud, string>;
+  shasLog!: Table<ShasLogRow, number>;
 
   constructor() {
     super("lemaan");
@@ -24,6 +27,11 @@ class LemaanDB extends Dexie {
       reviewLogs: "++id, cardId, at",
       goals: "id, type",
       settings: "key",
+    });
+    // לוח לימוד הש"ס: התקדמות לפי עמוד + יומן יומי לסטטיסטיקות
+    this.version(2).stores({
+      shasProgress: "key, masechta",
+      shasLog: "++id, at",
     });
   }
 }
