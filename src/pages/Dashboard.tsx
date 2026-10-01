@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import { CalendarClock, CheckCircle2, Download, Flame, GraduationCap, Library } from "lucide-react";
 import { db } from "../db";
-import { ensureAmudBackfill, importLibrary, type ImportProgress } from "../db/importLibrary";
+import { importLibrary, type ImportProgress } from "../db/importLibrary";
 
 function startOfDay(ts: number): number {
   const d = new Date(ts);
@@ -54,16 +54,7 @@ export default function Dashboard() {
     }
   };
 
-  // ייבוא אוטומטי בכניסה הראשונה — שהמערכת לעולם לא תיראה ריקה.
-  const autoStarted = useRef(false);
-  useEffect(() => {
-    if (imported === false && !importing && !autoStarted.current) {
-      autoStarted.current = true;
-      runImport();
-    }
-    if (imported === true) void ensureAmudBackfill();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [imported]);
+  // הייבוא האוטומטי רץ ברמת האפליקציה (useAutoImport ב-Layout) בכל עמוד.
 
   const stats = [
     { label: "שאלות במאגר", value: totalCards ?? "…", icon: Library, gold: false },

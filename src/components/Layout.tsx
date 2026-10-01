@@ -1,6 +1,7 @@
 import { useRef } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { useTheme } from "../theme/ThemeProvider";
+import { useAutoImport } from "../db/useAutoImport";
 import { CalendarDays, FolderTree, GraduationCap, HelpCircle, Home, Landmark, LineChart, Moon, Settings, Sparkles, Sun, Target, Timer } from "lucide-react";
 import { cn } from "../lib/utils";
 
@@ -23,9 +24,24 @@ export default function Layout() {
   const lastLight = useRef(themeId !== "midnight-gold" ? themeId : "royal-navy");
   if (themeId !== "midnight-gold") lastLight.current = themeId;
   const isDark = themeId === "midnight-gold";
+  const { importing, progress } = useAutoImport();
 
   return (
     <div className="min-h-screen flex flex-col">
+      {/* פס התקדמות ייבוא — מוצג בכל עמוד בזמן הייבוא הראשוני */}
+      {importing && (
+        <div className="fixed top-0 inset-x-0 z-50">
+          <div className="h-1.5 bg-muted">
+            <div
+              className="h-full bg-gradient-gold transition-all"
+              style={{ width: progress && progress.total ? `${Math.round((progress.done / progress.total) * 100)}%` : "15%" }}
+            />
+          </div>
+          <p className="text-center text-xs bg-card/95 border-b py-1 text-muted-foreground">
+            טוען את מאגר השאלות ({progress ? `${progress.done.toLocaleString()} / ${progress.total.toLocaleString()}` : "מתחיל"})…
+          </p>
+        </div>
+      )}
       {/* Top header bar */}
       <header className="h-14 shrink-0 border-b bg-card flex items-center justify-between px-4">
         <div className="flex items-center gap-2.5">
