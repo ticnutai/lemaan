@@ -370,5 +370,5 @@
 .lemaan-daf mark.daf-hit { background: #ffe08a; color: inherit; padding: 0 1px; border-radius: 2px; }
 .lemaan-daf .daf-seg { cursor: text; }
 /* דפוס מדויק: כל שורת גמרא בלוק ברוחב הגוש, מיושרת לשני הצדדים כמו בספר */
-.lemaan-print .daf-pline { display: block; white-space: nowrap; text-align: justify; text-align-last: justify; overflow: visible; }
+.lemaan-print .daf-pline { display: block; white-space: nowrap; text-align: right; overflow: visible; }
 .lemaan-print .daf-print-side { text-align: justify; hyphens: none; }

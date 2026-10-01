@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { BookOpen, ChevronLeft, ChevronRight, Landmark } from "lucide-react";
 import PageBanner from "../components/PageBanner";
 import DafPage from "../features/daf/DafPage";
+import { sanitizeSegment } from "../features/daf/buildHtml";
 import type { PrintLayout } from "../features/daf/PrintDaf";
 
 /** מאגר הש"ס המקומי (מהדורת וילנא, ספריא) — 37 מסכתות, עובד אופליין מלא. */
@@ -214,7 +215,7 @@ export default function ShasPage() {
         <>
           <article className="gold-frame p-6 leading-loose text-lg" style={{ fontFamily: "'Frank Ruhl Libre', 'Heebo', serif" }}>
             {amud.gemara.map((seg, i) => (
-              <p key={i} className="mb-3">{seg}</p>
+              <p key={i} className="mb-3" dangerouslySetInnerHTML={{ __html: sanitizeSegment(seg) }} />
             ))}
           </article>
 
@@ -235,7 +236,7 @@ export default function ShasPage() {
               {openCommentaries.has(c.key) && (
                 <div className="mt-3 space-y-2 text-sm leading-relaxed border-t pt-3">
                   {c.segments.map((seg, i) => (
-                    <p key={i}>{seg}</p>
+                    <p key={i} dangerouslySetInnerHTML={{ __html: sanitizeSegment(seg) }} />
                   ))}
                 </div>
               )}

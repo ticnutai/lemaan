@@ -7,7 +7,8 @@ export interface PrintSlab {
   s: "gemara" | "rashi" | "tosafot";
   l: number; t: number; w: number; h: number;
   fs: number; lh: number;
-  lines?: string[]; // גמרא — שורה-שורה כמו בספר
+  /** גמרא — שורה-שורה כמו בספר, עם ריווח המילים המדויק של הדפוס (px במידות העמוד) */
+  lines?: { t: string; ws: number; w: number | null }[];
   text?: string;    // רש"י/תוספות — זורם בתוך הגוש
 }
 export interface PrintLayout {
@@ -75,11 +76,14 @@ export default function PrintDaf({ layout, width, style, query }: Props) {
         html:
           slab.s === "gemara"
             ? (slab.lines ?? [])
-                .map((line, i) => `<span class="daf-seg daf-pline" data-stream="main" data-i="${i}">${sanitizeSegment(line, query)}</span>`)
+                .map(
+                  (line, i) =>
+                    `<span class="daf-seg daf-pline" data-stream="main" data-i="${i}" style="word-spacing:${(line.ws * k).toFixed(2)}px${line.w ? `;width:${(line.w * k).toFixed(1)}px` : ""}">${sanitizeSegment(line.t, query)}</span>`
+                )
                 .join("")
             : `<span class="daf-seg" data-stream="${slab.s === "rashi" ? "inner" : "outer"}">${sideHtml(slab.text ?? "", query)}</span>`,
       })),
-    [layout, query]
+    [layout, query, k]
   );
 
   return (
@@ -87,7 +91,13 @@ export default function PrintDaf({ layout, width, style, query }: Props) {
       ref={rootRef}
       className="lemaan-daf lemaan-print relative mx-auto bg-white"
       dir="rtl"
-      style={{ width, height: layout.page.h * k, position: "relative", overflow: "hidden" }}
+      style={{
+        width,
+        // גובה לפי תחתית הגוש האחרון (ולא כל שולי הדף הריקים של הסריקה)
+        height: (Math.min(layout.page.h, Math.max(...layout.slabs.map((sl) => sl.t + sl.h)) + 14)) * k,
+        position: "relative",
+        overflow: "hidden",
+      }}
     >
       {layout.header.map((hl, i) => (
         <span

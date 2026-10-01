@@ -24,6 +24,7 @@ type Renderer = ReturnType<typeof dafRenderer>;
  */
 export default function DafPage({ gemara, rashi, tosafot, amud, title, printLayout }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
+  const frameRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<Renderer | null>(null);
   const [style, setStyle] = useState<DafStyle>(DEFAULT_DAF_STYLE);
   const [styleLoaded, setStyleLoaded] = useState(false);
@@ -37,9 +38,9 @@ export default function DafPage({ gemara, rashi, tosafot, amud, title, printLayo
 
   // רוחב הדף לפי המיכל (עד 760px) — הפריסה מתאימה את עצמה
   useLayoutEffect(() => {
-    const el = hostRef.current?.parentElement;
+    const el = frameRef.current;
     if (!el) return;
-    const update = () => setWidth(Math.max(320, Math.min(760, el.clientWidth - 8)));
+    const update = () => setWidth(Math.max(320, Math.min(760, el.clientWidth - 28)));
     update();
     const ro = new ResizeObserver(update);
     ro.observe(el);
@@ -87,7 +88,7 @@ export default function DafPage({ gemara, rashi, tosafot, amud, title, printLayo
     if (!printLayout) return null;
     const g: string[] = [], r: string[] = [], t: string[] = [];
     for (const sl of printLayout.slabs) {
-      if (sl.s === "gemara") g.push(...(sl.lines ?? []));
+      if (sl.s === "gemara") g.push(...(sl.lines ?? []).map((l) => l.t));
       else if (sl.s === "rashi") r.push(sl.text ?? "");
       else t.push(sl.text ?? "");
     }
@@ -192,7 +193,7 @@ export default function DafPage({ gemara, rashi, tosafot, amud, title, printLayo
       )}
 
       {/* הדף עצמו */}
-      <div className="gold-frame bg-white p-2 overflow-x-auto">
+      <div ref={frameRef} className="gold-frame bg-white p-2 overflow-x-auto">
         <p className="text-center font-bold mb-1" style={{ color: style.colors.headers, fontFamily: FONT_FAMILY.Vilna }}>
           {title}
         </p>
