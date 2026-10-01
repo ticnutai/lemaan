@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import PrintDaf from "../features/daf/PrintDaf";
+import type { BlockReport } from "../features/daf/GrammarDaf";
 import GrammarDaf from "../features/daf/GrammarDaf";
 import { DEFAULT_DAF_STYLE } from "../features/daf/dafStyle";
 import type { AmudSpec } from "../features/daf/grammar";
@@ -22,7 +24,7 @@ function specFromTruth(lay: PrintLayout): AmudSpec {
   const g = lay.slabs.filter((s) => s.s === "gemara").sort((a, b) => a.t - b.t)
     .map((s) => ({ w: s.w, n: (s.lines ?? []).length }));
   const side = (st: "rashi" | "tosafot") =>
-    lay.slabs.filter((s) => s.s === st).sort((a, b) => a.t - b.t).map((s) => ({ w: s.w, n: Math.round(s.h / s.lh) }));
+    lay.slabs.filter((s) => s.s === st).sort((a, b) => a.t - b.t).map((s) => ({ w: s.w, n: Math.round((s.h - 0.3 * s.lh) / s.lh), fs: s.fs, lh: s.lh }));
   const rashiCol = lay.slabs.find((s) => s.s === "rashi" && s.w < 250);
   const gl = lay.slabs.filter((s) => s.s === "gemara").sort((a, b) => a.t - b.t).at(-1)?.lines ?? [];
   const tail = (gl.at(-1)?.t ?? "").split(/\s+/).filter(Boolean).length;
@@ -47,6 +49,22 @@ function anchorsFromTruth(lay: PrintLayout) {
   return out;
 }
 
+// גלישה פנימה: המילה האחרונה של הדפוס שייכת למשפט שספריא שמה בעמוד הבא → מצרפים את ראשו
+function spill(segs: string[], nextSegs: string[], last?: string): string[] {
+  if (!last) return segs;
+  const words = segs.join(" ").replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean);
+  const nextWords = nextSegs.join(" ").replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).slice(0, 80);
+  // המינימום מראש העמוד הבא שאחריו העוגן סוגר בדיוק את הרצף (העוגן יכול לחצות את הגבול)
+  const closesAt = (ws: string[]) => {
+    const i = findAnchor(ws, Math.max(0, ws.length - 12), last, true);
+    return i >= 0 && i + anchorSpan(ws, i, last) === ws.length;
+  };
+  for (let j = 0; j <= nextWords.length; j++) {
+    if (closesAt([...words, ...nextWords.slice(0, j)])) return j ? [...segs, nextWords.slice(0, j).join(" ")] : segs;
+  }
+  return segs;
+}
+
 /** מעבדת דקדוק: /#/daf-lab?m=Berakhot&a=10a — מציירת לפי המספרים ומדווחת גבולות. */
 export default function DafLabPage() {
   const [params] = useSearchParams();
@@ -58,6 +76,9 @@ export default function DafLabPage() {
   const [amud, setAmud] = useState<AmudData | null>(null);
   const [nextAmud, setNextAmud] = useState<AmudData | null>(null);
   const [truth, setTruth] = useState<PrintLayout | null>(null);
+  const [keys, setKeys] = useState<string[]>([]);
+  const [rep, setRep] = useState<BlockReport[]>([]);
+  const nav = useNavigate();
 
   useEffect(() => {
     (async () => {
@@ -78,47 +99,79 @@ export default function DafLabPage() {
       setNextAmud(pick(keys[keys.indexOf(a) + 1]) ?? null);
       const t = await (await fetch(`${base}tzurat/print/${m.toLowerCase()}.json`)).json();
       setTruth(t[a]);
+      setKeys(Object.keys(t));
     })();
   }, [m, a, src]);
 
-  const report = useCallback((r: unknown) => { window.__dafLab = r; }, []);
+  const report = useCallback((r: BlockReport[]) => { window.__dafLab = r; setRep(r); }, []);
 
-  if (!amud || !truth) return <p className="p-6 text-muted-foreground">טוען…</p>;
-  const spec = specFromTruth(truth);
-  const anchors = anchorsFromTruth(truth);
-  // גלישה פנימה: המילה האחרונה של הדפוס שייכת למשפט שספריא שמה בעמוד הבא → מצרפים את ראשו
-  const spill = (segs: string[], nextSegs: string[], last?: string) => {
-    if (!last) return segs;
-    const words = segs.join(" ").replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean);
-    const nextWords = nextSegs.join(" ").replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).slice(0, 80);
-    // המינימום מראש העמוד הבא שאחריו העוגן סוגר בדיוק את הרצף (העוגן יכול לחצות את הגבול)
-    const closesAt = (ws: string[]) => {
-      const i = findAnchor(ws, Math.max(0, ws.length - 12), last, true);
-      return i >= 0 && i + anchorSpan(ws, i, last) === ws.length;
-    };
-    for (let j = 0; j <= nextWords.length; j++) {
-      if (closesAt([...words, ...nextWords.slice(0, j)])) return j ? [...segs, nextWords.slice(0, j).join(" ")] : segs;
-    }
-    return segs;
-  };
-  const gemaraText = spill(amud.gemara, nextAmud?.gemara ?? [], anchors.gemara?.last);
+  // מחושבים פעם אחת לעמוד — אחרת כל דיווח מרנדר מחדש ומפעיל מדידה מחדש בלולאה
+  const spec = useMemo(() => (truth ? specFromTruth(truth) : null), [truth]);
+  const anchors = useMemo(() => (truth ? anchorsFromTruth(truth) : null), [truth]);
+  const gemaraText = useMemo(
+    () => (amud && anchors ? spill(amud.gemara, nextAmud?.gemara ?? [], anchors.gemara?.last) : []),
+    [amud, nextAmud, anchors]
+  );
+  const rashi = useMemo(() => amud?.commentaries.find((c) => c.key === "rashi")?.segments ?? [], [amud]);
+  const tosafot = useMemo(() => amud?.commentaries.find((c) => c.key === "tosafot")?.segments ?? [], [amud]);
+  if (!amud || !truth || !spec || !anchors) return <p className="p-6 text-muted-foreground">טוען…</p>;
+  const go = (k: string) => nav(`/daf-lab?m=${m}&a=${k}`);
+  const i = keys.indexOf(a);
+  const label = (k: string) => `${k.slice(0, -1)}${k.endsWith("a") ? "." : ":"}`;
+  const NAME: Record<string, string> = { gemara: "גמרא", rashi: 'רש"י', tosafot: "תוספות" };
+  const ok = rep.filter((r) => r.lines === r.n).length;
   return (
-    <div className="max-w-3xl mx-auto space-y-3">
-      <p className="text-sm text-muted-foreground" dir="ltr">
-        spec: gemara {JSON.stringify(spec.gemara)} · rashi {JSON.stringify(spec.rashi)} · tosafot {JSON.stringify(spec.tosafot)} · rashi {spec.rashiSide}
-      </p>
-      <div className="gold-frame bg-white p-2">
-        <GrammarDaf
-          gemara={gemaraText}
-          rashi={amud.commentaries.find((c) => c.key === "rashi")?.segments ?? []}
-          tosafot={amud.commentaries.find((c) => c.key === "tosafot")?.segments ?? []}
-          spec={spec}
-          width={640}
-          style={DEFAULT_DAF_STYLE}
-          anchors={useAnchors ? anchors : undefined}
-          onReport={report}
-        />
+    <div className="max-w-6xl mx-auto space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <h1 className="text-xl font-bold">מעבדת צורת הדף — ברכות {label(a)}</h1>
+        <button className="btn-ghost" disabled={i <= 0} onClick={() => go(keys[i - 1])}>→ הקודם</button>
+        <select className="input w-auto" value={a} onChange={(e) => go(e.target.value)}>
+          {keys.map((k) => <option key={k} value={k}>{label(k)}</option>)}
+        </select>
+        <button className="btn-ghost" disabled={i < 0 || i >= keys.length - 1} onClick={() => go(keys[i + 1])}>הבא ←</button>
+        {rep.length > 0 && (
+          <span className={`text-sm font-semibold ${ok === rep.length ? "text-green-700" : "text-amber-700"}`}>
+            {ok}/{rep.length} גושים תואמים לדפוס
+          </span>
+        )}
       </div>
+      <div className="grid gap-3 lg:grid-cols-2">
+        <figure className="space-y-1">
+          <figcaption className="text-sm text-muted-foreground">נבנה מטקסט (ויקיטקסט + רש"י ותוספות דפוס וילנא) לפי מספרי השורות</figcaption>
+          <div className="gold-frame bg-white p-2">
+            <GrammarDaf
+              gemara={gemaraText}
+              rashi={rashi}
+              tosafot={tosafot}
+              spec={spec}
+              width={520}
+              style={DEFAULT_DAF_STYLE}
+              anchors={useAnchors ? anchors : undefined}
+              onReport={report}
+            />
+          </div>
+        </figure>
+        <figure className="space-y-1">
+          <figcaption className="text-sm text-muted-foreground">הדפוס (וילנא) — להשוואה</figcaption>
+          <div className="gold-frame bg-white p-2">
+            <PrintDaf layout={truth} width={560} style={DEFAULT_DAF_STYLE} query="" />
+          </div>
+        </figure>
+      </div>
+      {rep.length > 0 && (
+        <table className="text-sm w-full max-w-xl">
+          <thead><tr className="text-muted-foreground"><th className="text-right">גוש</th><th>רוחב</th><th>שורות בדפוס</th><th>שורות אצלנו</th><th>מילים</th><th>מ־ … עד</th><th /></tr></thead>
+          <tbody>
+            {[...rep].sort((x, y) => ["gemara", "rashi", "tosafot"].indexOf(x.s) - ["gemara", "rashi", "tosafot"].indexOf(y.s)).map((r, j) => (
+              <tr key={j} className="border-t border-border">
+                <td>{NAME[r.s]}</td><td className="text-center">{r.w}</td><td className="text-center">{r.n}</td>
+                <td className="text-center">{r.lines}</td><td className="text-center">{r.words}</td>
+                <td>{r.first} … {r.last}</td><td>{r.lines === r.n ? "✓" : "✗"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }

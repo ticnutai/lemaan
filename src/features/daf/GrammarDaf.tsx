@@ -29,21 +29,56 @@ const norm = (t: string) => stripNikud(t).replace(/[^א-ת]/g, "");
 const toWords = (segs: string[], nikud: boolean) =>
   segs.flatMap((seg) => (nikud ? seg : stripNikud(seg)).replace(TAGS, " ").split(/\s+/).filter((w) => HEB.test(w)));
 
+/** ריווח אותיות בסיס לזרם הנמדד כעת (מפרשים) — נקבע לפני כל מדידה */
+let baseLs = 0;
+/** סימון מילת דיבור המתחיל (במפרשים) — נקרא ע"י toHtml, נעלם ב-norm */
+const DH = "";
+/**
+ * מפרשים: כל דיבור הוא "דיבור המתחיל – פירוש"; בדפוס הד"ה באותיות מרובעות
+ * מודגשות ואחריו נקודה (הקו המפריד של ספריא אינו בדפוס).
+ */
+const toSideWords = (segs: string[], nikud: boolean) =>
+  segs.flatMap((seg) => {
+    const plain = (nikud ? seg : stripNikud(seg)).replace(TAGS, " ");
+    const m = plain.match(/^(.*?)\s+[–—-]\s+(.*)$/s);
+    const split = (t: string) => t.split(/\s+/).filter((w) => HEB.test(w));
+    if (!m) return split(plain);
+    const dh = split(m[1]);
+    if (dh.length) dh[dh.length - 1] = dh[dh.length - 1].replace(/[.:]?$/, ".");
+    return [...dh.map((w) => DH + w), ...split(m[2])];
+  });
+const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+/** מילים → HTML: רצפי ד"ה עטופים בגופן המרובע */
+function toHtml(words: string[], dhFont: string) {
+  let out = "", inDh = false;
+  for (const w of words) {
+    const isDh = w.startsWith(DH);
+    if (isDh !== inDh) {
+      out += isDh ? `<span style="font-family:${dhFont};font-weight:700">` : "</span>";
+      inDh = isDh;
+    }
+    out += esc(isDh ? w.slice(1) : w) + " ";
+  }
+  return out.trimEnd() + (inDh ? "</span>" : "");
+}
+
 /** מספר השורות שטקסט תופס ברוחב/ריווח נתונים (מדידה ב-DOM נסתר). */
 function measureLines(m: HTMLElement, text: string, widthPx: number, font: string, fsPx: number, lhPx: number, wsPx: number, lsPx = 0) {
+  lsPx += baseLs;
   m.style.cssText = `position:absolute;visibility:hidden;direction:rtl;text-align:justify;width:${widthPx}px;font-family:${font};font-size:${fsPx}px;line-height:${lhPx}px;white-space:normal;word-spacing:${wsPx}px;letter-spacing:${lsPx}px`;
-  m.textContent = text;
+  m.innerHTML = text;
   return Math.round(m.offsetHeight / lhPx);
 }
 
 /** כמה מילים נכנסות ל-n שורות (חיפוש בינארי). */
-function fitCount(m: HTMLElement, words: string[], start: number, n: number, widthPx: number, font: string, fsPx: number, lhPx: number, wsPx: number) {
+function fitCount(m: HTMLElement, words: string[], start: number, n: number, widthPx: number, font: string, fsPx: number, lhPx: number, wsPx: number, dhFont = font) {
   let lo = 0, hi = words.length - start;
   if (hi <= 0) return 0;
-  if (measureLines(m, words.slice(start, start + hi).join(" "), widthPx, font, fsPx, lhPx, wsPx) <= n) return hi;
+  const H = (c: number) => toHtml(words.slice(start, start + c), dhFont);
+  if (measureLines(m, H(hi), widthPx, font, fsPx, lhPx, wsPx) <= n) return hi;
   while (lo < hi) {
     const mid = (lo + hi + 1) >> 1;
-    if (measureLines(m, words.slice(start, start + mid).join(" "), widthPx, font, fsPx, lhPx, wsPx) <= n) lo = mid; else hi = mid - 1;
+    if (measureLines(m, H(mid), widthPx, font, fsPx, lhPx, wsPx) <= n) lo = mid; else hi = mid - 1;
   }
   return lo;
 }
@@ -142,7 +177,7 @@ export default function GrammarDaf({ gemara, rashi, tosafot, spec, width, style,
 
   const placed = useMemo(() => placeBlocks(spec), [spec]);
   const streams = useMemo(
-    () => ({ gemara: toWords(gemara, style.nikud), rashi: toWords(rashi, style.nikud), tosafot: toWords(tosafot, style.nikud) }),
+    () => ({ gemara: toWords(gemara, style.nikud), rashi: toSideWords(rashi, style.nikud), tosafot: toSideWords(tosafot, style.nikud) }),
     [gemara, rashi, tosafot, style.nikud]
   );
 
@@ -169,32 +204,33 @@ export default function GrammarDaf({ gemara, rashi, tosafot, spec, width, style,
       for (const b of placed) {
         const words = streams[b.s].slice(0, endOf[b.s]);
         const font = b.s === "gemara" ? FONT_FAMILY[style.mainFont] : FONT_FAMILY[style.sideFont];
+        baseLs = b.s !== "gemara" && style.sideFont === "Rashi" ? G.side.ls * k : 0;
         const a = anchors?.[b.s];
         const bi = blockIdx[b.s]++;
         const remainingBlocks = placed.filter((p) => p.s === b.s).length - bi - 1;
         let end: number;
         if (a && bi < a.firsts.length) {
           // גבול הגוש = המילה הראשונה של הגוש הבא; בין מופעים חוזרים — הקרוב לקיבולת
-          const cap = fitCount(m, words, pos[b.s], b.n, b.w * k, font, b.fs * k, b.lh * k, -1.5 * k);
+          const cap = fitCount(m, words, pos[b.s], b.n, b.w * k, font, b.fs * k, b.lh * k, -1.5 * k, FONT_FAMILY[style.mainFont]);
           const cands = findAll(words, a.firsts[bi], pos[b.s] + 1);
           end = cands.length ? closestToCapacity(cands, pos[b.s], cap) : pos[b.s] + cap;
         } else if (remainingBlocks === 0) {
           end = words.length; // הגוש האחרון לוקח את שארית הטקסט
         } else {
-          end = pos[b.s] + fitCount(m, words, pos[b.s], b.n, b.w * k, font, b.fs * k, b.lh * k, -1.5 * k);
+          end = pos[b.s] + fitCount(m, words, pos[b.s], b.n, b.w * k, font, b.fs * k, b.lh * k, -1.5 * k, FONT_FAMILY[style.mainFont]);
         }
         const slice = words.slice(pos[b.s], end);
         // סוף הגמרא: 1–2 מילים תלויות בשורה משלהן, מיושרות לשמאל
         const hangN = b.s === "gemara" && remainingBlocks === 0 && spec.hang && b.n > 1 ? spec.hang : 0;
         const body = hangN ? slice.slice(0, -hangN) : slice;
         const hang = hangN ? slice.slice(-hangN).join(" ") : undefined;
-        const text = body.join(" ");
+        const text = toHtml(body, FONT_FAMILY[style.mainFont]);
         const fit = fitSpacing(m, text, b.n - (hangN ? 1 : 0), b.w * k, font, b.fs * k, b.lh * k, k);
         const { ws, ls } = fit;
         const lines = fit.lines + (hangN ? 1 : 0);
         pos[b.s] = end;
-        out.push({ b, text, ws, ls, hang });
-        report.push({ s: b.s, w: b.w, n: b.n, first: slice[0] ?? "", last: slice[slice.length - 1] ?? "", words: slice.length, lines, ws: +(ws / k).toFixed(2) });
+        out.push({ b, text, ws, ls: ls + baseLs, hang });
+        report.push({ s: b.s, w: b.w, n: b.n, first: (slice[0] ?? "").replace(DH, ""), last: (slice[slice.length - 1] ?? "").replace(DH, ""), words: slice.length, lines, ws: +(ws / k).toFixed(2) });
       }
       setFilled(out);
       onReport?.(report);
@@ -221,7 +257,7 @@ export default function GrammarDaf({ gemara, rashi, tosafot, spec, width, style,
             color: colorOf(b.s), textAlign: "justify", overflow: "hidden", wordSpacing: `${ws}px`, letterSpacing: `${ls}px`,
           }}
         >
-          {hang ? <span style={{ display: "block", textAlignLast: "justify" }}>{text}</span> : text}
+          {hang ? <span style={{ display: "block", textAlignLast: "justify" }} dangerouslySetInnerHTML={{ __html: text }} /> : <span dangerouslySetInnerHTML={{ __html: text }} />}
           {hang && <span style={{ display: "block", textAlign: "left" }}>{hang}</span>}
         </div>
       ))}

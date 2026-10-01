@@ -1,7 +1,7 @@
 /**
  * "דקדוק" דף וילנא — נמדד על 125 עמודי ברכות המעוגנים (יחידות: px של עמוד 643.58):
- * מסגרת טקסט 435 רוחב; גמרא ב-3 רוחבים (170/300/430) מתחילה 59px מראש המסגרת;
- * מפרשים: ראש 210 / עמודה 120 / פס מלא 430, מראש המסגרת; מרווח 12.5;
+ * מסגרת טקסט 435 רוחב; גמרא ב-3 רוחבים (170 / 302.5 / 435 — נגזרים מהמסגרת) מתחילה 59px מראש המסגרת;
+ * מפרשים: ראש 211.25 / עמודה 120 / פס מלא 435, מראש המסגרת; מרווח 12.5;
  * גופנים 12.6 (גמרא) / 7.7 (מפרשים); פסיעות 12.03 / 11.16.
  * מכאן: עמוד = מספרים שלמים בלבד — כמה שורות בכל גוש.
  */
@@ -9,12 +9,15 @@ export const G = {
   frame: 435,
   gutter: 12.5,
   gemaraTop: 59,
-  gemara: { fs: 12.6, lh: 12.033, widths: [170, 300, 430] as const },
-  side: { fs: 7.7, lh: 11.16, head: 210, col: 120, band: 430 },
+  // רוחבים כנגזרת של המסגרת — כל גוש הנוגע בשוליים יושב בדיוק על קו המסגרת
+  // (נמדד: המסגרת 121→555.6 בכל 125 העמודים; "430/300" היו רק היקף הדיו של השורות)
+  gemara: { fs: 12.6, lh: 12.033, widths: [170, 302.5, 435] as const },
+  // ls: אותיות הרש"י בדפוס רחבות ב~9% מהגופן שלנו (נמדד על 219 גושי מפרשים) → ריווח אותיות בסיסי
+  side: { fs: 7.7, lh: 11.16, head: 211.25, col: 120, band: 435, ls: 0.28 },
 };
 
 export type Side = "right" | "left";
-export interface BlockSpec { w: number; n: number }
+export interface BlockSpec { w: number; n: number; fs?: number; lh?: number }
 export interface AmudSpec {
   gemara: BlockSpec[];
   rashi: BlockSpec[];
@@ -39,8 +42,9 @@ export function placeBlocks(spec: AmudSpec): PlacedBlock[] {
     let y = 0;
     for (const b of blocks) {
       const w = b.w >= 400 ? G.side.band : b.w >= 180 ? G.side.head : G.side.col;
-      out.push({ s, x: w >= 400 ? 0 : sideX(side, w), y, w, n: b.n, fs: G.side.fs, lh: G.side.lh });
-      y += b.n * G.side.lh;
+      const lh = b.lh ?? G.side.lh;
+      out.push({ s, x: w >= 400 ? 0 : sideX(side, w), y, w, n: b.n, fs: b.fs ?? G.side.fs, lh });
+      y += b.n * lh;
     }
     return y;
   };
@@ -51,10 +55,11 @@ export function placeBlocks(spec: AmudSpec): PlacedBlock[] {
   const longer: Side = rashiEnd >= tosEnd ? spec.rashiSide : tosSide;
   let y = G.gemaraTop;
   for (const b of spec.gemara) {
-    const w = b.w >= 400 ? 430 : b.w >= 250 ? 300 : 170;
+    const [narrow, mid, full] = G.gemara.widths;
+    const w = b.w >= 400 ? full : b.w >= 250 ? mid : narrow;
     let x: number;
-    if (w === 170) x = G.side.col + G.gutter;           // בין שתי העמודות
-    else if (w === 300) x = longer === "right" ? 0 : F - 300; // מול העמודה שנשארה
+    if (w === narrow) x = G.side.col + G.gutter;            // בין שתי העמודות
+    else if (w === mid) x = longer === "right" ? 0 : F - mid; // מול העמודה שנשארה
     else x = 0;
     out.push({ s: "gemara", x, y, w, n: b.n, fs: G.gemara.fs, lh: G.gemara.lh });
     y += b.n * G.gemara.lh;
