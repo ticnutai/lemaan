@@ -53,6 +53,7 @@
 
   /* ============ THEME: Midnight Gold ============ */
   [data-theme="midnight-gold"] {
+    --gold-ink: 42 80% 62%;
     --background: 220 50% 8%;
     --foreground: 40 40% 95%;
     --card: 220 45% 12%;
@@ -358,3 +359,6 @@
     background-image: linear-gradient(125deg, hsl(var(--accent) / 0.10), hsl(var(--card)) 45%, hsl(var(--gold) / 0.13));
   }
 }
+
+/* טקסט זהב קריא: עוקף את טוני המותג רק עבור טקסט, לא מסגרות וגרדיאנטים */
+.text-gold { color: hsl(var(--gold-ink, 40 70% 34%)); }
