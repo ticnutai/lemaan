@@ -8,6 +8,7 @@ const defaultOptions = {
   innerPadding: "4px",
   outerPadding: "4px",
   halfway: "50%",
+  startLines: "4.3",
   fontFamily: {
     inner: "Rashi",
     outer: "Rashi",

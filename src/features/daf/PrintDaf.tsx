@@ -69,6 +69,9 @@ export default function PrintDaf({ layout, width, style, query }: Props) {
   }, [layout, width, query, style]);
   const colorOf = (s: PrintSlab["s"]) => (s === "gemara" ? style.colors.main : s === "rashi" ? style.colors.inner : style.colors.outer);
 
+  // הגוש האחרון של הגמרא בעמוד: השורה האחרונה שלו, אם היא מילה-שתיים "תלויות",
+  // מיושרת לשמאל — כך בדפוס וילנא (העין ממשיכה לעמוד הבא).
+  const lastGemara = [...layout.slabs].reverse().find((sl) => sl.s === "gemara");
   const slabs = useMemo(
     () =>
       layout.slabs.map((slab) => ({
@@ -76,14 +79,14 @@ export default function PrintDaf({ layout, width, style, query }: Props) {
         html:
           slab.s === "gemara"
             ? (slab.lines ?? [])
-                .map(
-                  (line, i) =>
-                    `<span class="daf-seg daf-pline" data-stream="main" data-i="${i}" style="word-spacing:${(line.ws * k).toFixed(2)}px${line.w ? `;width:${(line.w * k).toFixed(1)}px` : ""}">${sanitizeSegment(line.t, query)}</span>`
-                )
+                .map((line, i, arr) => {
+                  const hanging = slab === lastGemara && i === arr.length - 1 && line.t.trim().split(/\s+/).length <= 2;
+                  return `<span class="daf-seg daf-pline${hanging ? " daf-hanging" : ""}" data-stream="main" data-i="${i}" style="word-spacing:${(line.ws * k).toFixed(2)}px${line.w && !hanging ? `;width:${(line.w * k).toFixed(1)}px` : ""}">${sanitizeSegment(line.t, query)}</span>`;
+                })
                 .join("")
             : `<span class="daf-seg" data-stream="${slab.s === "rashi" ? "inner" : "outer"}">${sideHtml(slab.text ?? "", query)}</span>`,
       })),
-    [layout, query, k]
+    [layout, query, k, lastGemara]
   );
 
   return (

@@ -55,15 +55,21 @@ export default function DafPage({ gemara, rashi, tosafot, amud, title, printLayo
     if (style.mode === "print" && printLayout) return;
     let cancelled = false;
     host.innerHTML = "";
-    const base = 15 * style.scale;
+    // "דקדוק" דף וילנא, נמדד על 125 עמודים: מסגרת 435; גמרא 170/300/430;
+    // מפרשים 210 (ראש) / 120 (עמודה); מרווחים 12.5; גמרא מתחילה 5.3 שורות מפרש מהראש;
+    // גופנים 12.6 / 7.7; פסיעות 12.03 / 11.16 — הכל ביחס לרוחב הדף.
+    const pageW = Math.round(width * style.scale);
+    const k = pageW / 435;
     const renderer = dafRenderer(host, {
-      contentWidth: `${width}px`,
-      mainWidth: "50%",
-      padding: { vertical: "8px", horizontal: "14px" },
+      contentWidth: `${pageW}px`,
+      mainWidth: `${((170 + 25) / 435) * 100}%`,
+      halfway: `${((210 + 12.5) / 435) * 100}%`,
+      startLines: "5.3",
+      padding: { vertical: `${2 * k}px`, horizontal: `${12.5 * k}px` },
       fontFamily: { main: FONT_FAMILY[style.mainFont], inner: FONT_FAMILY[style.sideFont], outer: FONT_FAMILY[style.sideFont] },
       direction: "rtl",
-      fontSize: { main: `${base}px`, side: `${base * 0.72}px` },
-      lineHeight: { main: `${base * 1.15}px`, side: `${base * 0.72 * 1.33}px` },
+      fontSize: { main: `${12.6 * k}px`, side: `${7.7 * k}px` },
+      lineHeight: { main: `${12.033 * k}px`, side: `${11.16 * k}px` },
     });
     rendererRef.current = renderer;
     const prep = (segs: string[]) => (style.nikud ? segs : segs.map(stripNikud));
@@ -200,7 +206,7 @@ export default function DafPage({ gemara, rashi, tosafot, amud, title, printLayo
         {isPrint && printLayout ? (
           <PrintDaf layout={printLayout} width={Math.round(width * style.scale)} style={style} query={query} />
         ) : (
-          <div ref={hostRef} className="lemaan-daf mx-auto" style={{ width }} dir="rtl" />
+          <div ref={hostRef} className="lemaan-daf mx-auto" style={{ width: Math.round(width * style.scale) }} dir="rtl" />
         )}
       </div>
     </div>

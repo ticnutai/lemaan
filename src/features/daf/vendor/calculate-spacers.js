@@ -36,7 +36,8 @@ function calculateSpacers(mainText, innerText, outerText, options, dummy) {
   const sideWidth = Number(parsedOptions.width * (1 - parsedOptions.mainWidth)/2) //each commentary widths, dont include padding, sokeep it constant
 
    const spacerHeights = {
-    start: 4.3 * parsedOptions.lineHeight.side,
+    // למען: מספר שורות המפרש שמעל תחילת הגמרא — בדפוס וילנא 5.3 (92-33=59px / 11.16)
+    start: (options.startLines != null ? parseFloat(options.startLines) : 4.3) * parsedOptions.lineHeight.side,
     inner: null,
     outer: null,
     end: 0,

@@ -1,6 +1,8 @@
 export interface DafOptions {
   contentWidth?: string;
   mainWidth?: string;
+  halfway?: string;
+  startLines?: string;
   padding?: { vertical?: string; horizontal?: string };
   fontFamily?: { main?: string; inner?: string; outer?: string };
   direction?: "rtl" | "ltr";

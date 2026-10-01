@@ -372,3 +372,5 @@
 /* דפוס מדויק: כל שורת גמרא בלוק ברוחב הגוש, מיושרת לשני הצדדים כמו בספר */
 .lemaan-print .daf-pline { display: block; white-space: nowrap; text-align: right; overflow: visible; }
 .lemaan-print .daf-print-side { text-align: justify; hyphens: none; }
+/* מילה תלויה בסוף העמוד — בצד שמאל כמו בדפוס */
+.lemaan-print .daf-pline.daf-hanging { text-align: left; width: 100%; }
