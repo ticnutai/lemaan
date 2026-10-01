@@ -130,3 +130,23 @@ export async function pullApprovedQuestions(): Promise<number> {
   await db.settings.put({ key: "shared-pull-at", value: latest });
   return added;
 }
+
+/** פעולות ניהול משתמשים דרך פונקציית הענן (יצירה/עדכון/מחיקה + קביעת סיסמה). */
+export async function adminUserAction(payload: {
+  action: "create" | "update" | "delete";
+  userId?: string;
+  email?: string;
+  password?: string;
+  name?: string;
+}): Promise<{ ok?: boolean; id?: string; error?: string }> {
+  const { data, error } = await supabase.functions.invoke("admin-users", { body: payload });
+  if (error) {
+    // supabase-js עוטף שגיאות HTTP — מנסה לחלץ את ההודעה מהגוף
+    try {
+      const ctx = (error as { context?: Response }).context;
+      if (ctx) return (await ctx.json()) as { error: string };
+    } catch { /* נפילה להודעה כללית */ }
+    return { error: error.message };
+  }
+  return data as { ok?: boolean; id?: string; error?: string };
+}

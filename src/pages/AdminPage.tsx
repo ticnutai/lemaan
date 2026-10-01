@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  BarChart3, Check, Download, Library, MessageSquare, RefreshCw, ShieldCheck, Users, X,
+  BarChart3, Check, Download, Library, MessageSquare, Pencil, Plus, RefreshCw, ShieldCheck, Trash2, Users, X,
 } from "lucide-react";
 import PageBanner from "../components/PageBanner";
 import { supabase } from "../db/supabase";
 import { db } from "../db";
-import { FOUNDER_EMAILS, listAdmins, setAdminRole } from "../db/admin";
+import { FOUNDER_EMAILS, adminUserAction, listAdmins, setAdminRole } from "../db/admin";
 import { useIsAdmin } from "../db/useIsAdmin";
 import { useSession } from "../db/useSession";
 import { defaultSrs } from "../features/study/srs";
@@ -37,6 +37,8 @@ export default function AdminPage() {
 
   const admin = useIsAdmin(session);
   const [adminEmails, setAdminEmails] = useState<string[]>([]);
+  const [userForm, setUserForm] = useState<{ userId: string | null; name: string; email: string; password: string } | null>(null);
+  const [userBusy, setUserBusy] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -202,10 +204,56 @@ export default function AdminPage() {
       {/* ---- משתמשים ---- */}
       {tab === "users" && (
         <div className="gold-frame bg-card p-4 space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
             <h3 className="font-bold text-lg">רשימת משתמשים ({profiles.length})</h3>
-            <button className="btn-outline h-9" onClick={exportUsersCsv}><Download className="h-4 w-4" /> CSV</button>
+            <div className="flex gap-2">
+              <button className="btn-gold h-9" onClick={() => setUserForm({ userId: null, name: "", email: "", password: "" })}>
+                <Plus className="h-4 w-4" /> הוסף משתמש
+              </button>
+              <button className="btn-outline h-9" onClick={exportUsersCsv}><Download className="h-4 w-4" /> CSV</button>
+            </div>
           </div>
+
+          {userForm && (
+            <div className="card-panel gold-frame space-y-2.5 animate-slide-in-down">
+              <h4 className="font-semibold">{userForm.userId ? "עריכת משתמש" : "משתמש חדש"}</h4>
+              <div className="grid md:grid-cols-3 gap-2">
+                <input className="input" placeholder="שם (אופציונלי)" value={userForm.name}
+                  onChange={(e) => setUserForm({ ...userForm, name: e.target.value })} />
+                <input className="input" dir="ltr" type="email" placeholder="אימייל"
+                  value={userForm.email} onChange={(e) => setUserForm({ ...userForm, email: e.target.value })} />
+                <input className="input" dir="ltr" type="text"
+                  placeholder={userForm.userId ? "סיסמה חדשה (ריק = ללא שינוי)" : "סיסמה (6+ תווים)"}
+                  value={userForm.password} onChange={(e) => setUserForm({ ...userForm, password: e.target.value })} />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                המשתמש ייכנס עם האימייל והסיסמה שקבעת — בלי צורך בהרשמה או באימות מייל.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  className="btn-primary h-9"
+                  disabled={userBusy || !userForm.email.trim() || (!userForm.userId && userForm.password.length < 6)}
+                  onClick={async () => {
+                    setUserBusy(true);
+                    setMsg("");
+                    const res = await adminUserAction({
+                      action: userForm.userId ? "update" : "create",
+                      userId: userForm.userId ?? undefined,
+                      email: userForm.email.trim(),
+                      password: userForm.password || undefined,
+                      name: userForm.name.trim() || undefined,
+                    });
+                    setUserBusy(false);
+                    if (res.error) setMsg(`שגיאה: ${res.error}`);
+                    else { setUserForm(null); await load(); }
+                  }}
+                >
+                  {userForm.userId ? "שמור שינויים" : "צור משתמש"}
+                </button>
+                <button className="btn-outline h-9" onClick={() => setUserForm(null)}>ביטול</button>
+              </div>
+            </div>
+          )}
           {profiles.length === 0 ? (
             <p className="text-muted-foreground text-center py-6">{loading ? "טוען…" : "עדיין אין משתמשים רשומים (הרשימה מתמלאת מכניסות לאפליקציה)."}</p>
           ) : (
@@ -247,6 +295,21 @@ export default function AdminPage() {
                           {!founder && email && (
                             <button className="btn-outline h-7 px-2 text-xs" onClick={toggle}>
                               {isAdm ? "הסר ניהול" : "הפוך למנהל"}
+                            </button>
+                          )}
+                          <button className="btn-ghost h-7 w-7 p-0" title="עריכת שם / מייל / סיסמה"
+                            onClick={() => setUserForm({ userId: p.user_id, name: p.display_name ?? "", email, password: "" })}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          {!founder && (
+                            <button className="btn-ghost h-7 w-7 p-0 text-destructive" title="מחיקת המשתמש"
+                              onClick={async () => {
+                                if (!confirm(`למחוק את ${email || p.user_id}? החשבון יימחק לצמיתות (הנתונים המקומיים במכשיר שלו יישארו).`)) return;
+                                const res = await adminUserAction({ action: "delete", userId: p.user_id });
+                                if (res.error) setMsg(`שגיאה: ${res.error}`);
+                                else await load();
+                              }}>
+                              <Trash2 className="h-3.5 w-3.5" />
                             </button>
                           )}
                         </div>
