@@ -1,0 +1,186 @@
+<!doctype html><html lang='he' dir='rtl'><head><meta charset='utf-8'><title>ברכות 54a</title><style>
+@font-face{font-family:MekorotVilna;src:url('../../assets/fonts/mekorot-vilna/Mekorot-Vilna.ttf') format('truetype');font-weight:100 900;font-style:normal}
+@font-face{font-family:MekorotRashi;src:url('../../assets/fonts/mekorot/Mekorot[wght].ttf') format('truetype');font-weight:100 900;font-style:normal}
+html,body{margin:0;padding:0;background:#eee;font-family:Arial,Helvetica,sans-serif;overflow:hidden}
+.page{position:relative;width:643.58px;height:992.58px;margin:0;background:white;border:1px solid #111;box-sizing:border-box;overflow:hidden}
+/* Vilna print header strip — each OCR line is absolutely positioned at its
+   PDF bbox so the HTML reproduces the print layout exactly: the large
+   center title ("מאימתי פרק ראשון ברכות"), the daf number ("י:") right of
+   center, the corner marginal labels ("עין משפט / נר מצוה", "מסורת הש״ס").
+   Font size = polygon height so each piece matches print scale. */
+.daf-hline{position:absolute;font-family:MekorotVilna,serif;font-weight:700;color:#111;white-space:nowrap;line-height:1;z-index:6;user-select:text}
+.daf-header-fallback{position:absolute;top:4px;left:0;right:0;text-align:center;direction:rtl;font-family:MekorotVilna,serif;font-size:22px;font-weight:700;color:#111;letter-spacing:0.5px;pointer-events:none;z-index:6;line-height:1.1}
+.daf-header-fallback .sep{margin:0 8px;color:#666}
+/* No vertical padding: when chained slabs of the same stream overlap, the
+   pad-top of slab i+1 used to cover the bottom ~1.5 px of slab i's last
+   text line. With padding:0 on the y-axis, slab i+1 starts exactly at its
+   top with text — no chrome to hide the previous line. Horizontal padding
+   stays so text doesn't kiss the gutter edges. */
+.text-slab{position:absolute;box-sizing:border-box;overflow:hidden;direction:rtl;text-align:justify;padding:0 2px;background:white;z-index:1}
+.text-slab:after{content:'';display:inline-block;width:100%}
+.white-gutter{position:absolute;box-sizing:border-box;background:white;z-index:5;pointer-events:none}
+.text-slab.gemara{overflow:visible;z-index:6}
+.gemara{font-weight:600;font-variation-settings:'wght' 600}
+.gemara .pdf-line{display:block;position:relative;width:100%;white-space:nowrap;text-align:justify;text-align-last:justify;direction:rtl}
+.gemara .pdf-line:after{content:'';display:inline-block;width:100%}
+.chavrusa-gemara{background:transparent;box-decoration-break:clone;-webkit-box-decoration-break:clone;border-radius:3px;outline:1.3px solid transparent;outline-offset:1px;transition:background-color .08s,outline-color .08s}
+.chavrusa-gemara.is-active{background:rgba(255,214,51,.42);outline-color:#b58100}
+.rashi-dh{border-radius:3px;outline:1.2px solid transparent;outline-offset:1px;transition:background-color .08s,outline-color .08s}
+.rashi-dh.is-rashi-match{background:rgba(86,156,214,.25);outline-color:#1269d3}
+/* Rashi/Tosafot body — slightly heavier than the bare TTF outlines so the
+   commentary script reads with the right print weight. A small text-stroke
+   thickens the strokes without changing glyph metrics (advance widths stay
+   the same, so the Pillow line-wrap simulator stays accurate). */
+.rashi,.tosafot{-webkit-text-stroke:0.15px currentColor;text-stroke:0.15px currentColor}
+/* Rashi dibur hamatchil: heavy stroke at the body size — no 1.5× scaling. */
+.rashi b{font-weight:900;-webkit-text-stroke:0.45px currentColor;text-stroke:0.45px currentColor}
+/* Tosafot: every dibur starts a new visual paragraph. Only the second visual
+   line gets the Vilna inset; later lines return to the normal block edge. */
+.tosafot-entry{display:block;text-align:justify;text-align-last:center}
+.tos-word{display:inline}
+.tos-second-line-indent{margin-right:1.8em}
+.tosafot-dh{font-weight:900;-webkit-text-stroke:0.45px currentColor;text-stroke:0.45px currentColor}
+.tosafot-dh .tos-first{font-size:1.5em;line-height:1}
+.missing-text{color:#666;text-align:center;text-align-last:center;-webkit-text-stroke:0;text-stroke:0}
+</style></head><body>
+<div class='page' data-amud='54a' data-layout-source='berakhot_layoutocr_azure_f0_shapes' data-text-source='hebrewbooks'><span class='daf-hline' style='left:227.33px;top:10.78px;font-size:23.04px;font-weight:400'>הרואה פרק תשיעי ברכות</span><span class='daf-hline' style='left:128.31px;top:14.90px;font-size:14.29px'>נד.</span><div class='text-slab rashi' data-kind='rashi' data-render-kind='rashi' data-slab='1' data-words='48' style='left:344.67px;top:33.00px;width:210.60px;height:57.32px;font-family:MekorotRashi, serif;font-size:7.42px;line-height:10.755px;color:#111'><span class='rashi-dh'><b>הרואה</b> <b>מקום</b> <b>שנעשו</b> <b>בו</b> <b>נסים</b> <b>לישראל.</b></span> כגון הנך דקתני לקמן מעברות הים והירדן ונחלי ארנון כו&#x27;: <span class='rashi-dh'><b>זיקין</b> <b>וזועות</b> <b>ורעמים.</b></span> מפרש בגמרא: <span class='rashi-dh'><b>מלא</b> <b>עולם.</b></span> לפי שאלו נראין או נשמעין למרחוק: <span class='rashi-dh'><b>ברוך</b> <b>עושה</b> <b>בראשית.</b></span> ובגמרא (ד&#x27; נט.) פריך אטו הנך דלעיל לאו מעשה בראשית נינהו: <span class='rashi-dh'><b>לפרקים.</b></span> מפרש בגמרא (שם ע&quot;ב)</div><div class='text-slab rashi' data-kind='rashi' data-render-kind='rashi' data-slab='2' data-words='371' style='left:436.88px;top:77.66px;width:118.46px;height:625.40px;font-family:MekorotRashi, serif;font-size:7.42px;line-height:10.755px;color:#111'>ולפי שהוא חשוב וגדול מכלן קבע ליה רבי יהודה ברכה לעצמו: <span class='rashi-dh'><b>מברך</b> <b>על</b> <b>הרעה</b> <b>מעין</b> <b>על</b> <b>הטובה.</b></span> דיין האמת: <span class='rashi-dh'><b>ועל</b> <b>הטובה</b> <b>מעין</b> <b>על</b> <b>הרעה.</b></span> הטוב והמטיב ובגמרא מפרש היכי דמי: <span class='rashi-dh'><b>הנכנס</b> <b>לכרך.</b></span> המהלך בדרך וצריך לעבור כרך ושם מצויים מושלים רעים ומחפשים עלילות: <span class='rashi-dh'><b>אחת</b> <b>בכניסתו.</b></span> מתפלל שיכנס לשלום: <span class='rashi-dh'><b>ביציאתו.</b></span> מתפלל שיצא לשלום: <span class='rashi-dh'><b>ארבע.</b></span> כדמפרש נותן הודאה על שעבר וצועק על העתיד נמצאו ד&#x27; כדמפרש בגמרא: <span class='rashi-dh'><b>חייב</b> <b>אדם</b> <b>לברך</b> <b>על</b> <b>הרעה</b> <b>כו&#x27;.</b></span> מפרש בגמרא: <span class='rashi-dh'><b>ד&quot;א</b> <b>בכל</b> <b>מאדך.</b></span> מדות מדודות לך בין מדה טובה בין מדת פורענות: <span class='rashi-dh'><b>לא</b> <b>יקל</b> <b>ראשו.</b></span> לא ינהג קלות ראש: <span class='rashi-dh'><b>כנגד</b> <b>שער</b> <b>מזרחי.</b></span> חוץ להר הבית אשר בחומה הנמוכה אשר לרגלי הבית במזרח לפי שכל השערים מכוונים זה כנגד זה שער מזרח שער עזרת נשים ושער עזרת ישראל ופתח האולם וההיכל ובית קדשי הקדשים בימי מקדש ראשון כשהיה אמה טרקסין: <span class='rashi-dh'><b>בפונדתו.</b></span> חגור חלול ונותנין בו מעות: <span class='rashi-dh'><b>מק&quot;ו.</b></span> בגמרא מפרש ליה: <span class='rashi-dh'><b>כל</b> <b>חותמי</b> <b>ברכות</b> <b>שבמקדש</b> <b>היו</b> <b>אומרים</b> <b>עד</b> <b>העולם.</b></span> במסכת תענית (פ&quot;ב דף טז:) אמרינן אין עונין אמן במקדש המברך אומר בסוף כל ברכה ברוך אתה ה&#x27; אלהי ישראל מן העולם ועד העולם ברוך חונן הדעת וכן בכולם והעונין אומרים ברוך שם כבוד מלכותו לעולם ועד וילפינן לה מקרא דתפלת עזרא וסיעתו ואשמעינן הכא דבמקדש ראשון לא היו אומרים אלא ברוך ה&#x27; אלהי ישראל עד מן העולם: <span class='rashi-dh'><b>משקלקלו</b> <b>הצדוקים.</b></span> ואמרו אין עולם אלא זה: <span class='rashi-dh'><b>התקינו.</b></span> עזרא וסיעתו שיהו אומרים מן העולם ועד העולם לומר ששני עולמות יש להוציא מלב הצדוקים הכופרים בתחיית המתים: <span class='rashi-dh'><b>שיהא</b> <b>אדם</b> <b>שואל</b> <b>לשלום</b> <b>חבירו</b> <b>בשם.</b></span> בשמו של הקב&quot;ה ולא אמרינן מזלזל הוא בכבודו של מקום בשביל כבוד הבריות להוציא שם שמים עליו ולמדו מבעז שאמר ה&#x27; עמכם ומן המלאך שאמר לגדעון ה&#x27; עמך גבור החיל: <span class='rashi-dh'><b>ואומר</b> <b>אל</b> <b>תבוז</b> <b>כי</b> <b>זקנה</b> <b>אמך.</b></span> למוד מדברי זקני אומתך לעשות מה שראית שעשו הם ובגמ&#x27; מפרש מאי ואומר: <span class='rashi-dh'><b>ואומר</b> <b>עת</b> <b>לעשות</b> <b>לה&#x27;</b> <b>הפרו</b> <b>תורתך.</b></span> פעמים שמבטלים דברי תורה כדי לעשות לה&#x27; אף זה המתכוין לשאול לשלום חברו זהו רצונו של מקום שנא&#x27; בקש שלום ורדפהו מותר להפר תורה ולעשות דבר הנראה אסור: <span class='rashi-dh'><b>גמ&#x27;</b></span> ה&quot;ג <span class='rashi-dh'><b>מנלן</b> <b>דמברכינן</b> <b>אניסא</b> <b>א&quot;ר</b> <b>יוחנן</b> <b>דאמר</b> <b>קרא</b> <b>ויאמר</b> <b>יתרו</b> <b>ברוך</b> <b>ה&#x27;</b> <b>אשר</b> <b>הציל</b> <b>אתכם</b> <b>וגו&#x27;</b></span> : <span class='rashi-dh'><b>בעבר</b> <b>ימינא.</b></span> שם מדינה בדרומו של פרת: <span class='rashi-dh'><b>בפקתא.</b></span> בקעה: <span class='rashi-dh'><b>ערבות.</b></span> שם מקום: <span class='rashi-dh'><b>וצחא</b> <b>למיא.</b></span> צמא למים: <span class='rashi-dh'><b>ברסתקא.</b></span> בשוק: <span class='rashi-dh'><b>גמלא</b> <b>פריצא.</b></span> גמל משוגע שעסקיו רעים: <span class='rashi-dh'><b>אתפרקא</b> <b>ליה</b> <b>אשיתא.</b></span> נפלה חומת בית</div><div class='text-slab rashi' data-kind='rashi' data-render-kind='rashi' data-slab='3' data-words='41' style='left:121.50px;top:704.13px;width:434.06px;height:32.26px;font-family:MekorotRashi, serif;font-size:7.42px;line-height:10.755px;color:#111'>שהיה סמוך לו ונכנס לתוך הבית מפני הגמל: <span class='rashi-dh'><b>מעברות</b> <b>הים.</b></span> מקום שעברו ישראל בים סוף: <span class='rashi-dh'><b>ומעברות</b> <b>הירדן.</b></span> בימי יהושע: <span class='rashi-dh'><b>מעברות</b> <b>נחלי</b> <b>ארנון.</b></span> לקמן מפרש מאי ניסא: <span class='rashi-dh'><b>במורד</b> <b>בית</b> <b>חורון.</b></span> בימי יהושע היה בספר יהושע (י) : <span class='rashi-dh'><b>ואבן</b> <b>שזרק</b> <b>עוג.</b></span> לקמן מפרש:</div><div class='text-slab rashi catchword' data-kind='rashi' data-render-kind='rashi' style='left:121.50px;top:725.64px;width:434.06px;height:11.75px;font-family:MekorotRashi, serif;padding-left:20px;font-size:7.42px;line-height:10.755px;color:#111;text-align:left'>עבדי</div><div class='text-slab tosafot' data-kind='tosafot' data-render-kind='tosafot' data-slab='1' data-words='47' style='left:121.13px;top:33.00px;width:210.54px;height:57.32px;font-family:MekorotRashi, serif;font-size:7.70px;line-height:11.165px;color:#111'><span class='tosafot-entry'><span class='tosafot-dh'><b class='tos-word tos-first'>הרואה</b> <b class='tos-word'>וכו&#x27;</b> <b class='tos-word'>אומר</b> <b class='tos-word'>ברוך</b> <b class='tos-word'>שעשה</b> <b class='tos-word'>נסים</b> <b class='tos-word'>לאבותינו</b> <b class='tos-word'>וכו&#x27;.</b></span> <span class='tos-word'>פירש</span> <span class='tos-word'>רבי&#x27;</span> <span class='tos-word'>שמעיה</span> <span class='tos-word'>דכל</span> <span class='tos-word'>הני</span> <span class='tos-word'>ברכות</span> <span class='tos-word'>צריכות</span> <span class='tos-word'>להזכרת</span> <span class='tos-word'>שם</span> <span class='tos-word'>ומלכות</span> <span class='tos-word'>ברוך</span> <span class='tos-word'>אתה</span> <span class='tos-word'>ה&#x27;</span> <span class='tos-word'>אלהינו</span> <span class='tos-word'>מלך</span> <span class='tos-word'>העולם</span> <span class='tos-word'>וכן</span> <span class='tos-word'>כתב</span> <span class='tos-word'>רבינו</span> <span class='tos-word'>שמשון</span> <span class='tos-word'>מקוצי</span> <span class='tos-word'>כי</span> <span class='tos-word'>הר&quot;י</span> <span class='tos-word'>היה</span> <span class='tos-word'>רגיל</span> <span class='tos-word'>לברך</span> <span class='tos-word'>על</span> <span class='tos-word'>הברקים</span> <span class='tos-word'>ברוך</span> <span class='tos-word'>אתה</span> <span class='tos-word'>ה&#x27;</span> <span class='tos-word'>אלהינו</span> <span class='tos-word'>מלך</span> <span class='tos-word'>העולם</span> <span class='tos-word'>שכחו</span> <span class='tos-word'>וגבורתו</span> <span class='tos-word'>מלא</span> <span class='tos-word'>עולם</span> <span class='tos-word'>וכן</span></span></div><div class='text-slab tosafot' data-kind='tosafot' data-render-kind='tosafot' data-slab='2' data-words='56' style='left:122.54px;top:77.66px;width:116.29px;height:145.85px;font-family:MekorotRashi, serif;font-size:7.70px;line-height:11.165px;color:#111'><span class='tos-word'>פר&quot;י</span> <span class='tos-word'>ומייתי</span> <span class='tos-word'>ירושלמי</span> <span class='tos-word'>דפירקין</span> <span class='tos-word'>רבי</span> <span class='tos-word'>זעירא</span> <span class='tos-word'>כו&#x27;</span> <span class='tos-word'>כל</span> <span class='tos-word'>ברכה</span> <span class='tos-word'>שאין</span> <span class='tos-word'>בה</span> <span class='tos-word'>וכו&#x27;</span> <span class='tos-word'>ונראה</span> <span class='tos-word'>לרבינו</span> <span class='tos-word'>דדוקא</span> <span class='tos-word'>לרואה</span> <span class='tos-word'>משלשים</span> <span class='tos-word'>יום</span> <span class='tos-word'>לשלשים</span> <span class='tos-word'>יום</span> <span class='tos-word'>דומיא</span> <span class='tos-word'>דרואה</span> <span class='tos-word'>ים</span> <span class='tos-word'>הגדול</span> <span class='tos-word'>לפרקים</span> <span class='tos-word'>דאמר</span> <span class='tos-word'>בירושלמי</span> <span class='tos-word'>דפרקים</span> <span class='tos-word'>היינו</span> <span class='tos-word'>שלשים</span> <span class='tos-word'>יום:</span> <span class='tosafot-entry'><span class='tosafot-dh'><b class='tos-word tos-first'>שעקר</b> <b class='tos-word'>עכו&quot;ם</b> <b class='tos-word'>מארצנו.</b></span> <span class='tos-word'>בירושלמי</span> <span class='tos-word'>מתני</span> <span class='tos-word'>כשנעקרה</span> <span class='tos-word'>עכו&quot;ם</span> <span class='tos-word'>מכל</span> <span class='tos-word'>ארץ</span> <span class='tos-word'>ישראל:</span></span> <span class='tosafot-entry'><span class='tosafot-dh'><b class='tos-word tos-first'>על</b> <b class='tos-word'>הנהרות.</b></span> <span class='tos-word'>לאו</span> <span class='tos-word'>על</span> <span class='tos-word'>כל</span> <span class='tos-word'>נהרות</span> <span class='tos-word'>איירי</span> <span class='tos-word'>אלא</span> <span class='tos-word'>ארבע</span> <span class='tos-word'>נהרות</span> <span class='tos-word'>דכתיבי</span> <span class='tos-word'>בקרא</span> <span class='tos-word'>כמו</span> <span class='tos-word'>חדקל</span> <span class='tos-word'>ופרת:</span></span></div><div class='text-slab tosafot catchword' data-kind='tosafot' data-render-kind='tosafot' style='left:122.54px;top:200.47px;width:116.29px;height:12.16px;font-family:MekorotRashi, serif;padding-left:20px;font-size:7.70px;line-height:11.165px;color:#111;text-align:left'>אבני</div><div class='text-slab gemara' data-kind='gemara' data-render-kind='gemara' data-slab='1' data-words='69' style='left:251.83px;top:90.32px;width:172.06px;height:142.45px;font-family:MekorotVilna, serif;font-size:12.60px;line-height:12.033px;color:#111'><span class='chavrusa-gemara' data-chavrusa-idx='0' tabindex='-1'>מנא הני מילי</span> <span class='chavrusa-gemara' data-chavrusa-idx='1' tabindex='-1'>אמר רבי יוחנן דאמר קרא</span> <span class='chavrusa-gemara' data-chavrusa-idx='2' tabindex='-1'>ויאמר יתרו ברוך ה&#x27; אשר הציל</span> <span class='chavrusa-gemara' data-chavrusa-idx='3' tabindex='-1'>וגו&#x27;</span> <span class='chavrusa-gemara' data-chavrusa-idx='4' tabindex='-1'>אניסא דרבים מברכינן</span> <span class='chavrusa-gemara' data-chavrusa-idx='5' tabindex='-1'>אניסא דיחיד לא מברכינן</span> <span class='chavrusa-gemara' data-chavrusa-idx='6' tabindex='-1'>והא ההוא גברא דהוה קא אזיל בעבר ימינא</span> <span class='chavrusa-gemara' data-chavrusa-idx='7' tabindex='-1'>נפל עליה אריא אתעביד ליה ניסא ואיתצל מיניה</span> <span class='chavrusa-gemara' data-chavrusa-idx='8' tabindex='-1'>אתא לקמיה דרבא ואמר ליה כל אימת דמטית להתם בריך ברוך שעשה לי נס</span> <span class='chavrusa-gemara' data-chavrusa-idx='9' tabindex='-1'>במקום הזה</span> <span class='chavrusa-gemara' data-chavrusa-idx='10' tabindex='-1'>ומר</span> <span class='chavrusa-gemara' data-chavrusa-idx='11' tabindex='-1'>בריה</span> דרבינא <span class='chavrusa-gemara' data-chavrusa-idx='12' tabindex='-1'>הוה</span> קאזיל בפקתא <span class='chavrusa-gemara' data-chavrusa-idx='13' tabindex='-1'>דערבות</span> <span class='chavrusa-gemara' data-chavrusa-idx='14' tabindex='-1'>וצחא</span> למיא אתעביד ליה ניסא איברי ליה עינא</div><div class='text-slab gemara' data-kind='gemara' data-render-kind='gemara' data-slab='2' data-words='168' style='left:121.01px;top:210.65px;width:302.88px;height:473.65px;font-family:MekorotVilna, serif;font-size:12.60px;line-height:12.033px;color:#111'>דמיא ואישתי <span class='chavrusa-gemara' data-chavrusa-idx='15' tabindex='-1'>ותו</span> <span class='chavrusa-gemara' data-chavrusa-idx='16' tabindex='-1'>זמנא חדא הוה קאזיל ברסתקא</span> <span class='chavrusa-gemara' data-chavrusa-idx='17' tabindex='-1'>דמחוזא ונפל עליה גמלא פריצא</span> <span class='chavrusa-gemara' data-chavrusa-idx='18' tabindex='-1'>איתפרקא ליה אשיתא</span> <span class='chavrusa-gemara' data-chavrusa-idx='19' tabindex='-1'>על לגוה</span> <span class='chavrusa-gemara' data-chavrusa-idx='20' tabindex='-1'>כי מטא לערבות בריך ברוך שעשה לי נס בערבות</span> <span class='chavrusa-gemara' data-chavrusa-idx='21' tabindex='-1'>ובגמל</span> <span class='chavrusa-gemara' data-chavrusa-idx='22' tabindex='-1'>כי מטא לרסתקא דמחוזא בריך ברוך שעשה לי נס בגמל ובערבות</span> <span class='chavrusa-gemara' data-chavrusa-idx='23' tabindex='-1'>אמרי אניסא דרבים כולי עלמא מיחייבי לברוכי</span> <span class='chavrusa-gemara' data-chavrusa-idx='24' tabindex='-1'>אניסא דיחיד</span> <span class='chavrusa-gemara' data-chavrusa-idx='25' tabindex='-1'>איהו</span> <span class='chavrusa-gemara' data-chavrusa-idx='26' tabindex='-1'>חייב לברוכי</span> <span class='chavrusa-gemara' data-chavrusa-idx='27' tabindex='-1'>תנו רבנן הרואה</span> <span class='chavrusa-gemara' data-chavrusa-idx='28' tabindex='-1'>מעברות הים</span> ומעברות הירדן <span class='chavrusa-gemara' data-chavrusa-idx='29' tabindex='-1'>מעברות נחלי ארנון</span> <span class='chavrusa-gemara' data-chavrusa-idx='30' tabindex='-1'>אבני אלגביש</span> <span class='chavrusa-gemara' data-chavrusa-idx='31' tabindex='-1'>במורד בית חורון ואבן שבקש לזרוק עוג מלך הבשן על ישראל ואבן שישב עליה משה</span> בשעה שעשה יהושע מלחמה בעמלק ואשתו <span class='chavrusa-gemara' data-chavrusa-idx='32' tabindex='-1'>של</span> לוט וחומת יריחו שנבלעה במקומה על כולן <span class='chavrusa-gemara' data-chavrusa-idx='33' tabindex='-1'>צריך</span> שיתן <span class='chavrusa-gemara' data-chavrusa-idx='34' tabindex='-1'>הודאה</span> ושבח <span class='chavrusa-gemara' data-chavrusa-idx='35' tabindex='-1'>לפני</span> המקום <span class='chavrusa-gemara' data-chavrusa-idx='36' tabindex='-1'>בשלמא מעברות הים</span> <span class='chavrusa-gemara' data-chavrusa-idx='37' tabindex='-1'>דכתיב</span> <span class='chavrusa-gemara' data-chavrusa-idx='38' tabindex='-1'>ויבאו בני ישראל בתוך הים ביבשה</span> <span class='chavrusa-gemara' data-chavrusa-idx='39' tabindex='-1'>מעברות הירדן</span> <span class='chavrusa-gemara' data-chavrusa-idx='40' tabindex='-1'>דכתיב</span> ויעמדו הכהנים נשאי הארון <span class='chavrusa-gemara' data-chavrusa-idx='41' tabindex='-1'>ברית</span> <span class='chavrusa-gemara' data-chavrusa-idx='42' tabindex='-1'>ה&#x27;</span> בחרבה <span class='chavrusa-gemara' data-chavrusa-idx='43' tabindex='-1'>בתוך</span> הירדן הכן <span class='chavrusa-gemara' data-chavrusa-idx='44' tabindex='-1'>וכל</span> ישראל עברים בחרבה <span class='chavrusa-gemara' data-chavrusa-idx='45' tabindex='-1'>עד</span> אשר תמו <span class='chavrusa-gemara' data-chavrusa-idx='46' tabindex='-1'>כל</span> הגוי <span class='chavrusa-gemara' data-chavrusa-idx='47' tabindex='-1'>לעבור</span> <span class='chavrusa-gemara' data-chavrusa-idx='48' tabindex='-1'>את</span> הירדן <span class='chavrusa-gemara' data-chavrusa-idx='49' tabindex='-1'>אלא</span> <span class='chavrusa-gemara' data-chavrusa-idx='50' tabindex='-1'>מעברות נחלי ארנון</span> <span class='chavrusa-gemara' data-chavrusa-idx='51' tabindex='-1'>מנלן</span> <span class='chavrusa-gemara' data-chavrusa-idx='52' tabindex='-1'>דכתיב</span> על <span class='chavrusa-gemara' data-chavrusa-idx='53' tabindex='-1'>כן</span> יאמר בספר מלחמת <span class='chavrusa-gemara' data-chavrusa-idx='54' tabindex='-1'>ה&#x27;</span> <span class='chavrusa-gemara' data-chavrusa-idx='55' tabindex='-1'>את</span> והב בסופה <span class='chavrusa-gemara' data-chavrusa-idx='56' tabindex='-1'>וגו&#x27;</span> <span class='chavrusa-gemara' data-chavrusa-idx='57' tabindex='-1'>תנא את והב בסופה</span> <span class='chavrusa-gemara' data-chavrusa-idx='58' tabindex='-1'>שני</span> <span class='chavrusa-gemara' data-chavrusa-idx='59' tabindex='-1'>מצורעים היו</span> <span class='chavrusa-gemara' data-chavrusa-idx='60' tabindex='-1'>דהוו מהלכין</span> <span class='chavrusa-gemara' data-chavrusa-idx='61' tabindex='-1'>בסוף מחנה ישראל</span> <span class='chavrusa-gemara' data-chavrusa-idx='62' tabindex='-1'>כי הוו קא חלפי</span> ישראל <span class='chavrusa-gemara' data-chavrusa-idx='63' tabindex='-1'>אתו אמוראי</span></div><div class='white-gutter' data-center-x='338.17' style='left:331.67px;top:33.00px;width:13.00px;height:57.32px'></div><div class='white-gutter' data-center-x='245.33' style='left:238.83px;top:90.32px;width:13.00px;height:131.59px'></div><div class='white-gutter' data-center-x='430.38' style='left:423.88px;top:90.32px;width:13.00px;height:612.81px'></div></div>
+<script type='application/json' id='layoutocr-typography'>{&quot;font_sources&quot;: [&quot;/Users/moshe/projects/shasDafHermes/layoutOCR/talmud_layout_measurements.md&quot;, &quot;/Users/moshe/projects/shasDafHermes/layoutOCR/shas_layout_measurements.md&quot;], &quot;font_pt&quot;: {&quot;gemara&quot;: 13.68, &quot;rashi&quot;: 11.16, &quot;tosafot&quot;: 11.16}, &quot;baseline_pitch_pt&quot;: {&quot;gemara&quot;: 11.9, &quot;rashi&quot;: 10.4, &quot;tosafot&quot;: 10.4}, &quot;visual_correction_2026_05_24&quot;: {&quot;reason&quot;: &quot;User compared against the original PDF and observed that the original print font is about 1.5x smaller while the inter-line distance is larger.&quot;, &quot;status&quot;: &quot;superseded_by_html_visual_correction_2026_05_28&quot;, &quot;css_font_scale&quot;: 0.6666666666666666, &quot;effective_css_font_px&quot;: {&quot;gemara&quot;: 9.12, &quot;rashi&quot;: 7.44, &quot;tosafot&quot;: 7.44}, &quot;effective_css_line_height_px&quot;: {&quot;gemara&quot;: 13.5, &quot;rashi&quot;: 11.8, &quot;tosafot&quot;: 11.8}}, &quot;fit_correction_2026_05_24b&quot;: {&quot;reason&quot;: &quot;Source text overflowed the shape rectangles. Shrunk both font-size and line-height by 25% so HebrewBooks text fits within the Azure F0 compound shapes.&quot;, &quot;status&quot;: &quot;superseded_by_pdf_line_breaks_and_html_visual_correction_2026_05_28&quot;, &quot;css_font_scale_from_visual_correction&quot;: 0.75, &quot;effective_css_font_px&quot;: {&quot;gemara&quot;: 6.84, &quot;rashi&quot;: 5.58, &quot;tosafot&quot;: 5.58}, &quot;effective_css_line_height_px&quot;: {&quot;gemara&quot;: 10.13, &quot;rashi&quot;: 8.85, &quot;tosafot&quot;: 8.85}}, &quot;html_visual_correction_2026_05_28&quot;: {&quot;reason&quot;: &quot;With the open Frank Ruhl Libre substitute, Gemara must have larger glyphs and tighter line spacing to match the original PDF.&quot;, &quot;source&quot;: &quot;layoutOCR/talmud_layout_measurements.md §3.1 and layoutOCR/shas_layout_measurements.md html_visual_correction_2026_05_28&quot;, &quot;effective_css_font_px&quot;: {&quot;gemara&quot;: 10.0, &quot;rashi&quot;: 7.7, &quot;tosafot&quot;: 7.7}, &quot;effective_css_line_height_px&quot;: {&quot;gemara&quot;: 11.8, &quot;rashi&quot;: 11.165, &quot;tosafot&quot;: 11.165}, &quot;line_height_ratio&quot;: {&quot;gemara&quot;: 1.18, &quot;rashi&quot;: 1.45, &quot;tosafot&quot;: 1.45}, &quot;font_weight&quot;: {&quot;gemara&quot;: 600}}, &quot;css_unit&quot;: &quot;px&quot;, &quot;coordinate_mapping&quot;: &quot;1 PDF pt == 1 CSS px in generated HTML&quot;, &quot;font_kind&quot;: {&quot;gemara&quot;: &quot;standard_square_vilna&quot;, &quot;rashi&quot;: &quot;standard_rashi_script&quot;, &quot;tosafot&quot;: &quot;standard_rashi_script&quot;}}</script>
+<script type='application/json' id='text-flow-summary'>{&quot;amud&quot;: &quot;54a&quot;, &quot;text_source&quot;: &quot;/Users/moshe/projects/shasDaf/data/hebrewbooks/berakhot/54a.json&quot;, &quot;streams&quot;: {&quot;rashi&quot;: {&quot;rects&quot;: 3, &quot;words&quot;: 460, &quot;written_words&quot;: 460, &quot;auto_fit_size_px&quot;: 7.417, &quot;auto_fit_line_height_px&quot;: 10.755, &quot;size_constraint&quot;: &quot;per_page_auto_fit:7.42 + catchword_overlay&quot;, &quot;render_as_kind&quot;: null, &quot;top_wrap_tight_lh_px&quot;: 10.755, &quot;all_words_fit&quot;: true, &quot;layout_exception&quot;: null}, &quot;tosafot&quot;: {&quot;rects&quot;: 2, &quot;words&quot;: 103, &quot;written_words&quot;: 103, &quot;auto_fit_size_px&quot;: 7.7, &quot;auto_fit_line_height_px&quot;: 11.165, &quot;size_constraint&quot;: &quot;global_size + catchword_overlay&quot;, &quot;render_as_kind&quot;: null, &quot;top_wrap_tight_lh_px&quot;: 11.165, &quot;all_words_fit&quot;: true, &quot;layout_exception&quot;: null}, &quot;gemara&quot;: {&quot;rects&quot;: 2, &quot;words&quot;: 237, &quot;written_words&quot;: 237, &quot;auto_fit_size_px&quot;: 12.6, &quot;auto_fit_line_height_px&quot;: 12.033, &quot;size_constraint&quot;: &quot;global_size&quot;, &quot;render_as_kind&quot;: null, &quot;top_wrap_tight_lh_px&quot;: null, &quot;all_words_fit&quot;: true, &quot;layout_exception&quot;: null, &quot;chavrusa_highlighted_words&quot;: 186, &quot;chavrusa_highlighted_runs&quot;: 64, &quot;chavrusa_source&quot;: &quot;/Users/moshe/projects/shasRU/chavrusa_v3/01_brachot/chapters&quot;, &quot;pdf_line_breaks&quot;: {&quot;enabled&quot;: false, &quot;ocr_lines&quot;: 56, &quot;rendered_lines&quot;: 25, &quot;source_words&quot;: 237, &quot;avg_score&quot;: 0.2299, &quot;min_score&quot;: 0.1169, &quot;low_score_lines&quot;: 6, &quot;skipped_ocr_lines&quot;: 31, &quot;line_word_counts&quot;: [], &quot;reason&quot;: &quot;low_alignment_score&quot;}}}, &quot;white_gutters&quot;: {&quot;source&quot;: &quot;/Users/moshe/projects/shasDafHermes/layoutOCR/talmud_layout_measurements.md&quot;, &quot;vertical_width_pt&quot;: 13.0, &quot;canonical_middle_centers_pt&quot;: [246.5, 431.0], &quot;method&quot;: &quot;pairwise adjacent-stream vertical separators, including top Rashi/Tosafot wrap band&quot;, &quot;horizontal_inside_content&quot;: &quot;none: 0-3.5pt, effectively abutting&quot;, &quot;rects&quot;: [{&quot;x&quot;: 331.66999999999996, &quot;y&quot;: 33.0, &quot;w&quot;: 13.0, &quot;h&quot;: 57.32499999999999, &quot;center&quot;: 338.16999999999996}, {&quot;x&quot;: 238.82999999999998, &quot;y&quot;: 90.32499999999999, &quot;w&quot;: 13.0, &quot;h&quot;: 131.585, &quot;center&quot;: 245.32999999999998}, {&quot;x&quot;: 423.885, &quot;y&quot;: 90.32499999999999, &quot;w&quot;: 13.0, &quot;h&quot;: 612.8050000000001, &quot;center&quot;: 430.385}]}}</script>
+<script type='application/json' id='provenance'>{&quot;amud&quot;: &quot;54a&quot;, &quot;geometry&quot;: &quot;out/tzurat_hadaf/berakhot_layoutocr_azure_f0_shapes&quot;, &quot;text&quot;: &quot;/Users/moshe/projects/shasDaf/data/hebrewbooks/berakhot/54a.json&quot;, &quot;typography&quot;: &quot;layoutOCR/talmud_layout_measurements.md + visual correction&quot;, &quot;gutters_pt&quot;: 13.0, &quot;canonical_middle_gutter_centers_pt&quot;: [246.5, 431.0], &quot;fonts&quot;: &quot;Mekorot-Vilna (GPL v2) for Gemara; Mekorot (OFL) for Rashi/Tosafot&quot;, &quot;auto_fit&quot;: &quot;per-stream font size via Pillow + binary search; OCR is diagnostic only and never used as rendered text; Gemara OCR lines may define source-text line breaks&quot;, &quot;bold_rules&quot;: &quot;Rashi: every source &lt;b&gt; dibur hamatchil. Tosafot: every source &lt;b&gt; DH is bold and starts a visual line; first DH word is enlarged. Gemara: no inline bold; body weight is heavier to match the PDF.&quot;}</script>
+
+<script>
+(function() {
+  let active = 0;
+  let rashiItems = null;
+  let lastGemaraTop = null;
+  let lastRashiTop = null;
+  function items() {
+    return Array.from(document.querySelectorAll('.chavrusa-gemara'));
+  }
+  function normalizeText(s) {
+    return (s || '')
+      .replace(/[֑-ׇ]/g, '')
+      .replace(/[״`]/g, '"')
+      .replace(/[׳']/g, "'")
+      .replace(/[^א-ת0-9"' ]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+  function words(s) {
+    const n = normalizeText(s);
+    return n ? n.split(' ') : [];
+  }
+  function collectRashi() {
+    if (rashiItems) return rashiItems;
+    rashiItems = Array.from(document.querySelectorAll('.rashi-dh')).map(el => ({
+      el,
+      text: normalizeText(el.textContent),
+      words: words(el.textContent)
+    })).filter(item => item.words.length);
+    return rashiItems;
+  }
+  function clearRashi() {
+    collectRashi().forEach(item => item.el.classList.remove('is-rashi-match'));
+  }
+  function hasExactWindow(needleWords, haystackWords) {
+    if (!needleWords.length || !haystackWords.length) return false;
+    if (needleWords.length > haystackWords.length) return false;
+    const n = needleWords.length;
+    const needle = needleWords.join(' ');
+    const maxStart = haystackWords.length - n;
+    for (let i = 0; i <= maxStart; i++) {
+      if (haystackWords.slice(i, i + n).join(' ') === needle) return true;
+    }
+    return false;
+  }
+  function exactMatch(dhWords, gemWords) {
+    if (!dhWords.length || !gemWords.length) return 0;
+    return hasExactWindow(dhWords, gemWords) || hasExactWindow(gemWords, dhWords);
+  }
+  function visualTop(el) {
+    const r = el.getBoundingClientRect();
+    return r.top + window.scrollY;
+  }
+  function applyTosafotSecondLineIndent() {
+    document.querySelectorAll('.tosafot-entry').forEach(entry => {
+      const wordsInEntry = Array.from(entry.querySelectorAll('.tos-word'));
+      wordsInEntry.forEach(word => word.classList.remove('tos-second-line-indent'));
+      const rows = [];
+      wordsInEntry.forEach((word, idx) => {
+        const rects = word.getClientRects();
+        if (!rects.length) return;
+        const rect = rects[0];
+        const row = rows.find(item => Math.abs(item.top - rect.top) <= 1.5);
+        if (row) {
+          row.words.push({word, idx});
+          row.top = Math.min(row.top, rect.top);
+        } else {
+          rows.push({top: rect.top, words: [{word, idx}]});
+        }
+      });
+      rows.sort((a, b) => a.top - b.top);
+      if (rows.length < 2) return;
+      rows[1].words.sort((a, b) => a.idx - b.idx);
+      rows[1].words[0].word.classList.add('tos-second-line-indent');
+    });
+  }
+  function highlightRashiFor(gemaraEl, direction, prevGemaraEl) {
+    clearRashi();
+    const gw = words(gemaraEl ? gemaraEl.textContent : '');
+    if (!gw.length) return;
+    const currentGemaraTop = visualTop(gemaraEl);
+    const requireRashiProgress = direction > 0 && lastRashiTop !== null;
+    let best = null;
+    for (const item of collectRashi()) {
+      if (requireRashiProgress && visualTop(item.el) < lastRashiTop - 1) continue;
+      if (exactMatch(item.words, gw)) {
+        best = item;
+        break;
+      }
+    }
+    if (best) {
+      best.el.classList.add('is-rashi-match');
+      lastRashiTop = visualTop(best.el);
+    }
+    lastGemaraTop = currentGemaraTop;
+  }
+  function setActive(next, direction) {
+    const els = items();
+    if (!els.length) return;
+    const prevEl = els[active] || null;
+    active = ((next % els.length) + els.length) % els.length;
+    els.forEach((el, i) => {
+      const on = i === active;
+      el.classList.toggle('is-active', on);
+      el.setAttribute('aria-current', on ? 'true' : 'false');
+    });
+    highlightRashiFor(els[active], direction || 0, prevEl);
+    els[active].scrollIntoView({block: 'nearest', inline: 'nearest'});
+  }
+  window.__chavrusaStep = function(delta) {
+    setActive(active + delta, delta);
+  };
+  function onKey(e) {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      window.__chavrusaStep(e.key === 'ArrowRight' ? -1 : 1);
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      window.__chavrusaStep(e.key === 'ArrowLeft' ? 1 : -1);
+    }
+  }
+  document.addEventListener('keydown', onKey);
+  function boot() {
+    applyTosafotSecondLineIndent();
+    window.requestAnimationFrame(applyTosafotSecondLineIndent);
+    setActive(0, 0);
+  }
+  window.addEventListener('resize', () => window.requestAnimationFrame(applyTosafotSecondLineIndent));
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot, {once: true});
+  } else {
+    boot();
+  }
+})();
+</script>
+</body></html>

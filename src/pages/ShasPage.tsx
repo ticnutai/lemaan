@@ -53,11 +53,15 @@ async function loadMasechet(slug: string): Promise<Record<string, Amud>> {
   return data.amudim;
 }
 
+/** מסכתות שקיימת להן צורת הדף המלאה (HTML וילנא, ללא פרסומות) בקבצים מקומיים. */
+const TZURAT_TRACTATES: Record<string, string> = { Berakhot: "berakhot" };
+
 export default function ShasPage() {
   const [params, setParams] = useSearchParams();
   const [index, setIndex] = useState<ShasIndex | null>(null);
   const [amudim, setAmudim] = useState<Record<string, Amud> | null>(null);
   const [openCommentaries, setOpenCommentaries] = useState<Set<string>>(new Set(["rashi", "tosafot"]));
+  const [tzurat, setTzurat] = useState(false); // תצוגת צורת הדף
   const [error, setError] = useState("");
 
   const slug = params.get("m");
@@ -158,15 +162,42 @@ export default function ShasPage() {
             <ChevronLeft className="h-4 w-4" />
           </button>
         </div>
-        <h2 className="font-display text-xl font-bold">
-          {meta.he} {amud ? `· דף ${amud.daf} ${amud.amud}` : ""}
-        </h2>
+        <div className="flex items-center gap-2">
+          {TZURAT_TRACTATES[slug] ? (
+            <button
+              className={`btn-outline h-9 ${tzurat ? "border-gold text-gold bg-gold/10" : ""}`}
+              title="תצוגת דף וילנא אותנטית — רש״י, תוספות ומסורת הש״ס במקומם"
+              onClick={() => setTzurat((v) => !v)}
+            >
+              צורת הדף
+            </button>
+          ) : (
+            <button className="btn-outline h-9 opacity-40 cursor-not-allowed" title="צורת הדף זמינה בשלב זה למסכת ברכות; שאר המסכתות בטקסט מסודר">
+              צורת הדף
+            </button>
+          )}
+          <h2 className="font-display text-xl font-bold">
+            {meta.he} {amud ? `· דף ${amud.daf} ${amud.amud}` : ""}
+          </h2>
+        </div>
       </div>
 
       {error && <p className="text-destructive text-sm">{error}</p>}
       {!amudim && !error && <div className="card-panel text-center py-10 text-muted-foreground">טוען את המסכת…</div>}
 
-      {amud && (
+      {tzurat && TZURAT_TRACTATES[slug] && (
+        <div className="gold-frame bg-white overflow-hidden">
+          <iframe
+            key={amudKey}
+            src={`${import.meta.env.BASE_URL}tzurat/tractate/${TZURAT_TRACTATES[slug]}/${amudKey}.html`}
+            title={`צורת הדף — ${meta.he} ${amud?.daf ?? ""} ${amud?.amud ?? ""}`}
+            className="w-full border-0"
+            style={{ height: "82vh" }}
+          />
+        </div>
+      )}
+
+      {!tzurat && amud && (
         <>
           <article className="gold-frame p-6 leading-loose text-lg" style={{ fontFamily: "'Frank Ruhl Libre', 'Heebo', serif" }}>
             {amud.gemara.map((seg, i) => (
