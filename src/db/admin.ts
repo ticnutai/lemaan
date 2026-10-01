@@ -150,3 +150,70 @@ export async function adminUserAction(payload: {
   }
   return data as { ok?: boolean; id?: string; error?: string };
 }
+
+/** הטאבים שאפשר להסתיר מלומדים (בית תמיד מוצג; ניהול ממילא למנהלים). */
+export const TOGGLABLE_TABS: { to: string; label: string }[] = [
+  { to: "/study", label: "תרגול" },
+  { to: "/calendar", label: "חזרות" },
+  { to: "/quiz", label: "בניית מבחנים" },
+  { to: "/shas", label: 'הש"ס' },
+  { to: "/shas-board", label: 'לוח הש"ס' },
+  { to: "/goals", label: "יעדים" },
+  { to: "/questions", label: "בניית שאלות" },
+  { to: "/categories", label: "קטגוריות" },
+  { to: "/stats", label: "התקדמות" },
+  { to: "/settings", label: "הגדרות" },
+];
+
+const TABS_KEY = "visible-tabs";
+
+/** שני פרופילי תצוגה ללומדים (מנהל תמיד רואה הכל) + שיוך פר-לומד ופרופיל לאורחים. */
+export interface TabsConfig {
+  full: string[];
+  basic: string[];
+  guest: "full" | "basic";
+  assignments: Record<string, "full" | "basic">;
+}
+
+export const defaultTabsConfig = (): TabsConfig => ({
+  full: TOGGLABLE_TABS.map((t) => t.to),
+  basic: TOGGLABLE_TABS.map((t) => t.to),
+  guest: "full",
+  assignments: {},
+});
+
+function normalizeTabsConfig(raw: unknown): TabsConfig {
+  if (Array.isArray(raw)) return { ...defaultTabsConfig(), full: raw as string[], basic: raw as string[] };
+  const o = (raw ?? {}) as Partial<TabsConfig>;
+  return {
+    full: o.full ?? TOGGLABLE_TABS.map((t) => t.to),
+    basic: o.basic ?? TOGGLABLE_TABS.map((t) => t.to),
+    guest: o.guest === "basic" ? "basic" : "full",
+    assignments: o.assignments ?? {},
+  };
+}
+
+export async function fetchTabsConfig(): Promise<TabsConfig> {
+  try {
+    const { data, error } = await supabase.from("lemaan_config").select("value").eq("key", TABS_KEY).maybeSingle();
+    if (!error && data?.value) {
+      const cfg = normalizeTabsConfig(data.value);
+      await db.settings.put({ key: "visible-tabs-cache", value: JSON.stringify(cfg) });
+      return cfg;
+    }
+  } catch { /* אופליין — נופל למטמון */ }
+  const cached = (await db.settings.get("visible-tabs-cache"))?.value;
+  return cached ? normalizeTabsConfig(JSON.parse(cached)) : defaultTabsConfig();
+}
+
+export async function saveTabsConfig(cfg: TabsConfig): Promise<void> {
+  const { error } = await supabase.from("lemaan_config").upsert({ key: TABS_KEY, value: cfg, updated_at: new Date().toISOString() });
+  if (error) throw error;
+  await db.settings.put({ key: "visible-tabs-cache", value: JSON.stringify(cfg) });
+}
+
+/** הטאבים שמשתמש נתון רואה לפי התצורה. */
+export function tabsForUser(cfg: TabsConfig, email: string | null | undefined): string[] {
+  const profile = email ? (cfg.assignments[email] ?? "full") : cfg.guest;
+  return profile === "basic" ? cfg.basic : cfg.full;
+}

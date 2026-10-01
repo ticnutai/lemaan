@@ -1,9 +1,9 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { useTheme } from "../theme/ThemeProvider";
 import { useAutoImport } from "../db/useAutoImport";
 import { useSession } from "../db/useSession";
-import { logAppOpen, pullApprovedQuestions } from "../db/admin";
+import { fetchTabsConfig, logAppOpen, pullApprovedQuestions, tabsForUser } from "../db/admin";
 import { useIsAdmin } from "../db/useIsAdmin";
 import { CalendarDays, FolderTree, GraduationCap, HelpCircle, Home, Landmark, LineChart, Moon, Settings, LayoutGrid, ShieldCheck, Sparkles, Sun, Target, Timer, UserRound } from "lucide-react";
 import { cn } from "../lib/utils";
@@ -31,6 +31,11 @@ export default function Layout() {
   const { importing, progress } = useAutoImport();
   const session = useSession();
   const admin = useIsAdmin(session);
+  // אילו טאבים לומדים רואים — לפי הפרופיל (מלא/מצומצם); מנהל רואה הכל תמיד
+  const [visibleTabs, setVisibleTabs] = useState<string[] | null>(null);
+  useEffect(() => {
+    fetchTabsConfig().then((cfg) => setVisibleTabs(tabsForUser(cfg, session?.user.email)));
+  }, [session]);
   // רישום נוכחות ומשיכת שאלות מאושרות — פעם אחת לכל כניסה מחוברת
   useEffect(() => {
     if (!session) return;
@@ -78,7 +83,8 @@ export default function Layout() {
         {/* Right sidebar: label on the right, icon circle on the left, like the original */}
         <aside className="w-52 shrink-0 border-l bg-card flex flex-col">
           <nav className="flex-1 p-3 space-y-1.5 overflow-auto">
-            {[...nav, ...(admin ? [{ to: "/admin", label: "ניהול", icon: ShieldCheck }] : [])].map(({ to, label, icon: Icon }) => (
+            {[...nav.filter((n) => admin || n.to === "/" || !visibleTabs || visibleTabs.includes(n.to)),
+               ...(admin ? [{ to: "/admin", label: "ניהול", icon: ShieldCheck }] : [])].map(({ to, label, icon: Icon }) => (
               <NavLink
                 key={to}
                 to={to}

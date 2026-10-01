@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  BarChart3, Check, Download, Library, MessageSquare, Pencil, Plus, RefreshCw, ShieldCheck, Trash2, Users, X,
+  BarChart3, Check, Download, Eye, Library, MessageSquare, Pencil, Plus, RefreshCw, ShieldCheck, Trash2, Users, X,
 } from "lucide-react";
 import PageBanner from "../components/PageBanner";
 import { supabase } from "../db/supabase";
 import { db } from "../db";
-import { FOUNDER_EMAILS, adminUserAction, listAdmins, setAdminRole } from "../db/admin";
+import {
+  FOUNDER_EMAILS, TOGGLABLE_TABS, type TabsConfig, adminUserAction, defaultTabsConfig,
+  fetchTabsConfig, listAdmins, saveTabsConfig, setAdminRole,
+} from "../db/admin";
 import { useIsAdmin } from "../db/useIsAdmin";
 import { useSession } from "../db/useSession";
 import { defaultSrs } from "../features/study/srs";
@@ -17,7 +20,7 @@ interface UsageRow { user_id: string; email: string | null; kind: string; platfo
 interface NoteRow { id: string; email: string | null; card_id: string | null; question: string | null; note: string; status: string; created_at: string }
 interface SharedRow { id: string; email: string | null; card: Partial<Card>; status: string; created_at: string }
 
-type Tab = "users" | "reports" | "notes" | "shared";
+type Tab = "users" | "reports" | "notes" | "shared" | "display";
 
 const fmtDate = (s: string) => new Date(s).toLocaleString("he-IL", { day: "numeric", month: "numeric", year: "2-digit", hour: "2-digit", minute: "2-digit" });
 
@@ -39,6 +42,8 @@ export default function AdminPage() {
   const [adminEmails, setAdminEmails] = useState<string[]>([]);
   const [userForm, setUserForm] = useState<{ userId: string | null; name: string; email: string; password: string } | null>(null);
   const [userBusy, setUserBusy] = useState(false);
+  const [tabsCfg, setTabsCfg] = useState<TabsConfig>(defaultTabsConfig());
+  const [tabsSaved, setTabsSaved] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -53,6 +58,7 @@ export default function AdminPage() {
       ]);
       setProfiles((p.data as ProfileRow[]) ?? []);
       try { setAdminEmails(await listAdmins()); } catch { /* ייכשל רק אם אינו מנהל */ }
+      setTabsCfg(await fetchTabsConfig());
       setUsage((u.data as UsageRow[]) ?? []);
       setNotes((n.data as NoteRow[]) ?? []);
       setShared((s.data as SharedRow[]) ?? []);
@@ -180,6 +186,7 @@ export default function AdminPage() {
           { id: "reports", label: "דוחות", icon: BarChart3, badge: 0 },
           { id: "notes", label: "הערות על שאלות", icon: MessageSquare, badge: pendingNotes.length },
           { id: "shared", label: "שאלות משתמשים", icon: Library, badge: pendingShared.length },
+          { id: "display", label: "תצוגה", icon: Eye, badge: 0 },
         ] as const).map((t) => (
           <button
             key={t.id}
@@ -295,6 +302,20 @@ export default function AdminPage() {
                           {!founder && email && (
                             <button className="btn-outline h-7 px-2 text-xs" onClick={toggle}>
                               {isAdm ? "הסר ניהול" : "הפוך למנהל"}
+                            </button>
+                          )}
+                          {!isAdm && email && (
+                            <button
+                              className="btn-outline h-7 px-2 text-xs"
+                              title="החלפת פרופיל תצוגה"
+                              onClick={async () => {
+                                const cur = tabsCfg.assignments[email] ?? "full";
+                                const next: "full" | "basic" = cur === "full" ? "basic" : "full";
+                                const cfg = { ...tabsCfg, assignments: { ...tabsCfg.assignments, [email]: next } };
+                                try { await saveTabsConfig(cfg); setTabsCfg(cfg); } catch (e) { setMsg(e instanceof Error ? e.message : "שגיאה"); }
+                              }}
+                            >
+                              {(tabsCfg.assignments[email] ?? "full") === "full" ? "מלא" : "מצומצם"}
                             </button>
                           )}
                           <button className="btn-ghost h-7 w-7 p-0" title="עריכת שם / מייל / סיסמה"
@@ -447,6 +468,74 @@ export default function AdminPage() {
               ))}
             </div>
           )}
+        </div>
+      )}
+      {/* ---- תצוגה: שני פרופילי טאבים ללומדים ---- */}
+      {tab === "display" && (
+        <div className="gold-frame bg-card p-4 space-y-4">
+          <div>
+            <h3 className="font-bold text-lg">אילו טאבים לומדים רואים</h3>
+            <p className="text-sm text-muted-foreground">
+              שני פרופילים בלבד — מלא ומצומצם; משייכים לומד לפרופיל ברשימת המשתמשים. מנהלים רואים תמיד הכל, "בית" מוצג תמיד.
+            </p>
+          </div>
+
+          {(["full", "basic"] as const).map((prof) => (
+            <div key={prof} className="space-y-1.5">
+              <p className="font-semibold text-sm">{prof === "full" ? "🟡 פרופיל מלא (ברירת מחדל)" : "🔵 פרופיל מצומצם"}</p>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                {TOGGLABLE_TABS.map((t) => {
+                  const on = tabsCfg[prof].includes(t.to);
+                  return (
+                    <label key={t.to} className={`card-panel py-2 px-3 flex items-center gap-2 cursor-pointer ${on ? "" : "opacity-50"}`}>
+                      <input
+                        type="checkbox"
+                        className="accent-[hsl(var(--gold))] h-4 w-4"
+                        checked={on}
+                        onChange={(e) =>
+                          setTabsCfg((c) => ({
+                            ...c,
+                            [prof]: e.target.checked ? [...c[prof], t.to] : c[prof].filter((x) => x !== t.to),
+                          }))
+                        }
+                      />
+                      <span className="font-medium text-sm">{t.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+
+          <div className="flex items-center gap-2 text-sm">
+            אורחים (ללא חשבון) רואים:
+            <select
+              className="input w-40 h-9"
+              value={tabsCfg.guest}
+              onChange={(e) => setTabsCfg((c) => ({ ...c, guest: e.target.value as "full" | "basic" }))}
+            >
+              <option value="full">פרופיל מלא</option>
+              <option value="basic">פרופיל מצומצם</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              className="btn-primary h-10"
+              onClick={async () => {
+                try {
+                  await saveTabsConfig(tabsCfg);
+                  setTabsSaved(true);
+                  setTimeout(() => setTabsSaved(false), 2500);
+                } catch (e) {
+                  setMsg(e instanceof Error ? e.message : "שגיאה בשמירה");
+                }
+              }}
+            >
+              שמור תצוגה
+            </button>
+            {tabsSaved && <span className="text-sm text-gold font-medium animate-fade-in">✓ נשמר — ייכנס לתוקף אצל הלומדים בטעינה הבאה</span>}
+          </div>
         </div>
       )}
     </div>
