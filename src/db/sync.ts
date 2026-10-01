@@ -58,6 +58,7 @@ export async function pushSnapshot(): Promise<{ sizeKb: number }> {
     settings: (await db.settings.toArray()).filter((s) => s.key !== "sync-code"),
     shasProgress: await db.shasProgress.toArray(),
     shasLog: await db.shasLog.toArray(),
+    studyPlans: await db.studyPlans.toArray(),
   };
   const payload = await gzipBase64(JSON.stringify(snapshot));
   const res = await fetch(ENDPOINT, {
@@ -89,6 +90,7 @@ export async function pullSnapshot(code?: string): Promise<{ updatedAt: string }
     if (snapshot.goals?.length) await db.goals.bulkPut(snapshot.goals);
     if (snapshot.settings?.length) await db.settings.bulkPut(snapshot.settings);
     if (snapshot.shasProgress?.length) await db.shasProgress.bulkPut(snapshot.shasProgress);
+    if (snapshot.studyPlans?.length) await db.studyPlans.bulkPut(snapshot.studyPlans);
     if (snapshot.shasLog?.length) {
       await db.shasLog.bulkPut(snapshot.shasLog.map((l: { id?: number }) => { const { id: _id, ...rest } = l; return rest; }));
     }

@@ -1,5 +1,5 @@
 import Dexie, { type Table } from "dexie";
-import type { Card, Category, Deck, ReviewLog, Goal, Setting } from "../features/study/types";
+import type { Card, Category, Deck, ReviewLog, Goal, Setting, StudyPlan } from "../features/study/types";
 import type { ShasAmud, ShasLogRow } from "../features/study/shasBoard";
 
 /**
@@ -17,6 +17,7 @@ class LemaanDB extends Dexie {
   settings!: Table<Setting, string>;
   shasProgress!: Table<ShasAmud, string>;
   shasLog!: Table<ShasLogRow, number>;
+  studyPlans!: Table<StudyPlan, string>;
 
   constructor() {
     super("lemaan");
@@ -32,6 +33,10 @@ class LemaanDB extends Dexie {
     this.version(2).stores({
       shasProgress: "key, masechta",
       shasLog: "++id, at",
+    });
+    // תוכניות לימוד יומיות (חומש, רמב"ם, דף יומי...)
+    this.version(3).stores({
+      studyPlans: "id, name",
     });
   }
 }

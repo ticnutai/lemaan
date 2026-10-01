@@ -4,6 +4,8 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { CalendarClock, CheckCircle2, Download, Flame, GraduationCap, Library } from "lucide-react";
 import { db } from "../db";
 import { importLibrary, type ImportProgress } from "../db/importLibrary";
+import StudyPlansSection from "../components/StudyPlansSection";
+import ActivityInsights from "../components/ActivityInsights";
 
 function startOfDay(ts: number): number {
   const d = new Date(ts);
@@ -118,6 +120,10 @@ export default function Dashboard() {
           התחל חזרה
         </Link>
       </div>
+
+      {/* רכיבי "כללי" מהמערכת המקורית: תוכניות לימוד, סיכום שבועי ומפת חום */}
+      <StudyPlansSection />
+      <ActivityInsights />
     </div>
   );
 }

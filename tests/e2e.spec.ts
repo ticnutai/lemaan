@@ -183,3 +183,20 @@ test("T15 — ניהול: מוסתר בלי חשבון, כפתור הערה בת
   await page.getByRole("button", { name: /הערה על השאלה/ }).click();
   await expect(page.getByText(/שליחת הערות דורשת חשבון/)).toBeVisible();
 });
+
+test("T16 — תוכניות לימוד: יצירה מתבנית, סימון היום, מחיקה", async () => {
+  await page.goto("/#/");
+  await page.getByRole("button", { name: "הוסף תוכנית" }).click();
+  await page.getByRole("button", { name: /חומש — פרק ליום/ }).click();
+  await page.getByRole("button", { name: "צור תוכנית" }).click();
+  await expect(page.getByText(/היום: פרק 1/)).toBeVisible();
+  await page.getByRole("button", { name: /סמן את של היום/ }).click();
+  await expect(page.getByText(/היום: פרק 2/)).toBeVisible();
+  await expect(page.getByText(/1\/187/)).toBeVisible();
+  page.once("dialog", (d) => d.accept());
+  await page.getByTitle("מחיקת התוכנית").click();
+  await expect(page.getByText(/אין תוכניות לימוד פעילות/)).toBeVisible();
+  // ווידג'טים: סיכום 7 ימים ומפת חום מוצגים
+  await expect(page.getByText("סיכום 7 ימים")).toBeVisible();
+  await expect(page.getByText("מפת חום")).toBeVisible();
+});

@@ -79,3 +79,16 @@ export interface Setting {
   key: string;
   value: string;
 }
+
+/** תוכנית לימוד יומית: חומש, רמב"ם, דף יומי או כל ספר בקצב קבוע. */
+export interface StudyPlan {
+  id: string;
+  name: string;
+  unitLabel: string; // פרק / דף / משנה...
+  totalUnits: number;
+  unitsPerDay: number;
+  startDate: number; // חצות היום הראשון
+  completedUnits: number;
+  createdAt: number;
+  updatedAt: number;
+}
