@@ -152,7 +152,7 @@ export async function importLibrary(onProgress?: (p: ImportProgress) => void): P
       categoryId,
       deckIds: [],
       tags: (s.tags ?? []).filter((t) => !t.startsWith("cat:")),
-      masechta: s.masechta ?? null,
+      masechta: s.masechta ? (NAME_ALIASES[s.masechta.trim()] ?? s.masechta.trim()) : null,
       daf: s.daf != null ? String(s.daf) : null,
       amud: s.amud != null ? String(s.amud) : null,
       createdAt: s.createdAt ?? now,
@@ -205,6 +205,12 @@ export async function importLibrary(onProgress?: (p: ImportProgress) => void): P
  * (בלי זה הדרילדאון עד רמת עמוד לא יציג מונים במכשירים ותיקים.)
  */
 export async function ensureAmudBackfill(): Promise<void> {
+  // איחוד כתיב מסכתות (נידה→נדה) — עדכון חד-פעמי מהיר גם במכשירים קיימים
+  if (!(await db.settings.get("masechta-alias-fix"))?.value) {
+    const fixes = await db.cards.where("masechta").equals("נידה").primaryKeys();
+    if (fixes.length) await db.cards.where("masechta").equals("נידה").modify({ masechta: "נדה" });
+    await db.settings.put({ key: "masechta-alias-fix", value: "1" });
+  }
   if ((await db.settings.get("amud-backfill-done"))?.value) return;
   if (!(await db.settings.get("library-import-done"))?.value) return; // ימולא בייבוא עצמו
   try {
