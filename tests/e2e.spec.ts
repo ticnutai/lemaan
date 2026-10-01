@@ -212,3 +212,18 @@ test("T17 — צורת הדף: מנוע הפריסה מצייר גמרא/רש\"�
   await expect(page.getByText(/\d+ מופעים/)).toBeVisible();
   await expect(daf.locator("mark.daf-hit").first()).toBeAttached({ timeout: 10_000 });
 });
+
+test("T18 — דפוס מדויק (ברכות): שורות הדפוס, בלי תגיות/לטינית, חיפוש וצבע", async () => {
+  await page.goto("/#/shas?m=Berakhot&a=10a");
+  await page.getByRole("button", { name: /^צורת הדף/ }).click();
+  const daf = page.locator(".lemaan-daf");
+  await expect(daf.locator(".daf-pline").first()).toBeVisible({ timeout: 15_000 });
+  // השורה הראשונה זהה לשורת הדפוס
+  await expect(daf.locator(".daf-pline").first()).toHaveText(/כל פרשה שהיתה חביבה על דוד/);
+  // אין שום תגית/ישות/אות לטינית בטקסט המוצג
+  const text = await daf.innerText();
+  expect(text).not.toMatch(/[A-Za-z]|&#|&quot;|<b>|<big>/);
+  // חיפוש מדגיש גם בשורות הדפוס
+  await page.getByPlaceholder(/חיפוש בדף/).fill("אשרי");
+  await expect(daf.locator("mark.daf-hit").first()).toBeAttached({ timeout: 10_000 });
+});

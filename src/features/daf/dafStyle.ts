@@ -9,6 +9,8 @@ export interface DafStyle {
   scale: number;
   /** הצגת ניקוד וטעמים (הווילנא המקורי ללא ניקוד) */
   nikud: boolean;
+  /** "print" = שורות זהות לדפוס (כשיש נתוני שורות); "live" = פריסה מחושבת */
+  mode: "print" | "live";
   colors: { main: string; inner: string; outer: string; headers: string; highlight: string };
 }
 
@@ -17,6 +19,7 @@ export const DEFAULT_DAF_STYLE: DafStyle = {
   sideFont: "Rashi",
   scale: 1,
   nikud: false,
+  mode: "print",
   colors: { main: "#111111", inner: "#1c1c1c", outer: "#1c1c1c", headers: "#7a5c12", highlight: "#ffe08a" },
 };
 

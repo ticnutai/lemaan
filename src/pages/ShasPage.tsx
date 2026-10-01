@@ -62,8 +62,14 @@ export default function ShasPage() {
   const [index, setIndex] = useState<ShasIndex | null>(null);
   const [amudim, setAmudim] = useState<Record<string, Amud> | null>(null);
   const [openCommentaries, setOpenCommentaries] = useState<Set<string>>(new Set(["rashi", "tosafot"]));
-  const [tzurat, setTzurat] = useState(false); // תצוגת צורת הדף (מנוע חי)
-  const [printMode, setPrintMode] = useState(false); // דפוס מקורי מעוגן (ברכות)
+  // תצוגת צורת הדף — פרמטר ב-URL (?v=daf) כדי שקישורים עמוקים ומעבר בין מסכתות ישמרו אותה
+  const tzurat = params.get("v") === "daf";
+  const setTzurat = (on: boolean) => {
+    const next = new URLSearchParams(params);
+    if (on) next.set("v", "daf"); else next.delete("v");
+    setParams(next, { replace: true });
+  };
+  const [printLines, setPrintLines] = useState<Record<string, string[]> | null>(null); // שורות דפוס למסכת
   const [error, setError] = useState("");
 
   const slug = params.get("m");
@@ -84,6 +90,16 @@ export default function ShasPage() {
       .then(setIndex)
       .catch(() => setError("אינדקס הש\"ס לא נטען"));
   }, []);
+
+  // נתוני שורות דפוס (כשקיימים למסכת) — מאפשרים מצב "דפוס מדויק"
+  useEffect(() => {
+    setPrintLines(null);
+    if (!slug || !TZURAT_TRACTATES[slug]) return;
+    fetch(`${import.meta.env.BASE_URL}tzurat/lines/${TZURAT_TRACTATES[slug]}.json`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setPrintLines(d))
+      .catch(() => setPrintLines(null));
+  }, [slug]);
 
   useEffect(() => {
     if (!slug) {
@@ -112,7 +128,7 @@ export default function ShasPage() {
   const amudKeys = useMemo(() => (amudim ? Object.keys(amudim) : []), [amudim]);
   const amudPos = amudKeys.indexOf(amudKey);
 
-  const go = (m: string, a: string) => setParams({ m, a }, { replace: false });
+  const go = (m: string, a: string) => setParams(tzurat ? { m, a, v: "daf" } : { m, a }, { replace: false });
 
   // ---------- בחירת מסכת ----------
   if (!slug || !meta) {
@@ -168,19 +184,10 @@ export default function ShasPage() {
           <button
             className={`btn-outline h-9 ${tzurat ? "border-gold text-gold bg-gold/10" : ""}`}
             title="צורת הדף — גמרא במרכז, רש״י פנימה, תוספות בחוץ; חיפוש, צבעים וגופנים"
-            onClick={() => setTzurat((v) => !v)}
+            onClick={() => setTzurat(!tzurat)}
           >
             צורת הדף
           </button>
-          {tzurat && TZURAT_TRACTATES[slug] && (
-            <button
-              className={`btn-outline h-9 text-xs ${printMode ? "border-gold text-gold bg-gold/10" : ""}`}
-              title="דפוס וילנא מקורי — שבירת שורות זהה לספר (זמין לברכות)"
-              onClick={() => setPrintMode((v) => !v)}
-            >
-              דפוס מקורי
-            </button>
-          )}
           <h2 className="font-display text-xl font-bold">
             {meta.he} {amud ? `· דף ${amud.daf} ${amud.amud}` : ""}
           </h2>
@@ -190,7 +197,7 @@ export default function ShasPage() {
       {error && <p className="text-destructive text-sm">{error}</p>}
       {!amudim && !error && <div className="card-panel text-center py-10 text-muted-foreground">טוען את המסכת…</div>}
 
-      {tzurat && !printMode && amud && (
+      {tzurat && amud && (
         <DafPage
           key={`${slug}-${amudKey}`}
           gemara={amud.gemara}
@@ -198,19 +205,8 @@ export default function ShasPage() {
           tosafot={amud.commentaries.find((c) => c.key === "tosafot")?.segments ?? []}
           amud={amudKey.endsWith("b") ? "b" : "a"}
           title={`${meta.he} דף ${amud.daf} ${amud.amud}`}
+          printLines={printLines?.[amudKey]}
         />
-      )}
-
-      {tzurat && printMode && TZURAT_TRACTATES[slug] && (
-        <div className="gold-frame bg-white overflow-hidden">
-          <iframe
-            key={amudKey}
-            src={`${import.meta.env.BASE_URL}tzurat/tractate/${TZURAT_TRACTATES[slug]}/${amudKey}.html`}
-            title={`צורת הדף — ${meta.he} ${amud?.daf ?? ""} ${amud?.amud ?? ""}`}
-            className="w-full border-0"
-            style={{ height: "82vh" }}
-          />
-        </div>
       )}
 
       {!tzurat && amud && (
