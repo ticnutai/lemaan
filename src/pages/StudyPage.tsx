@@ -129,17 +129,19 @@ export default function StudyPage() {
   const startAmud = async (amud: "1" | "2" | null) => {
     if (!masechta || daf === null) return;
     const dafStr = String(daf);
-    const cards = (allCards ?? []).filter(
-      (c) => c.masechta === masechta && c.daf === dafStr && (amud === null || c.amud == null || c.amud === amud)
+    // שליפה ישירה מהמסד — עמיד גם ללחיצה לפני שהטעינה לזיכרון הסתיימה
+    const all = await db.cards.where("masechta").equals(masechta).toArray();
+    const cards = all.filter(
+      (c) => c.daf === dafStr && (amud === null || c.amud == null || c.amud === amud)
     );
     const amudLabel = amud ? ` · ${AMUD_LABELS[amud]}` : "";
     beginSession(cards, `${masechta} דף ${hebrewDaf(daf)}${amudLabel}`);
   };
 
-  /** תרגול מבחנים: סשן מכל שאלות המבחן. */
+  /** תרגול מבחנים: סשן מכל שאלות המבחן — שליפה ישירה, בלי תלות בטעינה לזיכרון. */
   const startDeck = async (deck: Deck) => {
-    if (!categories || !allCards) return;
-    beginSession(cardsForDeck(deck, allCards, categories), `תרגול מבחן: ${deck.name}`);
+    const [cats, cards] = await Promise.all([db.categories.toArray(), db.cards.toArray()]);
+    beginSession(cardsForDeck(deck, cards, cats), `תרגול מבחן: ${deck.name}`);
   };
 
   // כניסה מחפיסה/מבחן בקישור (/study?deck=<id>)
