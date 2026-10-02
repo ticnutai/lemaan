@@ -50,7 +50,15 @@ async function loadMasechet(slug: string): Promise<Record<string, Amud>> {
 }
 
 /** מסכתות שקיימת להן צורת הדף המלאה (HTML וילנא, ללא פרסומות) בקבצים מקומיים. */
-const TZURAT_TRACTATES: Record<string, string> = { Berakhot: "berakhot", Megillah: "megillah" };
+// מסכתות עם דפוס מדויק — הרשימה נכתבת ע"י scripts/daf-pipeline/hb_pdf.py
+let printIndex: Promise<Set<string>> | null = null;
+function loadPrintIndex(): Promise<Set<string>> {
+  printIndex ??= fetch(`${import.meta.env.BASE_URL}tzurat/print/index.json`)
+    .then((r) => (r.ok ? r.json() : []))
+    .then((l: string[]) => new Set(l))
+    .catch(() => new Set<string>());
+  return printIndex;
+}
 
 export default function ShasPage() {
   const [params, setParams] = useSearchParams();
@@ -89,10 +97,14 @@ export default function ShasPage() {
   // גיאומטריית דפוס (כשקיימת למסכת) — מאפשרת מצב "דפוס מדויק"
   useEffect(() => {
     setPrintLayouts(null);
-    if (!slug || !TZURAT_TRACTATES[slug]) return;
-    fetchGzJson<Record<string, PrintLayout>>(`${import.meta.env.BASE_URL}tzurat/print/${TZURAT_TRACTATES[slug]}.json.gz`)
-      .then((d) => setPrintLayouts(d))
-      .catch(() => setPrintLayouts(null));
+    if (!slug) return;
+    let cancelled = false;
+    const file = slug.toLowerCase();
+    loadPrintIndex()
+      .then((have) => (have.has(file) ? fetchGzJson<Record<string, PrintLayout>>(`${import.meta.env.BASE_URL}tzurat/print/${file}.json.gz`) : null))
+      .then((d) => { if (!cancelled) setPrintLayouts(d); })
+      .catch(() => { if (!cancelled) setPrintLayouts(null); });
+    return () => { cancelled = true; };
   }, [slug]);
 
   useEffect(() => {

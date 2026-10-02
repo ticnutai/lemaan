@@ -480,5 +480,59 @@ def main(pdf, tractate, first_page, only=None):
     print("→", out_path, len(out), "amudim")
 
 
+def tractate_of(pdf):
+    """מסכת לפי שם הקובץ העברי (למשל "מגילה.pdf", "שס נהרדעא - בבא מציעא.pdf")."""
+    idx = json.load(open(f"{ROOT}/shas/index.json", encoding="utf-8"))["masechtot"]
+    name = re.sub(r"[\s_\-]+", " ", os.path.splitext(os.path.basename(pdf))[0])
+    hits = [m for m in idx if m["he"] in name or m["slug"].lower() in name.lower()]
+    return max(hits, key=lambda m: len(m["he"]))["slug"] if hits else None
+
+
+def first_page_of(doc, slug):
+    """עמוד ה-PDF של דף ב. — העמוד שטקסט הגמרא שלו הכי דומה לתחילת ב. (בכרך יש לפעמים שער/הקדמה)."""
+    shas = load(f"{ROOT}/shas/{slug}.json.gz")
+    k0 = next(iter(shas))
+    ref = " ".join(fold(norm_token(t)) for t in gem_tokens(shas[k0]["gemara"]))[:400]
+    best = (0, 1)
+    for i in range(min(25, len(doc))):
+        ws_ = [w for w in page_words(doc[i]) if HEB.search(w["t"]) and w["size"] >= 8.5]
+        txt = " ".join(fold(norm_token(w["t"])) for w in ws_)
+        sc_ = fuzz.partial_ratio(ref[:200], txt) if txt else 0
+        best = max(best, (sc_, i + 1))
+    return best[1]
+
+
+def update_index():
+    """רשימת המסכתות שיש להן דפוס מדויק — האפליקציה קוראת אותה במקום רשימה קשיחה בקוד."""
+    d = f"{ROOT}/tzurat/print"
+    slugs = sorted(f[: -len(".json.gz")] for f in os.listdir(d) if f.endswith(".json.gz"))
+    json.dump(slugs, open(f"{d}/index.json", "w", encoding="utf-8"))
+
+
+def run(pdf, slug=None, first=None, only=None):
+    slug = slug or tractate_of(pdf)
+    if not slug:
+        sys.exit(f"לא זוהתה מסכת משם הקובץ: {pdf}")
+    if not os.path.exists(f"{ROOT}/shas-ws/{slug}.json.gz"):
+        import fetch_ws  # גמרא בכתיב הדפוס (ויקיטקסט) — פעם אחת לכל מסכת
+        fetch_ws.main(slug)
+    first = first or first_page_of(fitz.open(pdf), slug)
+    print(f"== {slug}: {pdf} (ב. = עמוד {first})", flush=True)
+    main(pdf, slug, first, only)
+    update_index()
+
+
 if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2], int(sys.argv[3]), sys.argv[4].split(",") if len(sys.argv) > 4 else None)
+    # hb_pdf.py <קובץ.pdf | תיקייה> [מסכת] [עמוד-של-ב.] [2a,2b...]
+    # תיקייה: כל קובצי ה-PDF בה, מסכת לפי שם הקובץ ועמוד ב. מזוהה לבד
+    arg = sys.argv[1]
+    if os.path.isdir(arg):
+        for f in sorted(os.listdir(arg)):
+            if f.lower().endswith(".pdf"):
+                try:
+                    run(os.path.join(arg, f))
+                except SystemExit as e:
+                    print(e)
+    else:
+        a = sys.argv[2:]
+        run(arg, a[0] if a else None, int(a[1]) if len(a) > 1 else None, a[2].split(",") if len(a) > 2 else None)
