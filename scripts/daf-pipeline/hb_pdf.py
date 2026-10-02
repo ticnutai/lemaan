@@ -81,11 +81,16 @@ def load(path):
 
 DH = ""
 
+# מראי-מקום לפסוקים בנוסח ספריא "(במדבר י״ז:ג׳)" — בדפוס וילנא: ספר ופרק בלבד "(במדבר יז)".
+# מראי-מקום של הדפוס עצמו ("(שבת דף קד.)") אינם בתבנית הזו ונשארים כמו שהם.
+VERSE_REF = re.compile(r"\(((?:[א-ת]+ ){1,3})([א-ת\"'״׳]+):[א-ת\"'״׳]+(?:[-–][א-ת\"'״׳:]+)?\)")
+vilna_ref = lambda m: "(" + m.group(1) + re.sub(r"[\"'״׳]", "", m.group(2)) + ")"
+
 def side_tokens(segs):
     """רש"י/תוספות: "ד"ה - פירוש:" → "ד"ה. פירוש:" (כמו בדפוס); מילות הד"ה מסומנות DH."""
     out = []
     for seg in segs:
-        s = NIKUD.sub("", TAGS.sub(" ", seg))
+        s = VERSE_REF.sub(vilna_ref, NIKUD.sub("", TAGS.sub(" ", seg)))
         m = re.match(r"^(.*?)\s+[–—-]\s+(.*)$", s, re.S)
         if m:
             dh = [t for t in m.group(1).split() if HEB.search(t)]
@@ -123,7 +128,8 @@ def window(tokens_of, keys, key, before=60, after=90):
     i = keys.index(key)
     prev = tokens_of(keys[i - 1])[-before:] if i > 0 else []
     nxt = tokens_of(keys[i + 1])[:after] if i + 1 < len(keys) else []
-    return prev + tokens_of(key) + nxt, len(prev)
+    cur = tokens_of(key)
+    return prev + cur + nxt, len(prev), len(prev) + len(cur)
 
 
 def heb_num(n):
@@ -139,8 +145,11 @@ def heb_num(n):
 
 
 # ---------- עיגון: כל מילת ייחוס → שורת דפוס ----------
-def anchor(lines, ref):
-    """lines: [[ocr words]] בסדר קריאה. מחזיר טקסט נכון לכל שורה + כיסוי."""
+def anchor(lines, ref, bounds=None):
+    """lines: [[ocr words]] בסדר קריאה. מחזיר טקסט נכון לכל שורה + כיסוי.
+    bounds: (התחלה, סוף) של טקסט העמוד עצמו בתוך ref — ההשלמה לפני ההתאמה הראשונה
+    ואחרי האחרונה לא חורגת ממנו (כדי שמילות הקשר מהעמוד הסמוך לא ייכנסו לשורה)."""
+    lo, hi = bounds or (0, len(ref))
     flat = [(li, w["t"]) for li, ln in enumerate(lines) for w in ln]
     okeys = [fold(norm_token(t)) for _, t in flat]
     rkeys = [fold(norm_token(t)) for t in ref]
@@ -164,13 +173,42 @@ def anchor(lines, ref):
     full = list(pairs)
     i0, j0 = pairs[0]
     # לפני ההתאמה הראשונה: רק כמה שיש מילות OCR לפניה
-    for k in range(1, min(i0, j0) + 1):
+    for k in range(1, min(i0, j0 - lo) + 1):
         line_of[j0 - k] = flat[i0 - k][0]
+    # בין שתי התאמות: פיזור לפי רוחב פיזי (לא לפי מספר מילות OCR — OCR גרוע מפרק/מאחד מילים)
+    # מיקום כל מילת OCR = רוחב השורות שלפניה + המרחק מקצה השורה הימני; מילות הייחוס לפי אורך באותיות
+    flat_w = [w for ln in lines for w in ln]
+    pos, off = [], 0.0
+    for ln in lines:
+        right = max(w["x1"] for w in ln) if ln else 0
+        pos += [off + right - w["x1"] for w in ln]
+        off += (right - min(w["x0"] for w in ln) if ln else 0) + 4
+    starts, acc = [], 0.0
+    for ln in lines:
+        starts.append(acc)
+        acc += (max(w["x1"] for w in ln) - min(w["x0"] for w in ln) + 4) if ln else 0
+    cum = [0]
+    for t in ref:
+        cum.append(cum[-1] + len(t) + 1)
+    import bisect
     for (ia, ja), (ib, jb) in zip(pairs, pairs[1:]):
+        if jb - ja <= 1:
+            continue
         g = jb - ja - 1
-        for k in range(g):
-            oi = ia + round((k + 1) * (ib - ia) / (g + 1))
-            line_of[ja + 1 + k] = flat[min(oi, len(flat) - 1)][0]
+        if ib - ia - 1 == g:
+            # OCR סביר בקטע (מספר מילים דומה) — פיזור לפי מיקומי מילות ה-OCR
+            for k in range(g):
+                oi = ia + round((k + 1) * (ib - ia) / (g + 1))
+                line_of[ja + 1 + k] = flat[min(oi, len(flat) - 1)][0]
+            continue
+        wa = flat_w[ia]
+        pa, pb = pos[ia] + (wa["x1"] - wa["x0"]) + 2, pos[ib]  # מסוף מילת העוגן ועד תחילת הבאה
+        for j in range(ja + 1, jb):
+            # מרכז המילה, יחסית לאורך הקטע באותיות
+            fr = ((cum[j] + cum[j + 1]) / 2 - cum[ja + 1]) / max(1, cum[jb] - cum[ja + 1])
+            x = pa + (pb - pa) * fr
+            li = max(0, bisect.bisect_right(starts, x) - 1)
+            line_of[j] = min(max(li, flat[ia][0]), flat[ib][0])
     i1, j1 = pairs[-1]
     for k in range(1, min(len(flat) - 1 - i1, len(ref) - 1 - j1) + 1):
         line_of[j1 + k] = flat[i1 + k][0]
@@ -208,17 +246,31 @@ def build_page(p, key, refs):
     side = [w for w in side if inside(w)]
     gem = [w for w in gem if inside(w)]
     # ה-OCR מאחד לפעמים שורת גמרא עם שורת המפרש שלצדה לפיסה אחת בגודל הגמרא.
-    # רווח מילים רגיל ≤15; רווח ≥20 בתוך "שורת גמרא" = גבול עמודה: החלק הגדול נשאר גמרא, השאר למפרשים
+    # גבול עמודה = רווח ≥20, או רווח שעובר ברצועה לבנה אנכית (מרווח העמודות) — ריקה ברוב
+    # השורות הסמוכות. החלק הרחב ביותר (לא זה עם הכי הרבה "מילים": OCR גרוע מתפרק לרסיסים) נשאר גמרא.
+    allrows = rows_of([w for w in W if inside(w)])
+    def gutter(xa, xb, cy):
+        if xb - xa < 5:
+            return False
+        xa, xb = (xa + xb) / 2 - 2, (xa + xb) / 2 + 2  # אמצע הרווח — קצוות המילים הסמוכות לא "סוגרים" אותו
+        # רק שורות שחוצות את המקום (יש להן מילים משני צדי הרצועה) — שורה של עמודה אחרת לא מעידה כלום
+        near_ = [r for r in allrows if 2 < abs(r["cy"] - cy) <= 45
+                 and min(w["x0"] for w in r["w"]) < xa - 15 and max(w["x1"] for w in r["w"]) > xb + 15]
+        if len(near_) < 4:
+            return False
+        hit = sum(1 for r in near_ if any(w["x0"] < xb and w["x1"] > xa for w in r["w"]))
+        return hit <= 0.25 * len(near_)
     keep = []
     for r in rows_of(gem):
         ws_ = r["w"]
         parts, cur = [], [ws_[0]]
         for a_, b_ in zip(ws_, ws_[1:]):
-            if a_["x0"] - b_["x1"] >= 20:
+            g_ = a_["x0"] - b_["x1"]
+            if g_ >= 20 or (g_ >= 7 and gutter(b_["x1"] + 1, a_["x0"] - 1, r["cy"])):
                 parts.append(cur); cur = []
             cur.append(b_)
         parts.append(cur)
-        main = max(parts, key=len)
+        main = max(parts, key=lambda pt: max(w["x1"] for w in pt) - min(w["x0"] for w in pt))
         keep += main
         for part in parts:
             if part is not main:
@@ -227,11 +279,13 @@ def build_page(p, key, refs):
     # וגם כשהרווח רגיל (מרווח העמודות ~12): מילה "של גמרא" שבמקומה יש עמודת מפרש גם בשורות
     # שמעליה וגם בשורות שמתחתיה — שייכת לעמודה (במעבר לגמרא רחבה אין מפרש מתחת, ולכן לא נוגעים)
     side_c = [((w["x0"] + w["x1"]) / 2, (w["y0"] + w["y1"]) / 2, w["x0"], w["x1"]) for w in side]
+    side_top = min((c[1] for c in side_c), default=0); side_bot = max((c[1] for c in side_c), default=0)
     def in_column(w):
         cx, cy = (w["x0"] + w["x1"]) / 2, (w["y0"] + w["y1"]) / 2
         near = lambda sgn: any(x0 - 3 <= cx <= x1 + 3 or abs(sx - cx) < 12
                                for sx, sy, x0, x1 in side_c if 3 < sgn * (sy - cy) < 26)
-        return near(1) and near(-1)
+        # בשורה העליונה/התחתונה של עמודת המפרש אין שכן מצד אחד — מספיק הצד השני
+        return (near(1) or cy <= side_top + 4) and (near(-1) or cy >= side_bot - 4)
     moved = [w for w in gem if in_column(w)]
     if moved:
         mv = {id(w) for w in moved}
@@ -317,7 +371,7 @@ def build_page(p, key, refs):
     slabs, report = [], {}
     # גמרא: עיגון
     glines = [r["w"] for b in blocks for r in b["rows"]]
-    gtext, gcov, grange = anchor(glines, refs["gemara"][0])
+    gtext, gcov, grange = anchor(glines, refs["gemara"][0], refs["gemara"][1:])
     report["gemara"] = {"lines": len(glines), "cover": round(gcov, 3)}
     lh = pitch * s
     li = 0
@@ -370,7 +424,7 @@ def build_page(p, key, refs):
             # מילת-קישור בסוף עמודת מפרש (המילה הראשונה בעמוד הבא) — שורה של מילה אחת שאינה צמודה לימין
             if len(cand) > 2 and len(cand[-1]["w"]) == 1 and cand[-1]["x1"] < cand[-2]["x1"] - 8:
                 cand = cand[:-1]
-            res = anchor([pc["w"] for pc in cand], refs[st_][0])
+            res = anchor([pc["w"] for pc in cand], refs[st_][0], refs[st_][1:])
             if best is None or res[1] > best[1][1] + 0.01:
                 best = (cand, res)
         ps, (stext, scov, _) = best
