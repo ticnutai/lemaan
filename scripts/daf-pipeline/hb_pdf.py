@@ -134,7 +134,7 @@ def heb_num(n):
             out += c; n -= v
     if n == 15: return out + "טו"
     if n == 16: return out + "טז"
-    tens = "  יכלמנסעפצ"; ones = " אבגדהוזחט"
+    tens = " יכלמנסעפצ"; ones = " אבגדהוזחט"
     return out + (tens[n // 10] if n >= 10 else "") + (ones[n % 10] if n % 10 else "")
 
 
@@ -184,19 +184,59 @@ def anchor(lines, ref):
 # ---------- עמוד ----------
 def build_page(p, key, refs):
     W = [w for w in page_words(p) if HEB.search(w["t"])]
-    # גמרא בדיוק ~9.5; מילות פתיחה מוגדלות של תוספות/רש"י ~11.5 — שייכות למפרשים
-    side = [w for w in W if 7.0 <= w["size"] < 9.0 or 10.8 <= w["size"] < 13]
-    gem = [w for w in W if 9.0 <= w["size"] < 10.8]
+    # גדלי הגופן משתנים מעמוד לעמוד (קנה המידה של הסריקה): גמרא בד"כ 9.5, לפעמים 11;
+    # מפרשים ~7.5; שוליים (עין משפט, מסורת הש"ס) 5–6.5; כותרת ≥14.
+    # הגמרא = הגודל הגדול ביותר עם ≥100 מילים מתחת לכותרת; המפרשים = הנפוץ בין 6.8 לגמרא.
+    hist = {}
+    for w in W:
+        hist[round(w["size"] * 2) / 2] = hist.get(round(w["size"] * 2) / 2, 0) + 1
+    G = max((z for z, n in hist.items() if n >= 100 and 8.5 <= z < 14), default=9.5)
+    S = max((z for z in hist if 6.8 <= z <= G - 1.2), key=lambda z: hist[z], default=7.5)
+    small_ = lambda w: S - 0.6 <= w["size"] < min(S + 1.2, G - 0.6)
+    gem_ = lambda w: G - 0.6 <= w["size"] < G + 0.8
+    bigcap = lambda w: G + 0.8 <= w["size"] < 14  # מילת פתיחה מוגדלת של רש"י/תוספות
+    side = [w for w in W if small_(w) or bigcap(w)]
+    gem = [w for w in W if gem_(w)]
     head = [w for w in W if w["size"] >= 14]
 
     # מסגרת: קצוות העמודות המיושרות (אחוזונים — עמידים לשוליים)
-    small = [w for w in side if w["size"] < 9]
+    small = [w for w in side if small_(w)]
     xs0 = sorted(w["x0"] for w in small if w["x0"] > 90)
     xs1 = sorted(w["x1"] for w in small if w["x1"] < p.rect.width - 60)
     fL, fR = xs0[int(0.02 * len(xs0))], xs1[int(0.98 * len(xs1)) - 1]
     inside = lambda w: w["x0"] >= fL - 3 and w["x1"] <= fR + 3
     side = [w for w in side if inside(w)]
     gem = [w for w in gem if inside(w)]
+    # ה-OCR מאחד לפעמים שורת גמרא עם שורת המפרש שלצדה לפיסה אחת בגודל הגמרא.
+    # רווח מילים רגיל ≤15; רווח ≥20 בתוך "שורת גמרא" = גבול עמודה: החלק הגדול נשאר גמרא, השאר למפרשים
+    keep = []
+    for r in rows_of(gem):
+        ws_ = r["w"]
+        parts, cur = [], [ws_[0]]
+        for a_, b_ in zip(ws_, ws_[1:]):
+            if a_["x0"] - b_["x1"] >= 20:
+                parts.append(cur); cur = []
+            cur.append(b_)
+        parts.append(cur)
+        main = max(parts, key=len)
+        keep += main
+        for part in parts:
+            if part is not main:
+                side += [dict(w, size=S) for w in part]
+    gem = keep
+    # וגם כשהרווח רגיל (מרווח העמודות ~12): מילה "של גמרא" שבמקומה יש עמודת מפרש גם בשורות
+    # שמעליה וגם בשורות שמתחתיה — שייכת לעמודה (במעבר לגמרא רחבה אין מפרש מתחת, ולכן לא נוגעים)
+    side_c = [((w["x0"] + w["x1"]) / 2, (w["y0"] + w["y1"]) / 2, w["x0"], w["x1"]) for w in side]
+    def in_column(w):
+        cx, cy = (w["x0"] + w["x1"]) / 2, (w["y0"] + w["y1"]) / 2
+        near = lambda sgn: any(x0 - 3 <= cx <= x1 + 3 or abs(sx - cx) < 12
+                               for sx, sy, x0, x1 in side_c if 3 < sgn * (sy - cy) < 26)
+        return near(1) and near(-1)
+    moved = [w for w in gem if in_column(w)]
+    if moved:
+        mv = {id(w) for w in moved}
+        gem = [w for w in gem if id(w) not in mv]
+        side += [dict(w, size=S) for w in moved]
     fTop = min(w["y0"] for w in side + gem)
     s = V_W / (fR - fL)
     X = lambda x: V_L + (x - fL) * s
@@ -250,13 +290,29 @@ def build_page(p, key, refs):
     rtxt = {k: " ".join(fold(norm_token(t)) for t in refs[k][0]) for k in ("rashi", "tosafot")}
     sc = lambda t, k: fuzz.partial_ratio(t, rtxt[k]) if t else 0
     R = [pc for pc in pcs if pc["side"] == "R"]; Lp = [pc for pc in pcs if pc["side"] == "L"]
-    rashi_side = "R" if sc(text(R)[:600], "rashi") + sc(text(Lp)[:600], "tosafot") >= sc(text(R)[:600], "tosafot") + sc(text(Lp)[:600], "rashi") else "L"
+    # רש"י תמיד בצד הפנימי (ליד הכריכה): בעמוד א מימין, בעמוד ב משמאל
+    rashi_side = "R" if key.endswith("a") else "L"
     for pc in pcs:
         if pc["side"] == "F":
             t = text([pc])
             pc["s"] = "rashi" if sc(t, "rashi") >= sc(t, "tosafot") else "tosafot"
         else:
             pc["s"] = "rashi" if pc["side"] == rashi_side else "tosafot"
+    # כשאין (כמעט) תוספות, רש"י ממשיך לעמודה החיצונית — מכריעים שורה-שורה לפי הטקסט,
+    # עם החלקה על השכנים (שורה בודדת דומה במקרה למפרש השני לא מחליפה צד)
+    for sd in ("R", "L"):
+        col = sorted((pc for pc in pcs if pc["side"] == sd), key=lambda pc: pc["cy"])
+        d = []
+        for pc in col:
+            t = text([pc])
+            d.append(sc(t, "rashi") - sc(t, "tosafot") if len(t) >= 12 else 0)
+        for i, pc in enumerate(col):
+            m = st.median(d[max(0, i - 3): i + 4])
+            if m > 12:
+                pc["s"] = "rashi"
+            elif m < -12:
+                pc["s"] = "tosafot"
+    gbottom = max((g[1] for g in gspan), default=0)
 
     slabs, report = [], {}
     # גמרא: עיגון
@@ -288,23 +344,36 @@ def build_page(p, key, refs):
     spitch = st.median(diffs)
     slh = spitch * s
     for st_ in ("rashi", "tosafot"):
-        ps = sorted([pc for pc in pcs if pc["s"] == st_], key=lambda pc: pc["cy"])
+        ps = [pc for pc in pcs if pc["s"] == st_]
         if not ps:
             continue
+        ps.sort(key=lambda pc: pc["cy"])
         # אות/מילה פותחת מוגדלת (על פני שתי שורות): מצטרפת לראש השורה הסמוכה מתחתיה בעמודה
         merged = []
         for i, pc in enumerate(ps):
-            big = all(w["size"] >= 10.8 for w in pc["w"]) and len(pc["w"]) <= 2
-            nxt = next((q for q in ps[i + 1:] if q["cy"] - pc["cy"] < 1.6 * spitch and abs((q["x0"] + q["x1"]) / 2 - (pc["x0"] + pc["x1"]) / 2) < 140), None)
+            big = all(bigcap(w) for w in pc["w"]) and len(pc["w"]) <= 2
+            nxt = next((q for q in ps[i + 1:] if 0 < q["cy"] - pc["cy"] < 1.6 * spitch and abs((q["x0"] + q["x1"]) / 2 - (pc["x0"] + pc["x1"]) / 2) < 140), None)
             if big and nxt is not None:
                 nxt["w"] = pc["w"] + nxt["w"]; nxt["x1"] = max(nxt["x1"], pc["x1"]); nxt["drop"] = len(pc["w"])
                 continue
             merged.append(pc)
         ps = merged
-        # מילת-קישור בסוף עמודת מפרש (המילה הראשונה בעמוד הבא) — שורה של מילה אחת שאינה צמודה לימין
-        if len(ps) > 2 and len(ps[-1]["w"]) == 1 and ps[-1]["x1"] < ps[-2]["x1"] - 8:
-            ps = ps[:-1]
-        stext, scov, _ = anchor([pc["w"] for pc in ps], refs[st_][0])
+        # סדר קריאה: בעמודה אחת — מלמעלה למטה. מפרש בשתי העמודות (רש"י ממשיך לעמודה החיצונית
+        # כשאין תוספות) — מנסים את שני הסדרים (ימין←שמאל / שמאל←ימין) ובוחרים לפי ההתאמה לטקסט.
+        orders = [ps]
+        if {pc["side"] for pc in ps} >= {"R", "L"}:
+            for first in ("R", "L"):
+                rank = lambda pc: 2 if pc["side"] == "F" and pc["cy"] > gbottom else (0 if pc["side"] in (first, "F") else 1)
+                orders.append(sorted(ps, key=lambda pc: (rank(pc), pc["cy"])))
+        best = None
+        for cand in orders:
+            # מילת-קישור בסוף עמודת מפרש (המילה הראשונה בעמוד הבא) — שורה של מילה אחת שאינה צמודה לימין
+            if len(cand) > 2 and len(cand[-1]["w"]) == 1 and cand[-1]["x1"] < cand[-2]["x1"] - 8:
+                cand = cand[:-1]
+            res = anchor([pc["w"] for pc in cand], refs[st_][0])
+            if best is None or res[1] > best[1][1] + 0.01:
+                best = (cand, res)
+        ps, (stext, scov, _) = best
         report[st_] = {"lines": len(ps), "cover": round(scov, 3)}
         groups = []
         for i, (pc, t) in enumerate(zip(ps, stext)):
@@ -314,7 +383,7 @@ def build_page(p, key, refs):
             short_ok = nxt is None or abs(nxt["x1"] - pc["x1"]) > 8
             # שורה מוזחת מימין (ליד אות פותחת מוגדלת) — אותו קצה שמאלי, הזחה קטנה
             indented = g is not None and abs(pc["x0"] - g["x0"]) < 6 and 0 < g["x1"] - pc["x1"] < 40
-            if g and (abs(pc["x1"] - g["x1"]) < 8 or indented) and (abs(pc["x0"] - g["x0"]) < 8 or short_ok) and pc["cy"] - g["ps"][-1]["cy"] < 2.2 * spitch:
+            if g and (abs(pc["x1"] - g["x1"]) < 8 or indented) and (abs(pc["x0"] - g["x0"]) < 8 or short_ok) and 0 < pc["cy"] - g["ps"][-1]["cy"] < 2.2 * spitch:
                 g["ps"].append(pc); g["t"].append(t)
             else:
                 groups.append({"x1": pc["x1"], "x0": pc["x0"], "ps": [pc], "t": [t]})
@@ -346,9 +415,17 @@ def build_page(p, key, refs):
     # סימן העמוד בכותרת: מהמספר עצמו (ה-OCR מאבד את הנקודה/הנקודתיים)
     label = heb_num(int(key[:-1])) + ("." if key.endswith("a") else ":")
     # הסימן בקצה החיצוני של הכותרת (ימין בעמוד ב, שמאל בעמוד א) — הפיסה הקצרה
-    for h in header:
-        if len(h["text"].replace(" ", "")) <= 4:
-            h["text"] = label
+    short = [h for h in header if len(h["text"].replace(" ", "")) <= 4]
+    if short:
+        # רעש קטן בכותרת נקרא גם הוא כ"פיסה קצרה" — נשאר רק הסימן בפינה החיצונית
+        outer = min(short, key=lambda h: h["l"]) if key.endswith("a") else max(short, key=lambda h: h["l"])
+        outer["text"] = label
+        header = [h for h in header if h not in short or h is outer]
+    if header and not short:
+        # ה-OCR לא קרא את הסימן — מוסיפים אותו בפינה החיצונית (עמוד א משמאל, עמוד ב מימין)
+        fs_ = max(h["fs"] for h in header); t_ = min(h["t"] for h in header)
+        header.append({"l": round(V_L if key.endswith("a") else V_L + V_W - 1.2 * fs_, 2), "t": t_, "fs": fs_, "text": label})
+    report["rashi_side"] = rashi_side
     report["frame"] = [round(fL, 1), round(fR, 1), round(fTop, 1)]
     report["blocks"] = [f'{sl["s"]} {round(sl["w"])}×{len(sl.get("lines") or []) or round(sl["h"] / sl["lh"])}' for sl in slabs]
     lay = {"page": {"w": PAGE_W, "h": round(Y(p.rect.height), 2)}, "slabs": slabs, "header": header}
@@ -391,9 +468,14 @@ def main(pdf, tractate, first_page, only=None):
             "rashi": window(lambda k: side_tokens(com(k, "rashi")), keys, key),
             "tosafot": window(lambda k: side_tokens(com(k, "tosafot")), keys, key),
         }
-        lay, rep = build_page(doc[pg], key, refs)
+        try:
+            lay, rep = build_page(doc[pg], key, refs)
+        except Exception as e:  # עמוד חריג לא עוצר את המסכת — מדווחים וממשיכים
+            print(key, "pdf p", pg + 1, "FAILED", repr(e), flush=True)
+            continue
         out[key] = lay
-        print(key, "pdf p", pg + 1, json.dumps(rep, ensure_ascii=False))
+        print(key, "pdf p", pg + 1, json.dumps(rep, ensure_ascii=False), flush=True)
+    out = {k: out[k] for k in keys if k in out}  # סדר העמודים במסכת
     write_layouts(out_path, out)
     print("→", out_path, len(out), "amudim")
 
