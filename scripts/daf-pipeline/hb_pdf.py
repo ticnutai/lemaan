@@ -222,27 +222,75 @@ def anchor(lines, ref, bounds=None):
 # ---------- עמוד ----------
 def build_page(p, key, refs):
     W = [w for w in page_words(p) if HEB.search(w["t"])]
-    # גדלי הגופן משתנים מעמוד לעמוד (קנה המידה של הסריקה): גמרא בד"כ 9.5, לפעמים 11;
-    # מפרשים ~7.5; שוליים (עין משפט, מסורת הש"ס) 5–6.5; כותרת ≥14.
-    # הגמרא = הגודל הגדול ביותר עם ≥100 מילים מתחת לכותרת; המפרשים = הנפוץ בין 6.8 לגמרא.
+    # גדלי הגופן משתנים מעמוד לעמוד ובין מקורות ה-OCR (HebrewBooks: גמרא 9.5/11, מפרשים 6.5–7.5,
+    # שוליים 5–6.5; ABBYY של אוצריא: גמרא 8.5–10, מפרשים 6.5–8, שוליים 4.5–5.5), ולפעמים רש"י ותוספות
+    # באותו עמוד בשני גדלים. לכן: הגמרא = הגודל הגדול הנפוץ; המפרשים = כל מה שקטן ממנה (ולא זעיר) —
+    # ובתוך המסגרת, שנמצאת גיאומטרית (ראו למטה) ולא לפי גודל.
     hist = {}
     for w in W:
         hist[round(w["size"] * 2) / 2] = hist.get(round(w["size"] * 2) / 2, 0) + 1
     G = max((z for z, n in hist.items() if n >= 100 and 8.5 <= z < 14), default=9.5)
-    S = max((z for z in hist if 6.8 <= z <= G - 1.2), key=lambda z: hist[z], default=7.5)
-    small_ = lambda w: S - 0.6 <= w["size"] < min(S + 1.2, G - 0.6)
+    small_ = lambda w: 0.55 * G <= w["size"] < G - 0.6
     gem_ = lambda w: G - 0.6 <= w["size"] < G + 0.8
     bigcap = lambda w: G + 0.8 <= w["size"] < 14  # מילת פתיחה מוגדלת של רש"י/תוספות
     side = [w for w in W if small_(w) or bigcap(w)]
     gem = [w for w in W if gem_(w)]
     head = [w for w in W if w["size"] >= 14]
 
-    # מסגרת: קצוות העמודות המיושרות (אחוזונים — עמידים לשוליים)
-    small = [w for w in side if small_(w)]
-    xs0 = sorted(w["x0"] for w in small if w["x0"] > 90)
-    xs1 = sorted(w["x1"] for w in small if w["x1"] < p.rect.width - 60)
-    fL, fR = xs0[int(0.02 * len(xs0))], xs1[int(0.98 * len(xs1)) - 1]
+    # מסגרת: עמודות המפרשים מיושרות לשני הצדדים, ולכן שורות רבות מתחילות/נגמרות בדיוק בקצה המסגרת.
+    # אוספים את קצוות השורות (פיסות המופרדות ברווח עמודה) ומחפשים זוג קצוות שאליו מתיישרות הכי הרבה
+    # שורות — ברוחב מסגרת וילנא (~65% מרוחב העמוד, יציב מאוד). כך שוליים בגודל דומה לא מבלבלים.
+    PW = p.rect.width
+    lefts_h, rights_h = {}, {}
+    for r in rows_of(side + gem, tol=3, base=True):
+        segs, cur = [], [r["w"][0]]
+        for a_, b_ in zip(r["w"], r["w"][1:]):
+            if a_["x0"] - b_["x1"] >= 9:
+                segs.append(cur); cur = []
+            cur.append(b_)
+        segs.append(cur)
+        for sg in segs:
+            if len(sg) >= 3:
+                x0, x1 = round(min(w["x0"] for w in sg)), round(max(w["x1"] for w in sg))
+                lefts_h[x0] = lefts_h.get(x0, 0) + 1; rights_h[x1] = rights_h.get(x1, 0) + 1
+    near_ = lambda h, x: sum(h.get(x + d, 0) for d in (-2, -1, 0, 1, 2))
+    # ציון = כמה שורות מתיישרות לשני הקצוות × קרבה לרוחב הטיפוסי (סריקות שונות בקנה מידה ב~±7%)
+    import math
+    best_ = None
+    for l in lefts_h:
+        for r in rights_h:
+            if 0.55 * PW <= r - l <= 0.75 * PW:
+                n_ = min(near_(lefts_h, l), near_(rights_h, r))
+                sc_ = n_ * math.exp(-(((r - l) / PW - 0.655) / 0.03) ** 2)
+                if n_ >= 8 and (best_ is None or sc_ > best_[0]):
+                    best_ = (sc_, l, r)
+    if best_:
+        _, fL, fR = best_
+        # הקצה המדויק: הערך הנפוץ בסביבה
+        fL = max(range(fL - 2, fL + 3), key=lambda x: lefts_h.get(x, 0))
+        fR = max(range(fR - 2, fR + 3), key=lambda x: rights_h.get(x, 0))
+    else:  # גיבוי: אחוזונים של קצוות עמודות המפרשים
+        xs0 = sorted(w["x0"] for w in side if w["x0"] > 0.14 * PW)
+        xs1 = sorted(w["x1"] for w in side if w["x1"] < 0.9 * PW)
+        fL, fR = xs0[int(0.02 * len(xs0))], xs1[int(0.98 * len(xs1)) - 1]
+    if os.environ.get("FRAME_DEBUG"):
+        print(key, "frame", fL, fR, "score", best_ and best_[0])
     inside = lambda w: w["x0"] >= fL - 3 and w["x1"] <= fR + 3
+    # גודל המפרשים העיקרי; טקסט קטן ממנו שנמצא מתחת לשורת המפרש האחרונה = הערות תחתית
+    # (ציטוטי "תורה אור", הגהות) — לא רש"י ולא תוספות
+    # נבחר לפי מספר השורות (קווי בסיס שונים) ולא לפי מספר המילים: הערות התחתית צפופות בכמה שורות בלבד
+    sh = {}
+    for w in side:
+        if small_(w) and inside(w):
+            sh.setdefault(round(w["size"] * 2) / 2, set()).add(round(w["y1"] / 4))
+    S = max(sh, key=lambda z: len(sh[z]), default=7.5)
+    # לפי שורות: שורה שרוב מילותיה קטנות מהמפרשים, ואחרי השורה האחרונה של מפרשים/גמרא — הערה
+    frows = rows_of([w for w in side + gem if inside(w)], tol=3, base=True)
+    is_main = [st.median(w["size"] for w in r["w"]) >= S - 0.4 for r in frows]
+    last_main = max((i for i, m in enumerate(is_main) if m), default=len(frows))
+    notes = {id(w) for r in frows[last_main + 1:] for w in r["w"]}
+    side = [w for w in side if id(w) not in notes]
+    gem = [w for w in gem if id(w) not in notes]
     side = [w for w in side if inside(w)]
     gem = [w for w in gem if inside(w)]
     # ה-OCR מאחד לפעמים שורת גמרא עם שורת המפרש שלצדה לפיסה אחת בגודל הגמרא.
