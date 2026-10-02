@@ -101,6 +101,17 @@ def side_tokens(segs):
             out += [DH + t for t in dh] + [t for t in m.group(2).split() if HEB.search(t)]
         else:
             out += [t for t in s.split() if HEB.search(t)]
+    return no_quotes(out)
+
+
+def no_quotes(toks):
+    """מרכאות ציטוט בקצה מילה ("משכו) — תוספת של ספריא, לא בדפוס. גרשיים בתוך מילה (ר"י) נשארים."""
+    out = []
+    for t in toks:
+        pre = DH if t.startswith(DH) else ""
+        core = re.sub(r'^["״]+|["״]+$', "", t[len(pre):])
+        if core:
+            out.append(pre + core)
     return out
 
 
@@ -823,17 +834,17 @@ def tractate_of(pdf):
 
 
 def first_page_of(doc, slug):
-    """עמוד ה-PDF של דף ב. — העמוד שטקסט הגמרא שלו הכי דומה לתחילת ב. (בכרך יש לפעמים שער/הקדמה)."""
+    """עמוד ה-PDF של דף ב. — בכרך יש לפעמים שער/הקדמה. משווים זוג עמודים רצופים לטקסט ב. ו-ב:
+    (כל המילים, בלי סינון לפי גודל: ה-OCR נותן לגמרא גדלים שונים בעמודים שונים)."""
     shas = load(f"{ROOT}/shas/{slug}.json.gz")
-    k0 = next(iter(shas))
-    ref = " ".join(fold(norm_token(t)) for t in gem_tokens(shas[k0]["gemara"]))[:400]
-    best = (0, 1)
-    for i in range(min(25, len(doc))):
-        ws_ = [w for w in page_words(doc[i]) if HEB.search(w["t"]) and w["size"] >= 8.5]
-        txt = " ".join(fold(norm_token(w["t"])) for w in ws_)
-        sc_ = fuzz.partial_ratio(ref[:200], txt) if txt else 0
-        best = max(best, (sc_, i + 1))
-    return best[1]
+    k0, k1 = list(shas)[:2]
+    ref = lambda k: " ".join(fold(norm_token(t)) for t in gem_tokens(shas[k]["gemara"]))
+    r0, r1 = ref(k0), ref(k1)
+    n = min(26, len(doc))
+    txt = [" ".join(fold(norm_token(w["t"])) for w in page_words(doc[i]) if HEB.search(w["t"])) for i in range(n)]
+    sc = lambda r, t: (fuzz.partial_ratio(r[:150], t) + fuzz.partial_ratio(r[-150:], t)) / 2 if t else 0
+    best = max(range(n - 1), key=lambda i: (sc(r0, txt[i]) + sc(r1, txt[i + 1]), -i))
+    return best + 1
 
 
 def update_index():
