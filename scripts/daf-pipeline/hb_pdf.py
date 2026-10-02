@@ -318,6 +318,16 @@ def fit_rows(cys, default_pitch):
     return st.median(c - i * pitch for i, c in enumerate(cys)), pitch
 
 
+def running_header(head, fL, fR, p):
+    """הכותרת הרצה = השורה העליונה של מילים גדולות בראש העמוד בלבד. מילה פותחת מוגדלת של רש"י/תוספות
+    בדף פתיחה ("מאימתי", גופן 14) קרובה לכותרת ואינה חלק ממנה."""
+    top = [w for w in head if fL - 6 <= w["x0"] and w["x1"] <= fR + 6 and w["y1"] < p.rect.y0 + 0.1 * p.rect.height]
+    if not top:
+        return []
+    y_ = min(w["y1"] for w in top)
+    return [w for w in top if w["y1"] <= y_ + 6]
+
+
 # ---------- שורות מהתמונה ----------
 def image_rows(p, W, fL, fR, head):
     """שורות הגמרא והמפרשים כפי שהן בפיקסלים של הסריקה (img_lines), עם מילות ה-OCR שבתוכן.
@@ -326,7 +336,7 @@ def image_rows(p, W, fL, fR, head):
     import img_lines as IL
     mid = (fL + fR) / 2
     # הכותרת הרצה: מילים גדולות בראש העמוד בלבד (מילה גדולה באמצע הדף — פתיחת פרק — אינה כותרת)
-    hd = [w for w in head if fL - 6 <= w["x0"] and w["x1"] <= fR + 6 and w["y1"] < p.rect.y0 + 0.1 * p.rect.height]
+    hd = running_header(head, fL, fR, p)
     y_top = max((w["y1"] for w in hd), default=p.rect.y0 + 18) + 1.0
     pieces, gutter_between = IL.find_lines(p, fL, fR, y_top, p.rect.height - 10)
     wd = lambda l: l["x1"] - l["x0"]
@@ -420,8 +430,12 @@ def image_rows(p, W, fL, fR, head):
     # מילות ה-OCR לשורות (לפי מיקום — הגודל שה-OCR נתן להן לא משנה)
     for l in L:
         l["w"] = []
+    hd_ids = {id(w) for w in hd}
+    # מילת פתיחת המסכת במסגרת המעוטרת (פי 3–4 מהגופן הרגיל) — לא שייכת לשום שורה; מילה פותחת
+    # מוגדלת של רש"י/תוספות (פי 1.5–2) כן שייכת לשורה שלה
+    title_sz = 2.2 * st.median(w["size"] for w in W)
     for w in W:
-        if w["size"] >= 14:
+        if id(w) in hd_ids or w["size"] >= title_sz:
             continue
         cx, cy = (w["x0"] + w["x1"]) / 2, (w["y0"] + w["y1"]) / 2
         c = [l for l in L if l["x0"] - 2 <= cx <= l["x1"] + 2 and l["top"] - 3 <= cy <= l["base"] + 2.5]
@@ -429,6 +443,14 @@ def image_rows(p, W, fL, fR, head):
             min(c, key=lambda l: abs(cy - (l["top"] + l["base"]) / 2))["w"].append(w)
     for l in L:
         l["w"].sort(key=lambda w: -w["x1"])
+        # מילה פותחת מוגדלת בראש שורת מפרש (תחילת מסכת/פרק): ה-OCR נותן לה גופן גדול בבירור מיתר השורה
+        if l["c"] == "s" and len(l["w"]) >= 3 and not l.get("big"):
+            med_ = st.median(w["size"] for w in l["w"])
+            k_ = 0
+            while k_ < min(3, len(l["w"]) - 1) and l["w"][k_]["size"] >= 1.45 * med_:
+                k_ += 1
+            if k_:
+                l["big"] = (min(w["x0"] for w in l["w"][:k_]), max(w["x1"] for w in l["w"][:k_]))
         if l.get("big") and l["c"] == "s" and l["big"][1] >= l["x1"] - 3:  # מילה מוגדלת בראש (ימין) שורת מפרש
             l["drop"] = max(1, sum(1 for w in l["w"] if l["big"][0] - 2 <= (w["x0"] + w["x1"]) / 2 <= l["big"][1] + 2))
     # כיול מול מוסכמות ה-OCR (מרכז תיבת מילה לגמרא, תחתית התיבה למפרשים) — כדי שמיקום הגושים לא ישתנה
@@ -761,7 +783,7 @@ def build_page(p, key, refs):
                           "fs": round(S_FS * slh / S_LH, 2), "lh": round(slh_b, 3), "lines": lines})
     # כותרת
     header = []
-    head = [w for w in head if fL - 6 <= w["x0"] and w["x1"] <= fR + 6]
+    head = running_header(head, fL, fR, p)
     for r in rows_of(head):
         for pc in pieces_of(r, gap=15):
             header.append({"l": round(X(pc["x0"]), 2), "t": round(Y(min(w["y0"] for w in pc["w"])), 2),
