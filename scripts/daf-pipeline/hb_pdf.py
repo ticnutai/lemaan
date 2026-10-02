@@ -100,7 +100,17 @@ def side_tokens(segs):
                 dh[-1] = re.sub(r"[.:]?$", ".", dh[-1])
             out += [DH + t for t in dh] + [t for t in m.group(2).split() if HEB.search(t)]
         else:
-            out += [t for t in s.split() if HEB.search(t)]
+            toks = [t for t in s.split() if HEB.search(t)]
+            # בלי מקף: הד"ה נגמר בנקודה הראשונה (בתוך 15 המילים הראשונות, לא בתוך סוגריים)
+            depth, end = 0, None
+            for i, t in enumerate(toks[:15]):
+                depth += t.count("(") + t.count("[") - t.count(")") - t.count("]")
+                if depth <= 0 and t.endswith("."):
+                    end = i
+                    break
+            if end is not None:
+                toks = [DH + t for t in toks[: end + 1]] + toks[end + 1:]
+            out += toks
     return no_quotes(out)
 
 
@@ -774,7 +784,42 @@ def build_page(p, key, refs):
     report["frame"] = [round(fL, 1), round(fR, 1), round(fTop, 1)]
     report["blocks"] = [f'{sl["s"]} {round(sl["w"])}×{len(sl.get("lines") or []) or round(sl["h"] / sl["lh"])}' for sl in slabs]
     # src: מסגרת הטקסט בסריקה (שמאל, ימין, ראש — בנקודות PDF) — למיפוי חזרה אל הצילום (בדיקת איכות)
-    lay = {"page": {"w": PAGE_W, "h": round(Y(p.rect.height), 2)}, "slabs": slabs, "header": header,
+    # שורות ריקות בקצה גוש (שורה שזוהתה בתמונה ואין לה מילים — מסגרת עיטור, כתם) — מסירים
+    empty = lambda ln: not re.sub(r"<[^>]+>|\s", "", ln["t"])
+    for sl in slabs:
+        while sl["lines"] and empty(sl["lines"][0]):
+            sl["lines"].pop(0); sl["t"] = round(sl["t"] + sl["lh"], 2); sl["h"] = round(sl["h"] - sl["lh"], 2)
+        while sl["lines"] and empty(sl["lines"][-1]):
+            sl["lines"].pop(); sl["h"] = round(sl["h"] - sl["lh"], 2)
+    slabs = [sl for sl in slabs if sl["lines"]]
+    # דף הפתיחה של מסכת: המילה הראשונה של המשנה מודפסת במסגרת מעוטרת שה-OCR לא קורא.
+    # המילה (אחרי "מתני׳") נלקחת מהטקסט, והמסגרת — בין ראשי המפרשים לשורת הגמרא הראשונה
+    box = None
+    if refs["gemara"][1] == 0:
+        gref = [t for t in refs["gemara"][0] if not re.match(r"^מתני[׳']?$", t)]
+        gs = sorted((sl for sl in slabs if sl["s"] == "gemara"), key=lambda sl: sl["t"])
+        if gref and gs:
+            g0 = gs[0]
+            first_shown = re.sub(r"<[^>]+>", "", g0["lines"][0]["t"]).split()[:1]
+            if first_shown and fold(norm_token(first_shown[0])) != fold(norm_token(gref[0])):
+                # המסגרת נמדדת מהתמונה: הדיו בעמודת הגמרא, בין ראשי המפרשים (הרחבים) לשורת הגמרא הראשונה
+                import img_lines as IL
+                heads = [sl for sl in slabs if sl["s"] != "gemara" and sl["w"] >= 0.4 * V_W and sl["t"] + sl["h"] <= g0["t"] + 2]
+                top_u = max((sl["t"] + sl["h"] for sl in heads), default=V_TOP)
+                ux = lambda u: fL + (u - V_L) / s
+                uy = lambda u: fTop + (u - V_TOP) / s
+                clip = fitz.Rect(ux(g0["l"]) - 2, uy(top_u) + 1, ux(g0["l"] + g0["w"]) + 2, uy(g0["t"]) - 0.5)
+                if clip.height > 12:
+                    ink = IL.ink_mask(p, clip)
+                    rows_, cols_ = ink.any(axis=1).nonzero()[0], ink.any(axis=0).nonzero()[0]
+                    if len(rows_) and len(cols_):
+                        bx0, bx1 = clip.x0 + cols_[0] / IL.Z, clip.x0 + (cols_[-1] + 1) / IL.Z
+                        by0, by1 = clip.y0 + rows_[0] / IL.Z, clip.y0 + (rows_[-1] + 1) / IL.Z
+                        if by1 - by0 > 12 and bx1 - bx0 > 40:
+                            box = {"l": round(X(bx0), 2), "t": round(Y(by0), 2), "w": round((bx1 - bx0) * s, 2),
+                                   "h": round((by1 - by0) * s, 2), "text": gref[0]}
+    lay_box = {"box": box} if box else {}
+    lay = {"page": {"w": PAGE_W, "h": round(Y(p.rect.height), 2)}, "slabs": slabs, "header": header, **lay_box,
            "src": [round(fL, 1), round(fR, 1), round(fTop, 1)]}
     return lay, report
 

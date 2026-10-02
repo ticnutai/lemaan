@@ -16,6 +16,8 @@ export interface PrintLayout {
   page: { w: number; h: number };
   slabs: PrintSlab[];
   header: { l: number; t: number; fs: number; text: string }[];
+  /** דף פתיחת מסכת: המילה הראשונה במסגרת מעוטרת */
+  box?: { l: number; t: number; w: number; h: number; text: string };
 }
 
 /**
@@ -106,6 +108,20 @@ export default function PrintDaf({ layout, width, style, query }: Props) {
         overflow: "hidden",
       }}
     >
+      {layout.box && (
+        <div
+          className="absolute flex items-center justify-center font-bold"
+          style={{
+            left: layout.box.l * k, top: layout.box.t * k, width: layout.box.w * k, height: layout.box.h * k,
+            border: `${Math.max(2, 3 * k).toFixed(1)}px double ${style.colors.headers}`,
+            fontFamily: FONT_FAMILY.Vilna, color: style.colors.main,
+            fontSize: Math.min(layout.box.h * 0.5, (layout.box.w * 0.8) / Math.max(2, layout.box.text.length * 0.62)) * k,
+            lineHeight: 1,
+          }}
+        >
+          <span className="daf-seg" data-stream="main" dangerouslySetInnerHTML={{ __html: sanitizeSegment(layout.box.text, query) }} />
+        </div>
+      )}
       {layout.header.map((hl, i) => (
         <span
           key={`h${i}`}
