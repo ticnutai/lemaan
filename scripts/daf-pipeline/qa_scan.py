@@ -84,12 +84,13 @@ def compare(page, lay, shot_path, out_png=None):
                 on[last:k] = True
             last = k
         return [k for k in range(1, len(on)) if on[k - 1] and not on[k]]
-    shifts = {}
+    shifts, off_slabs = {}, []
     for name, test in (("gemara", lambda sl: sl["s"] == "gemara"), ("side", lambda sl: sl["s"] != "gemara")):
         d = []
         for sl in lay["slabs"]:
             if not test(sl) or len(sl.get("lines") or []) < 6:
                 continue
+            d0 = len(d)
             xa, xb = max(0, int((sl["l"] - V_L) / s * Z)), int((sl["l"] + sl["w"] - V_L) / s * Z)
             ya, yb = int((sl["t"] - V_TOP) / s * Z), int((sl["t"] + sl["h"] - V_TOP) / s * Z)
             ya, yb = max(0, ya - 4 * Z), min(scan.shape[0], yb + 4 * Z)
@@ -98,13 +99,19 @@ def compare(page, lay, shot_path, out_png=None):
                 near = min(bs, key=lambda v: abs(v - y), default=None)
                 if near is not None and abs(near - y) <= 4 * Z:
                     d.append((y - near) / Z)
+            # גוש שסוטה בעצמו (שורה חסרה/עודפת, פסיעה שגויה) — לאיתור מהיר של הבעיה
+            if len(d) > d0:
+                dd = d[d0:]
+                spread = float(np.percentile(dd, 90) - np.percentile(dd, 10))
+                if abs(float(np.median(dd))) >= 0.75 or spread >= 1.5 or len(bo) != len(bs):
+                    off_slabs.append(f'{sl["s"]} {round(sl["w"])}x{len(sl["lines"])} @t{round(sl["t"])}: shift {np.median(dd):+.2f} spread {spread:.1f} rows ours/scan {len(bo)}/{len(bs)}')
         if d:
             shifts[name] = round(float(np.median(d)), 2)  # חיובי = שלנו נמוך מדי
     if out_png:
         rgb = np.full(scan.shape + (3,), 255, dtype=np.float32)
         rgb[..., 1] -= 255 * np.maximum(scan, ours); rgb[..., 2] -= 255 * scan; rgb[..., 0] -= 255 * ours
         Image.fromarray(np.clip(rgb, 0, 255).astype(np.uint8)).resize((scan.shape[1] // 2, scan.shape[0] // 2), Image.LANCZOS).save(out_png)
-    return {"match": round(good / max(1, total), 3), "corr": round(corr, 3), "tiles": total, "bad": len(bad_tiles), "shift": shifts}
+    return {"match": round(good / max(1, total), 3), "corr": round(corr, 3), "tiles": total, "bad": len(bad_tiles), "shift": shifts, "off": off_slabs}
 
 
 def main():

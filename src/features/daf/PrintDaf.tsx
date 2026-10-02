@@ -85,7 +85,7 @@ export default function PrintDaf({ layout, width, style, query }: Props) {
                 const width = line.w && !hanging ? `;width:${(line.w * k).toFixed(1)}px` : "";
                 const indent = line.i ? `;margin-right:${(line.i * k).toFixed(1)}px` : "";
                 const stream = slab.s === "gemara" ? "main" : slab.s === "rashi" ? "inner" : "outer";
-                return `<span class="daf-seg daf-pline${hanging ? " daf-hanging" : ""}" data-stream="${stream}" data-i="${i}" style="${justify}${width}${indent}">${sanitizeSegment(line.t, query)}</span>`;
+                return `<span class="daf-seg daf-pline${hanging ? " daf-hanging" : ""}" data-stream="${stream}" data-i="${i}" style="${justify}${width}${indent}">${sanitizeSegment(line.t, query) || "&nbsp;"}</span>`;
               })
               .join("")
           : `<span class="daf-seg" data-stream="${slab.s === "rashi" ? "inner" : "outer"}">${sideHtml(slab.text ?? "", query)}</span>`,

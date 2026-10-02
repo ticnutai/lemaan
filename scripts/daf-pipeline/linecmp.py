@@ -19,9 +19,7 @@ f = lambda t: H.fold(H.norm_token(re.sub('<[^>]+>', '', t).lstrip(H.DH)))
 tot = {}
 for k in amudim:
     rec.clear()
-    refs = {'gemara': H.window(lambda k: H.gem_tokens(ws.get(k) or shas[k]['gemara']), keys, k),
-            'rashi': H.window(lambda k: H.side_tokens(com(k, 'rashi')), keys, k),
-            'tosafot': H.window(lambda k: H.side_tokens(com(k, 'tosafot')), keys, k)}
+    refs = H.make_refs(shas, ws, keys, k)
     try:
         lay, rep = H.build_page(doc[keys.index(k) + FIRST - 1], k, refs)
     except Exception as e:

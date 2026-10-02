@@ -134,6 +134,45 @@ def window(tokens_of, keys, key, before=60, after=90):
     return prev + cur + nxt, len(prev), len(prev) + len(cur)
 
 
+def make_refs(shas, ws, keys, key):
+    """טקסט הייחוס לעמוד: גמרא (ויקיטקסט), רש"י ותוספות (ספריא) — עם הקשר מהעמודים הסמוכים.
+    למפרשים מצורפת גם החלוקה לדיבורים, כדי שאפשר יהיה לסדר אותם לפי סדרם בדף המודפס."""
+    com = lambda k, c: next((x["segments"] for x in shas[k]["commentaries"] if x["key"] == c), [])
+    refs = {"gemara": window(lambda k: gem_tokens(ws.get(k) or shas[k]["gemara"]), keys, key)}
+    for c in ("rashi", "tosafot"):
+        refs[c] = window(lambda k: side_tokens(com(k, c)), keys, key) + ([side_tokens([sg]) for sg in com(key, c)],)
+    return refs
+
+
+def print_order(ocr_lines, ref, lo, hi, segs):
+    """סדר הדיבורים בדפוס אינו תמיד הסדר שבספריא (שם לפי מקום הדיבור בגמרא). מאתרים את תחילת כל
+    דיבור ברצף ה-OCR של העמודה ומסדרים לפיו; דיבור שלא אותר נשאר צמוד לקודמו."""
+    segs = [sg for sg in segs if sg]
+    if len(segs) < 2 or sum(len(sg) for sg in segs) != hi - lo:
+        return ref
+    toks = [fold(norm_token(w["t"])) for ln in ocr_lines for w in ln]
+    starts, hay, pos = [], [], 0
+    for t in toks:
+        starts.append(pos); hay.append(t); pos += len(t) + 1
+    hay = " ".join(hay)
+    if not hay:
+        return ref
+    import bisect
+    where = []
+    for sg in segs:
+        needle = " ".join(fold(norm_token(t)) for t in sg[:10])
+        al = fuzz.partial_ratio_alignment(needle, hay) if len(needle) >= 8 else None
+        where.append(bisect.bisect_right(starts, al.dest_start) - 1 if al and al.score >= 80 else None)
+    key_, last = [], -1
+    for i, w_ in enumerate(where):
+        last = w_ if w_ is not None else last
+        key_.append((last, i))
+    order = sorted(range(len(segs)), key=lambda i: key_[i])
+    if order == list(range(len(segs))):
+        return ref
+    return ref[:lo] + [t for i in order for t in segs[i]] + ref[hi:]
+
+
 def heb_num(n):
     """מספר עברי לכותרת הדף (ב, יג, טו, טז, קכא)."""
     out = ""
@@ -216,6 +255,33 @@ def anchor(lines, ref, bounds=None, ext=None):
     out = [[] for _ in lines]
     for j in sorted(line_of):
         out[line_of[j]].append(ref[j])
+    # שורה שנשארה ריקה בין שורות מלאות (ה-OCR איבד אותה, והמילים שלה נדחסו לשכנותיה):
+    # מחלקים מחדש את מילות השורות הסמוכות לפי רוחב כל שורה
+    n = len(out)
+    i = 0
+    while i < n:
+        if out[i] or ext[i][1] - ext[i][0] < 25:
+            i += 1
+            continue
+        j = i
+        while j + 1 < n and not out[j + 1]:
+            j += 1
+        a, b = i - 1, j + 1
+        if a >= 0 and b < n and out[a] and out[b]:
+            words = [w for k in range(a, b + 1) for w in out[k]]
+            widths = [max(1.0, ext[k][1] - ext[k][0]) for k in range(a, b + 1)]
+            if len(words) >= len(widths):
+                size = [len(w.lstrip(DH)) + 1 for w in words]
+                total, tw = sum(size), sum(widths)
+                new, k, cum, lim = [[] for _ in widths], 0, 0.0, widths[0] / tw * total
+                for w, sz in zip(words, size):
+                    while k < len(widths) - 1 and cum + sz / 2 > lim:
+                        k += 1
+                        lim += widths[k] / tw * total
+                    new[k].append(w); cum += sz
+                if all(new):
+                    out[a: b + 1] = new
+        i = j + 1
     cover = len(pairs) / max(1, len(flat))
     return out, cover, (min(line_of), max(line_of))
 
@@ -390,7 +456,7 @@ def build_page(p, key, refs):
     for r in rows_of(side + gem, tol=3, base=True):
         segs, cur = [], [r["w"][0]]
         for a_, b_ in zip(r["w"], r["w"][1:]):
-            if a_["x0"] - b_["x1"] >= 9:
+            if a_["x0"] - b_["x1"] >= 6.5:  # מרווח בין עמודת שוליים למסגרת יכול להיות ~8 נק'
                 segs.append(cur); cur = []
             cur.append(b_)
         segs.append(cur)
@@ -575,7 +641,7 @@ def build_page(p, key, refs):
     slabs, report = [], {}
     # גמרא: עיגון
     glines = [r["w"] for b in blocks for r in b["rows"]]
-    gtext, gcov, grange = anchor(glines, refs["gemara"][0], refs["gemara"][1:], [(r["x0"], r["x1"]) for b in blocks for r in b["rows"]])
+    gtext, gcov, grange = anchor(glines, refs["gemara"][0], refs["gemara"][1:3], [(r["x0"], r["x1"]) for b in blocks for r in b["rows"]])
     report["gemara"] = {"lines": len(glines), "cover": round(gcov, 3)}
     lh = pitch * s
     li = 0
@@ -632,7 +698,10 @@ def build_page(p, key, refs):
             # מילת-קישור בסוף עמודת מפרש (המילה הראשונה בעמוד הבא) — שורה של מילה אחת שאינה צמודה לימין
             if len(cand) > 2 and len(cand[-1]["w"]) <= 1 and cand[-1]["x1"] - cand[-1]["x0"] < 40 and cand[-1]["x1"] < cand[-2]["x1"] - 8:
                 cand = cand[:-1]
-            res = anchor([pc["w"] for pc in cand], refs[st_][0], refs[st_][1:], [(pc["x0"], pc["x1"]) for pc in cand])
+            ref_, lo_, hi_ = refs[st_][0], refs[st_][1], refs[st_][2]
+            if len(refs[st_]) > 3:
+                ref_ = print_order([pc["w"] for pc in cand], ref_, lo_, hi_, refs[st_][3])
+            res = anchor([pc["w"] for pc in cand], ref_, (lo_, hi_), [(pc["x0"], pc["x1"]) for pc in cand])
             if best is None or res[1] > best[1][1] + 0.01:
                 best = (cand, res)
         ps, (stext, scov, _) = best
@@ -732,12 +801,7 @@ def main(pdf, tractate, first_page, only=None):
         pg = first_page - 1 + idx
         if pg >= len(doc):
             break
-        com = lambda k, c: next((x["segments"] for x in shas[k]["commentaries"] if x["key"] == c), [])
-        refs = {
-            "gemara": window(lambda k: gem_tokens(ws.get(k) or shas[k]["gemara"]), keys, key),
-            "rashi": window(lambda k: side_tokens(com(k, "rashi")), keys, key),
-            "tosafot": window(lambda k: side_tokens(com(k, "tosafot")), keys, key),
-        }
+        refs = make_refs(shas, ws, keys, key)
         try:
             lay, rep = build_page(doc[pg], key, refs)
         except Exception as e:  # עמוד חריג לא עוצר את המסכת — מדווחים וממשיכים
