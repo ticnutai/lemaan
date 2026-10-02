@@ -335,8 +335,7 @@ def build_page(p, key, refs):
                     ln["i"] = round(ind, 2)
                 lines.append(ln)
             slabs.append({"s": st_, "l": round(L_, 2), "t": round(top, 2), "w": round(Rr - L_, 2), "h": round(len(ps_) * slh, 2),
-                          "fs": round(S_FS * slh / S_LH, 2), "lh": round(slh, 3), "lines": lines,
-                          "text": " ".join(x.lstrip(DH) for t in g["t"] for x in t)})
+                          "fs": round(S_FS * slh / S_LH, 2), "lh": round(slh, 3), "lines": lines})
     # כותרת
     header = []
     head = [w for w in head if fL - 6 <= w["x0"] and w["x1"] <= fR + 6]
@@ -356,13 +355,30 @@ def build_page(p, key, refs):
     return lay, report
 
 
+def compact(o):
+    """מספרים בדיוק עשירית יחידה (≈עשירית פיקסל) — חוץ מריווח מילים (מאית)."""
+    if isinstance(o, dict):
+        return {k: (round(v, 2) if k == "ws" and isinstance(v, float) else compact(v)) for k, v in o.items()}
+    if isinstance(o, list):
+        return [compact(v) for v in o]
+    if isinstance(o, float):
+        r = round(o, 1)
+        return int(r) if r == int(r) else r
+    return o
+
+
+def write_layouts(path, layouts):
+    data = json.dumps(compact(layouts), ensure_ascii=False, separators=(",", ":")).encode()
+    open(path, "wb").write(gzip.compress(data, 9))
+
+
 def main(pdf, tractate, first_page, only=None):
     shas = load(f"{ROOT}/shas/{tractate}.json.gz")
     ws = load(f"{ROOT}/shas-ws/{tractate}.json.gz")
     keys = list(shas.keys())
     doc = fitz.open(pdf)
-    out_path = f"{ROOT}/tzurat/print/{tractate.lower()}.json"
-    out = json.load(open(out_path, encoding="utf-8")) if os.path.exists(out_path) else {}
+    out_path = f"{ROOT}/tzurat/print/{tractate.lower()}.json.gz"
+    out = json.loads(gzip.decompress(open(out_path, "rb").read())) if os.path.exists(out_path) else {}
     for idx, key in enumerate(keys):
         if only and key not in only:
             continue
@@ -378,7 +394,7 @@ def main(pdf, tractate, first_page, only=None):
         lay, rep = build_page(doc[pg], key, refs)
         out[key] = lay
         print(key, "pdf p", pg + 1, json.dumps(rep, ensure_ascii=False))
-    json.dump(out, open(out_path, "w", encoding="utf-8"), ensure_ascii=False)
+    write_layouts(out_path, out)
     print("→", out_path, len(out), "amudim")
 
 

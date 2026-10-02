@@ -1,5 +1,6 @@
 import { test } from "@playwright/test";
 import fs from "node:fs";
+import zlib from "node:zlib";
 
 /** מעבדת דקדוק: הדף מצויר לפי המספרים — האם גבולות הגושים נופלים על אותן מילים כמו בדפוס? */
 const norm = (t: string) => t.replace(/[֑-ׇ]/g, "").replace(/[^א-ת]/g, "");
@@ -7,7 +8,7 @@ const norm = (t: string) => t.replace(/[֑-ׇ]/g, "").replace(/[^א-ת]/g, "");
 test("grammar renderer — Berakhot 10a & 13b block boundaries vs print", async ({ page }) => {
   test.skip(!process.env.CALIB, "כלי כיול — הרץ עם CALIB=1");
   test.setTimeout(10 * 60_000);
-  const truth = JSON.parse(fs.readFileSync("public/tzurat/print/berakhot.json", "utf-8"));
+  const truth = JSON.parse(zlib.gunzipSync(fs.readFileSync("public/tzurat/print/berakhot.json.gz")).toString("utf-8"));
   for (const key of (process.env.KEYS ?? "10a,13b").split(",")) for (const mode of (process.env.MODES ?? "anchors,none").split(",")) {
     await page.evaluate(() => { (window as unknown as { __dafLab?: unknown }).__dafLab = undefined; }).catch(() => {});
     await page.goto(`/#/daf-lab?m=Berakhot&a=${key}&anchors=${mode.startsWith("anchors") ? "1" : "0"}${mode.endsWith("-sefaria") ? "&src=sefaria" : ""}`);
@@ -36,7 +37,7 @@ test("grammar renderer — Berakhot 10a & 13b block boundaries vs print", async 
 test("grammar renderer — summary over many amudim", async ({ page }) => {
   test.skip(!process.env.CALIB || !process.env.SUMMARY, "הרץ עם CALIB=1 SUMMARY=1 KEYS=...");
   test.setTimeout(30 * 60_000);
-  const truth = JSON.parse(fs.readFileSync("public/tzurat/print/berakhot.json", "utf-8"));
+  const truth = JSON.parse(zlib.gunzipSync(fs.readFileSync("public/tzurat/print/berakhot.json.gz")).toString("utf-8"));
   const keys = process.env.KEYS ? process.env.KEYS.split(",") : Object.keys(truth);
   let okPages = 0, okBlocks = 0, allBlocks = 0;
   for (const key of keys) {

@@ -1,3 +1,4 @@
+import { fetchGzJson } from "../lib/gzJson";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import PrintDaf from "../features/daf/PrintDaf";
@@ -83,21 +84,14 @@ export default function DafLabPage() {
   useEffect(() => {
     (async () => {
       const base = import.meta.env.BASE_URL;
-      const load = async (url: string) => {
-        const bytes = new Uint8Array(await (await fetch(url)).arrayBuffer());
-        // vite dev מפענח gzip בעצמו; בפרודקשן מגיעים בייטים גולמיים — מזהים לפי החתימה
-        const text = bytes[0] === 0x1f && bytes[1] === 0x8b
-          ? await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"))).text()
-          : new TextDecoder().decode(bytes);
-        return JSON.parse(text).amudim;
-      };
+      const load = async (url: string) => (await fetchGzJson<{ amudim: Record<string, AmudData & string[]> }>(url)).amudim;
       const amudim = await load(`${base}shas/${m}.json.gz`);
       const ws: Record<string, string[]> | null = src === "ws" ? await load(`${base}shas-ws/${m}.json.gz`) : null;
       const keys = Object.keys(amudim);
       const pick = (k: string) => amudim[k] && (ws?.[k] ? { ...amudim[k], gemara: ws[k] } : amudim[k]);
       setAmud(pick(a));
       setNextAmud(pick(keys[keys.indexOf(a) + 1]) ?? null);
-      const t = await (await fetch(`${base}tzurat/print/${m.toLowerCase()}.json`)).json();
+      const t = await fetchGzJson<Record<string, PrintLayout>>(`${base}tzurat/print/${m.toLowerCase()}.json.gz`);
       setTruth(t[a]);
       setKeys(Object.keys(t));
     })();

@@ -1,3 +1,4 @@
+import { fetchGzJson } from "../lib/gzJson";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { BookOpen, ChevronLeft, ChevronRight, Landmark } from "lucide-react";
@@ -38,20 +39,12 @@ const fileCache = new Map<string, Record<string, Amud>>();
 async function loadMasechet(slug: string): Promise<Record<string, Amud>> {
   const cached = fileCache.get(slug);
   if (cached) return cached;
-  const res = await fetch(`${import.meta.env.BASE_URL}shas/${slug}.json.gz`);
-  if (!res.ok) throw new Error(`טעינת ${slug} נכשלה`);
-  // שרתים מסוימים (vite dev) מפענחים את ה-gzip בעצמם; אחרים מגישים בייטים
-  // גולמיים. מזהים לפי חתימת gzip (1f 8b) ומפענחים רק במקרה הצורך.
-  const buf = await res.arrayBuffer();
-  const bytes = new Uint8Array(buf);
-  let text: string;
-  if (bytes[0] === 0x1f && bytes[1] === 0x8b) {
-    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"));
-    text = await new Response(stream).text();
-  } else {
-    text = new TextDecoder().decode(bytes);
+  let data: { amudim: Record<string, Amud> };
+  try {
+    data = await fetchGzJson(`${import.meta.env.BASE_URL}shas/${slug}.json.gz`);
+  } catch {
+    throw new Error(`טעינת ${slug} נכשלה`);
   }
-  const data = JSON.parse(text);
   fileCache.set(slug, data.amudim);
   return data.amudim;
 }
@@ -97,8 +90,7 @@ export default function ShasPage() {
   useEffect(() => {
     setPrintLayouts(null);
     if (!slug || !TZURAT_TRACTATES[slug]) return;
-    fetch(`${import.meta.env.BASE_URL}tzurat/print/${TZURAT_TRACTATES[slug]}.json`)
-      .then((r) => (r.ok ? r.json() : null))
+    fetchGzJson<Record<string, PrintLayout>>(`${import.meta.env.BASE_URL}tzurat/print/${TZURAT_TRACTATES[slug]}.json.gz`)
       .then((d) => setPrintLayouts(d))
       .catch(() => setPrintLayouts(null));
   }, [slug]);

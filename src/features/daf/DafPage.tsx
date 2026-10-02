@@ -95,8 +95,7 @@ export default function DafPage({ gemara, rashi, tosafot, amud, title, printLayo
     const g: string[] = [], r: string[] = [], t: string[] = [];
     for (const sl of printLayout.slabs) {
       if (sl.s === "gemara") g.push(...(sl.lines ?? []).map((l) => l.t));
-      else if (sl.s === "rashi") r.push(sl.text ?? "");
-      else t.push(sl.text ?? "");
+      else (sl.s === "rashi" ? r : t).push(...(sl.lines ? sl.lines.map((l) => l.t) : [sl.text ?? ""]));
     }
     return { g, r, t };
   }, [printLayout]);
