@@ -24,6 +24,8 @@ NIKUD = re.compile(r"[֑-ׇ]")
 V_L, V_W, V_TOP, PAGE_W = 121.0, 435.0, 33.0, 643.58
 G_FS, G_LH, S_FS, S_LH = 12.6, 12.033, 7.7, 11.16
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..", "public")
+# מיקום קו הבסיס (תחתית גוף האות) בתוך תיבת השורה, כחלק מגובה השורה — גמרא (גופן וילנא) ומפרשים (גופן רש"י)
+BASE_G, BASE_S = float(os.environ.get("BASE_G", 0.785)), float(os.environ.get("BASE_S", 0.684))
 
 
 # ---------- מילים עם גודל/הדגשה ----------
@@ -145,11 +147,14 @@ def heb_num(n):
 
 
 # ---------- עיגון: כל מילת ייחוס → שורת דפוס ----------
-def anchor(lines, ref, bounds=None):
+def anchor(lines, ref, bounds=None, ext=None):
     """lines: [[ocr words]] בסדר קריאה. מחזיר טקסט נכון לכל שורה + כיסוי.
     bounds: (התחלה, סוף) של טקסט העמוד עצמו בתוך ref — ההשלמה לפני ההתאמה הראשונה
     ואחרי האחרונה לא חורגת ממנו (כדי שמילות הקשר מהעמוד הסמוך לא ייכנסו לשורה)."""
     lo, hi = bounds or (0, len(ref))
+    # ext: קצוות כל שורה (x0, x1) כפי שנמדדו מהתמונה — קיימים גם לשורות שה-OCR איבד לגמרי
+    if ext is None:
+        ext = [(min(w["x0"] for w in ln), max(w["x1"] for w in ln)) if ln else (0, 0) for ln in lines]
     flat = [(li, w["t"]) for li, ln in enumerate(lines) for w in ln]
     okeys = [fold(norm_token(t)) for _, t in flat]
     rkeys = [fold(norm_token(t)) for t in ref]
@@ -178,15 +183,11 @@ def anchor(lines, ref, bounds=None):
     # בין שתי התאמות: פיזור לפי רוחב פיזי (לא לפי מספר מילות OCR — OCR גרוע מפרק/מאחד מילים)
     # מיקום כל מילת OCR = רוחב השורות שלפניה + המרחק מקצה השורה הימני; מילות הייחוס לפי אורך באותיות
     flat_w = [w for ln in lines for w in ln]
-    pos, off = [], 0.0
-    for ln in lines:
-        right = max(w["x1"] for w in ln) if ln else 0
-        pos += [off + right - w["x1"] for w in ln]
-        off += (right - min(w["x0"] for w in ln) if ln else 0) + 4
-    starts, acc = [], 0.0
-    for ln in lines:
-        starts.append(acc)
-        acc += (max(w["x1"] for w in ln) - min(w["x0"] for w in ln) + 4) if ln else 0
+    pos, starts, off = [], [], 0.0
+    for ln, (ex0, ex1) in zip(lines, ext):
+        starts.append(off)
+        pos += [off + max(0.0, ex1 - w["x1"]) for w in ln]
+        off += (ex1 - ex0) + 4
     cum = [0]
     for t in ref:
         cum.append(cum[-1] + len(t) + 1)
@@ -217,6 +218,150 @@ def anchor(lines, ref, bounds=None):
         out[line_of[j]].append(ref[j])
     cover = len(pairs) / max(1, len(flat))
     return out, cover, (min(line_of), max(line_of))
+
+
+def fit_rows(cys, default_pitch):
+    """קו הבסיס של השורה הראשונה + פסיעת השורה של גוש, בהתאמה חסינה (Theil–Sen) לכל שורות הגוש —
+    שורה בודדת שנמדדה לא מדויק (סוגריים, ק/ך/ן, שורה קצרה) לא מזיזה את כל הגוש ולא צוברת סחף."""
+    n = len(cys)
+    if n < 3:
+        return cys[0], default_pitch
+    slopes = [(cys[j] - cys[i]) / (j - i) for i in range(n) for j in range(i + max(1, n // 2), n)]
+    pitch = st.median(slopes)
+    return st.median(c - i * pitch for i, c in enumerate(cys)), pitch
+
+
+# ---------- שורות מהתמונה ----------
+def image_rows(p, W, fL, fR, head):
+    """שורות הגמרא והמפרשים כפי שהן בפיקסלים של הסריקה (img_lines), עם מילות ה-OCR שבתוכן.
+    הסוג (גמרא/מפרש) נקבע לפי גובה גוף האות שנמדד בתמונה — לא לפי גודל הגופן שה-OCR ניחש.
+    מחזיר (שורות גמרא, פיסות מפרשים, ראש הטקסט)."""
+    import img_lines as IL
+    mid = (fL + fR) / 2
+    # הכותרת הרצה: מילים גדולות בראש העמוד בלבד (מילה גדולה באמצע הדף — פתיחת פרק — אינה כותרת)
+    hd = [w for w in head if fL - 6 <= w["x0"] and w["x1"] <= fR + 6 and w["y1"] < p.rect.y0 + 0.1 * p.rect.height]
+    y_top = max((w["y1"] for w in hd), default=p.rect.y0 + 18) + 1.0
+    pieces, gutter_between = IL.find_lines(p, fL, fR, y_top, p.rect.height - 10)
+    wd = lambda l: l["x1"] - l["x0"]
+    # שני גבהים אופייניים: גמרא (~6.5 נק') ומפרשים (~5) — 2-means על השורות הארוכות
+    xs_ = [l["xh"] for l in pieces if wd(l) >= 60 and 3.8 <= l["xh"] <= 8.5]
+    cg, cs = 6.5, 5.0
+    for _ in range(10):
+        a = [x for x in xs_ if abs(x - cg) < abs(x - cs)]; b = [x for x in xs_ if abs(x - cg) >= abs(x - cs)]
+        cg = st.mean(a) if a else cg; cs = st.mean(b) if b else cs
+    if cg - cs < 0.8:
+        raise ValueError(f"no gemara/commentary height split ({cg:.2f}/{cs:.2f})")
+    thr = (cg + cs) / 2
+    cls = lambda l: "n" if l["xh"] < cs - 0.9 else "g" if l["xh"] >= thr else "s"
+    # רק לשורה רחבה שגובהה סביר גובה גוף האות (ולכן הסוג) אמין
+    wide = lambda l: wd(l) >= 60 and l["xh"] >= cs - 0.9
+    # הערות תחתית באות קטנה (תורה אור): שורות רחבות ונמוכות שמתחת לשורת הטקסט האחרונה — לא חלק מהזרמים.
+    # שורה נמוכה באמצע הטקסט היא שורה רגילה שנמדדה חלקית (דפוס חיוור) — נשארת
+    last_text = max((l["base"] for l in pieces if wide(l)), default=0)
+    L = [l for l in pieces if not (wd(l) >= 60 and cls(l) == "n" and l["base"] > last_text)]
+
+    def classify():
+        """שורה רחבה — לפי גובה גוף האות. פיסה צרה (מילה-שתיים, שגובהה אינו אמין) — לפי העמודה
+        שהיא יושבת בה: סוג השורה הרחבה הקרובה שמעליה/מתחתיה ושמכילה אותה אופקית."""
+        W_ = [l for l in L if wide(l)]
+        for l in W_:
+            l["c"] = cls(l)
+        # שורה רחבה שגובהה נמדד על הגבול (דפוס חיוור/עבה) וששתי שכנותיה באותה עמודה מסוג אחר — כמותן
+        # וכן שורה שמילה פותחת מוגדלת בתוכה הגביהה אותה — כשהיא באותם קצוות בדיוק כמו שכנותיה (אותה עמודה)
+        flips = []
+        for l in W_:
+            ov = lambda o: min(o["x1"], l["x1"]) - max(o["x0"], l["x0"]) >= 0.8 * wd(l)
+            up = [o for o in W_ if 4 < l["base"] - o["base"] < 15 and ov(o)]
+            dn = [o for o in W_ if 4 < o["base"] - l["base"] < 15 and ov(o)]
+            if up and dn:
+                u, d = max(up, key=lambda o: o["base"]), min(dn, key=lambda o: o["base"])
+                same_col = all(abs(o["x0"] - l["x0"]) < 5 and abs(o["x1"] - l["x1"]) < 5 for o in (u, d))
+                if u["c"] == d["c"] != l["c"] and (abs(l["xh"] - thr) < 0.8 or same_col):
+                    flips.append((l, u["c"]))
+        for l, c in flips:
+            l["c"] = c
+        for l in L:
+            if wide(l):
+                continue
+            cx = (l["x0"] + l["x1"]) / 2
+            nb = [o for o in W_ if o["x0"] - 3 <= cx <= o["x1"] + 3 and 4 < abs(o["base"] - l["base"]) < 15]
+            l["c"] = min(nb, key=lambda o: abs(o["base"] - l["base"]))["c"] if nb else ("g" if l["xh"] >= thr else "s")
+
+    def same_row(a, b):
+        # שבר דק (רק ה"גג" או רק ה"בסיס" של מילה) — שייך לשורה שהפס שלה מכיל אותו
+        for t, o in ((a, b), (b, a)):
+            if t["xh"] < 3.4 and o["xh"] >= 3.4:
+                return t["top"] >= o["top"] - 1 and t["base"] <= o["base"] + 1
+        ov = min(a["base"], b["base"]) - max(a["top"], b["top"])
+        tol = 1.2 if wide(a) and wide(b) else 2.6  # מילה בודדת עם ק/ך/ן נמדדת נמוך יותר
+        return abs(a["base"] - b["base"]) <= tol and ov >= 0.6 * min(a["base"] - a["top"], b["base"] - b["top"])
+
+    def mergeable(a, b, gap):  # b משמאל ל-a, על אותה שורה
+        if a["c"] != b["c"]:
+            return False  # שורת גמרא ושורת מפרש שבמקרה באותו גובה
+        if a["c"] == "g":
+            return True  # לגמרא עמודה אחת — רווח גדול (או "נהר" של כמה שורות) בתוכה הוא רווחי מילים
+        # שני מפרשים זה לצד זה נפרדים רק במרווח שבאמצע העמוד
+        return not (gap >= 9 and b["x1"] <= mid - 3 and a["x0"] >= mid + 3)
+
+    changed = True
+    while changed:
+        changed = False
+        classify()
+        L.sort(key=lambda l: -l["x1"])
+        for i, a in enumerate(L):
+            for b in L[i + 1:]:
+                gap = a["x0"] - b["x1"]
+                thin = a["xh"] < 3.4 or b["xh"] < 3.4  # שבר דק יכול לחפוף אופקית לשורה שלו
+                if (-2 <= gap or thin) and gap < 25 and same_row(a, b) and mergeable(a, b, gap):
+                    main, other = (a, b) if wd(a) >= wd(b) else (b, a)
+                    m = dict(main, x0=min(a["x0"], b["x0"]), x1=max(a["x1"], b["x1"]))
+                    # מילה פותחת מוגדלת (גבוהה בבירור מהשורה שלידה) בתוך שורת מפרש
+                    if other["xh"] > main["xh"] + 1.2 and wd(other) < 60 and other["top"] < main["top"] - 0.8:
+                        m["big"] = (other["x0"], other["x1"])
+                    elif a.get("big") or b.get("big"):
+                        m["big"] = a.get("big") or b.get("big")
+                    L.remove(a); L.remove(b); L.append(m)
+                    changed = True
+                    break
+            if changed:
+                break
+    classify()
+    # שברי דיו שאינם שורה (סימוני הערה, כתמים): צרים ונמוכים מאוד
+    L = [l for l in L if wd(l) >= 60 or l["xh"] >= 3.4]
+    L.sort(key=lambda l: (l["base"], -l["x1"]))
+    # מילות ה-OCR לשורות (לפי מיקום — הגודל שה-OCR נתן להן לא משנה)
+    for l in L:
+        l["w"] = []
+    for w in W:
+        if w["size"] >= 14:
+            continue
+        cx, cy = (w["x0"] + w["x1"]) / 2, (w["y0"] + w["y1"]) / 2
+        c = [l for l in L if l["x0"] - 2 <= cx <= l["x1"] + 2 and l["top"] - 3 <= cy <= l["base"] + 2.5]
+        if c:
+            min(c, key=lambda l: abs(cy - (l["top"] + l["base"]) / 2))["w"].append(w)
+    for l in L:
+        l["w"].sort(key=lambda w: -w["x1"])
+        if l.get("big") and l["c"] == "s" and l["big"][1] >= l["x1"] - 3:  # מילה מוגדלת בראש (ימין) שורת מפרש
+            l["drop"] = max(1, sum(1 for w in l["w"] if l["big"][0] - 2 <= (w["x0"] + w["x1"]) / 2 <= l["big"][1] + 2))
+    # כיול מול מוסכמות ה-OCR (מרכז תיבת מילה לגמרא, תחתית התיבה למפרשים) — כדי שמיקום הגושים לא ישתנה
+    full = lambda c: [l for l in L if l["c"] == c and len(l["w"]) >= 3]
+    med = lambda v, d: st.median(v) if v else d
+    c_g = med([l["base"] - st.median((w["y0"] + w["y1"]) / 2 for w in l["w"]) for l in full("g")], 2.9)
+    c_s = med([st.median(w["y1"] for w in l["w"]) - l["base"] for l in full("s")], 1.6)
+    c_t = med([l["top"] - min(w["y0"] for w in l["w"]) for l in full("g") + full("s")], 2.5)
+    # cy = קו הבסיס האמיתי של השורה (מהפיקסלים). תיבות ה-OCR אינן עקביות בין עמודים (±0.3 נק')
+    grows = [dict(l, cy=l["base"]) for l in L if l["c"] == "g"]
+    pcs = []
+    for l in L:
+        if l["c"] == "s":
+            pc = dict(l, cy=l["base"])
+            pc["side"] = "F" if wd(pc) > 0.8 * (fR - fL) else ("R" if (pc["x0"] + pc["x1"]) / 2 > mid else "L")
+            pcs.append(pc)
+    fTop = min(l["top"] for l in L) - c_t
+    if os.environ.get("FRAME_DEBUG"):
+        print(f"image rows: gemara {len(grows)}, commentary {len(pcs)}, xh g/s {cg:.2f}/{cs:.2f}, calib {c_g:.2f} {c_s:.2f} {c_t:.2f}")
+    return grows, pcs, fTop
 
 
 # ---------- עמוד ----------
@@ -293,62 +438,72 @@ def build_page(p, key, refs):
     gem = [w for w in gem if id(w) not in notes]
     side = [w for w in side if inside(w)]
     gem = [w for w in gem if inside(w)]
-    # ה-OCR מאחד לפעמים שורת גמרא עם שורת המפרש שלצדה לפיסה אחת בגודל הגמרא.
-    # גבול עמודה = רווח ≥20, או רווח שעובר ברצועה לבנה אנכית (מרווח העמודות) — ריקה ברוב
-    # השורות הסמוכות. החלק הרחב ביותר (לא זה עם הכי הרבה "מילים": OCR גרוע מתפרק לרסיסים) נשאר גמרא.
-    allrows = rows_of([w for w in W if inside(w)])
-    def gutter(xa, xb, cy):
-        if xb - xa < 5:
-            return False
-        xa, xb = (xa + xb) / 2 - 2, (xa + xb) / 2 + 2  # אמצע הרווח — קצוות המילים הסמוכות לא "סוגרים" אותו
-        # רק שורות שחוצות את המקום (יש להן מילים משני צדי הרצועה) — שורה של עמודה אחרת לא מעידה כלום
-        near_ = [r for r in allrows if 2 < abs(r["cy"] - cy) <= 45
-                 and min(w["x0"] for w in r["w"]) < xa - 15 and max(w["x1"] for w in r["w"]) > xb + 15]
-        if len(near_) < 4:
-            return False
-        hit = sum(1 for r in near_ if any(w["x0"] < xb and w["x1"] > xa for w in r["w"]))
-        return hit <= 0.25 * len(near_)
-    keep = []
-    for r in rows_of(gem):
-        ws_ = r["w"]
-        parts, cur = [], [ws_[0]]
-        for a_, b_ in zip(ws_, ws_[1:]):
-            g_ = a_["x0"] - b_["x1"]
-            if g_ >= 20 or (g_ >= 7 and gutter(b_["x1"] + 1, a_["x0"] - 1, r["cy"])):
-                parts.append(cur); cur = []
-            cur.append(b_)
-        parts.append(cur)
-        main = max(parts, key=lambda pt: max(w["x1"] for w in pt) - min(w["x0"] for w in pt))
-        keep += main
-        for part in parts:
-            if part is not main:
-                side += [dict(w, size=S) for w in part]
-    gem = keep
-    # וגם כשהרווח רגיל (מרווח העמודות ~12): מילה "של גמרא" שבמקומה יש עמודת מפרש גם בשורות
-    # שמעליה וגם בשורות שמתחתיה — שייכת לעמודה (במעבר לגמרא רחבה אין מפרש מתחת, ולכן לא נוגעים)
-    side_c = [((w["x0"] + w["x1"]) / 2, (w["y0"] + w["y1"]) / 2, w["x0"], w["x1"]) for w in side]
-    side_top = min((c[1] for c in side_c), default=0); side_bot = max((c[1] for c in side_c), default=0)
-    def in_column(w):
-        cx, cy = (w["x0"] + w["x1"]) / 2, (w["y0"] + w["y1"]) / 2
-        near = lambda sgn: any(x0 - 3 <= cx <= x1 + 3 or abs(sx - cx) < 12
-                               for sx, sy, x0, x1 in side_c if 3 < sgn * (sy - cy) < 26)
-        # בשורה העליונה/התחתונה של עמודת המפרש אין שכן מצד אחד — מספיק הצד השני
-        return (near(1) or cy <= side_top + 4) and (near(-1) or cy >= side_bot - 4)
-    moved = [w for w in gem if in_column(w)]
-    if moved:
-        mv = {id(w) for w in moved}
-        gem = [w for w in gem if id(w) not in mv]
-        side += [dict(w, size=S) for w in moved]
-    fTop = min(w["y0"] for w in side + gem)
+    # מקור הגיאומטריה: התמונה עצמה (ברירת מחדל) או שורות ה-OCR (GEOM=ocr, וגם כגיבוי אם התמונה נכשלת)
+    use_img = os.environ.get("GEOM", "image") == "image"
+    if use_img:
+        try:
+            grows, pcs, fTop = image_rows(p, W, fL, fR, head)
+        except Exception as e:
+            print(key, "image geometry failed, using OCR rows:", repr(e), flush=True)
+            use_img = False
+    if not use_img:
+        # ה-OCR מאחד לפעמים שורת גמרא עם שורת המפרש שלצדה לפיסה אחת בגודל הגמרא.
+        # גבול עמודה = רווח ≥20, או רווח שעובר ברצועה לבנה אנכית (מרווח העמודות) — ריקה ברוב
+        # השורות הסמוכות. החלק הרחב ביותר (לא זה עם הכי הרבה "מילים": OCR גרוע מתפרק לרסיסים) נשאר גמרא.
+        allrows = rows_of([w for w in W if inside(w)])
+        def gutter(xa, xb, cy):
+            if xb - xa < 5:
+                return False
+            xa, xb = (xa + xb) / 2 - 2, (xa + xb) / 2 + 2  # אמצע הרווח — קצוות המילים הסמוכות לא "סוגרים" אותו
+            # רק שורות שחוצות את המקום (יש להן מילים משני צדי הרצועה) — שורה של עמודה אחרת לא מעידה כלום
+            near_ = [r for r in allrows if 2 < abs(r["cy"] - cy) <= 45
+                     and min(w["x0"] for w in r["w"]) < xa - 15 and max(w["x1"] for w in r["w"]) > xb + 15]
+            if len(near_) < 4:
+                return False
+            hit = sum(1 for r in near_ if any(w["x0"] < xb and w["x1"] > xa for w in r["w"]))
+            return hit <= 0.25 * len(near_)
+        keep = []
+        for r in rows_of(gem):
+            ws_ = r["w"]
+            parts, cur = [], [ws_[0]]
+            for a_, b_ in zip(ws_, ws_[1:]):
+                g_ = a_["x0"] - b_["x1"]
+                if g_ >= 20 or (g_ >= 7 and gutter(b_["x1"] + 1, a_["x0"] - 1, r["cy"])):
+                    parts.append(cur); cur = []
+                cur.append(b_)
+            parts.append(cur)
+            main = max(parts, key=lambda pt: max(w["x1"] for w in pt) - min(w["x0"] for w in pt))
+            keep += main
+            for part in parts:
+                if part is not main:
+                    side += [dict(w, size=S) for w in part]
+        gem = keep
+        # וגם כשהרווח רגיל (מרווח העמודות ~12): מילה "של גמרא" שבמקומה יש עמודת מפרש גם בשורות
+        # שמעליה וגם בשורות שמתחתיה — שייכת לעמודה (במעבר לגמרא רחבה אין מפרש מתחת, ולכן לא נוגעים)
+        side_c = [((w["x0"] + w["x1"]) / 2, (w["y0"] + w["y1"]) / 2, w["x0"], w["x1"]) for w in side]
+        side_top = min((c[1] for c in side_c), default=0); side_bot = max((c[1] for c in side_c), default=0)
+        def in_column(w):
+            cx, cy = (w["x0"] + w["x1"]) / 2, (w["y0"] + w["y1"]) / 2
+            near = lambda sgn: any(x0 - 3 <= cx <= x1 + 3 or abs(sx - cx) < 12
+                                   for sx, sy, x0, x1 in side_c if 3 < sgn * (sy - cy) < 26)
+            # בשורה העליונה/התחתונה של עמודת המפרש אין שכן מצד אחד — מספיק הצד השני
+            return (near(1) or cy <= side_top + 4) and (near(-1) or cy >= side_bot - 4)
+        moved = [w for w in gem if in_column(w)]
+        if moved:
+            mv = {id(w) for w in moved}
+            gem = [w for w in gem if id(w) not in mv]
+            side += [dict(w, size=S) for w in moved]
+        fTop = min(w["y0"] for w in side + gem)
     s = V_W / (fR - fL)
     X = lambda x: V_L + (x - fL) * s
     Y = lambda y: V_TOP + (y - fTop) * s
 
     # --- גמרא ---
-    grows = rows_of(gem)
+    if not use_img:
+        grows = rows_of(gem)
     pitch = st.median(b["cy"] - a["cy"] for a, b in zip(grows, grows[1:]) if 8 < b["cy"] - a["cy"] < 16)
     # מילת-קישור בתחתית (המילה הראשונה של העמוד הבא) — לא צמודה לשמאל הגוש
-    if len(grows) > 2 and len(grows[-1]["w"]) <= 2 and abs(grows[-1]["x0"] - grows[-2]["x0"]) > 6 and grows[-1]["x1"] < grows[-2]["x1"] - 20:
+    if len(grows) > 2 and grows[-1]["x1"] - grows[-1]["x0"] < 60 and (use_img or len(grows[-1]["w"]) <= 2) and abs(grows[-1]["x0"] - grows[-2]["x0"]) > 6 and grows[-1]["x1"] < grows[-2]["x1"] - 20:
         grows = grows[:-1]
     blocks = []
     for i, r in enumerate(grows):
@@ -360,7 +515,7 @@ def build_page(p, key, refs):
         else:
             blocks.append({"x0": r["x0"], "x1": r["x1"], "rows": [r]})
     # --- מפרשים: שורות (לפי קו בסיס) → פיסות → צד ---
-    srows = rows_of(side, tol=3.0, base=True)
+    srows = [] if use_img else rows_of(side, tol=3.0, base=True)
     mid = (fL + fR) / 2
     gspan = []  # טווחי הגמרא: (y עליון, y תחתון, x0, x1)
     for b_ in blocks:
@@ -368,7 +523,8 @@ def build_page(p, key, refs):
         gx0 = st.median(r["x0"] for r in rws[:-1]) if len(rws) > 1 else rws[0]["x0"]
         gspan.append((rws[0]["cy"] - pitch / 2, rws[-1]["cy"] + pitch / 2, gx0, st.median(r["x1"] for r in rws)))
     mk = lambda ws_, cy: {"cy": cy, "w": ws_, "x0": min(w["x0"] for w in ws_), "x1": max(w["x1"] for w in ws_)}
-    pcs = []
+    if not use_img:
+        pcs = []
     for r in srows:
         yc = r["cy"] - 2
         g = next((g for g in gspan if g[0] <= yc <= g[1]), None)
@@ -419,7 +575,7 @@ def build_page(p, key, refs):
     slabs, report = [], {}
     # גמרא: עיגון
     glines = [r["w"] for b in blocks for r in b["rows"]]
-    gtext, gcov, grange = anchor(glines, refs["gemara"][0], refs["gemara"][1:])
+    gtext, gcov, grange = anchor(glines, refs["gemara"][0], refs["gemara"][1:], [(r["x0"], r["x1"]) for b in blocks for r in b["rows"]])
     report["gemara"] = {"lines": len(glines), "cover": round(gcov, 3)}
     lh = pitch * s
     li = 0
@@ -435,9 +591,13 @@ def build_page(p, key, refs):
             t = " ".join(gtext[li]); li += 1
             partial = (r["x1"] - r["x0"]) < (x1 - x0) - 8
             lines.append({"t": t, "ws": None, "w": None if partial else round(Rr - L_, 2)})
-        top = Y(rows[0]["cy"]) - lh / 2
-        slabs.append({"s": "gemara", "l": round(L_, 2), "t": round(top, 2), "w": round(Rr - L_, 2), "h": round(len(rows) * lh, 2),
-                      "fs": round(G_FS * lh / G_LH, 2), "lh": round(lh, 3), "lines": lines})
+        # מיקום קו הבסיס בתוך תיבת השורה (יחסית לגובה השורה): נמדד מול הסריקה (qa_scan)
+        # פסיעת השורה של הגוש עצמו — בלי סחף מצטבר לאורך עשרות שורות
+        cy0, pitch_b = fit_rows([r["cy"] for r in rows], pitch)
+        lh_b = pitch_b * s
+        top = Y(cy0) - (BASE_G * lh if use_img else lh / 2)
+        slabs.append({"s": "gemara", "l": round(L_, 2), "t": round(top, 2), "w": round(Rr - L_, 2), "h": round(len(rows) * lh_b, 2),
+                      "fs": round(G_FS * lh / G_LH, 2), "lh": round(lh_b, 3), "lines": lines})
     # מפרשים: פסיעת שורה נמדדת בתוך כל עמודה (שורות רש"י ותוספות אינן באותו גובה)
     diffs = []
     for st_ in ("rashi", "tosafot"):
@@ -453,7 +613,7 @@ def build_page(p, key, refs):
         # אות/מילה פותחת מוגדלת (על פני שתי שורות): מצטרפת לראש השורה הסמוכה מתחתיה בעמודה
         merged = []
         for i, pc in enumerate(ps):
-            big = all(bigcap(w) for w in pc["w"]) and len(pc["w"]) <= 2
+            big = not use_img and all(bigcap(w) for w in pc["w"]) and len(pc["w"]) <= 2
             nxt = next((q for q in ps[i + 1:] if 0 < q["cy"] - pc["cy"] < 1.6 * spitch and abs((q["x0"] + q["x1"]) / 2 - (pc["x0"] + pc["x1"]) / 2) < 140), None)
             if big and nxt is not None:
                 nxt["w"] = pc["w"] + nxt["w"]; nxt["x1"] = max(nxt["x1"], pc["x1"]); nxt["drop"] = len(pc["w"])
@@ -470,9 +630,9 @@ def build_page(p, key, refs):
         best = None
         for cand in orders:
             # מילת-קישור בסוף עמודת מפרש (המילה הראשונה בעמוד הבא) — שורה של מילה אחת שאינה צמודה לימין
-            if len(cand) > 2 and len(cand[-1]["w"]) == 1 and cand[-1]["x1"] < cand[-2]["x1"] - 8:
+            if len(cand) > 2 and len(cand[-1]["w"]) <= 1 and cand[-1]["x1"] - cand[-1]["x0"] < 40 and cand[-1]["x1"] < cand[-2]["x1"] - 8:
                 cand = cand[:-1]
-            res = anchor([pc["w"] for pc in cand], refs[st_][0], refs[st_][1:])
+            res = anchor([pc["w"] for pc in cand], refs[st_][0], refs[st_][1:], [(pc["x0"], pc["x1"]) for pc in cand])
             if best is None or res[1] > best[1][1] + 0.01:
                 best = (cand, res)
         ps, (stext, scov, _) = best
@@ -496,7 +656,8 @@ def build_page(p, key, refs):
             L_, Rr = X(x0), X(x1)
             if abs(L_ - V_L) < 4: L_ = V_L
             if abs(Rr - (V_L + V_W)) < 4: Rr = V_L + V_W
-            top = Y(ps_[0]["cy"]) - 0.78 * slh
+            cy0, pitch_b = fit_rows([pc["cy"] for pc in ps_], spitch)
+            top = Y(cy0) - (BASE_S if use_img else 0.78) * slh
             lines = []
             for pc, t in zip(ps_, g["t"]):
                 ind = max(0.0, (x1 - pc["x1"]) * s) if x1 - pc["x1"] > 3 else 0.0
@@ -505,8 +666,9 @@ def build_page(p, key, refs):
                 if ind:
                     ln["i"] = round(ind, 2)
                 lines.append(ln)
-            slabs.append({"s": st_, "l": round(L_, 2), "t": round(top, 2), "w": round(Rr - L_, 2), "h": round(len(ps_) * slh, 2),
-                          "fs": round(S_FS * slh / S_LH, 2), "lh": round(slh, 3), "lines": lines})
+            slh_b = pitch_b * s
+            slabs.append({"s": st_, "l": round(L_, 2), "t": round(top, 2), "w": round(Rr - L_, 2), "h": round(len(ps_) * slh_b, 2),
+                          "fs": round(S_FS * slh / S_LH, 2), "lh": round(slh_b, 3), "lines": lines})
     # כותרת
     header = []
     head = [w for w in head if fL - 6 <= w["x0"] and w["x1"] <= fR + 6]
@@ -527,21 +689,27 @@ def build_page(p, key, refs):
         # ה-OCR לא קרא את הסימן — מוסיפים אותו בפינה החיצונית (עמוד א משמאל, עמוד ב מימין)
         fs_ = max(h["fs"] for h in header); t_ = min(h["t"] for h in header)
         header.append({"l": round(V_L if key.endswith("a") else V_L + V_W - 1.2 * fs_, 2), "t": t_, "fs": fs_, "text": label})
+    report["geom"] = "image" if use_img else "ocr"
     report["rashi_side"] = rashi_side
     report["frame"] = [round(fL, 1), round(fR, 1), round(fTop, 1)]
     report["blocks"] = [f'{sl["s"]} {round(sl["w"])}×{len(sl.get("lines") or []) or round(sl["h"] / sl["lh"])}' for sl in slabs]
-    lay = {"page": {"w": PAGE_W, "h": round(Y(p.rect.height), 2)}, "slabs": slabs, "header": header}
+    # src: מסגרת הטקסט בסריקה (שמאל, ימין, ראש — בנקודות PDF) — למיפוי חזרה אל הצילום (בדיקת איכות)
+    lay = {"page": {"w": PAGE_W, "h": round(Y(p.rect.height), 2)}, "slabs": slabs, "header": header,
+           "src": [round(fL, 1), round(fR, 1), round(fTop, 1)]}
     return lay, report
 
 
-def compact(o):
-    """מספרים בדיוק עשירית יחידה (≈עשירית פיקסל) — חוץ מריווח מילים (מאית)."""
+# דיוק לפי שדה: פסיעת שורה וגודל גופן מוכפלים בעשרות שורות — עיגול לעשירית צובר סחף של כמה נקודות
+PRECISION = {"ws": 2, "lh": 3, "fs": 2}
+
+def compact(o, key=None):
+    """מספרים בדיוק עשירית יחידה (≈עשירית פיקסל), חוץ מהשדות שב-PRECISION."""
     if isinstance(o, dict):
-        return {k: (round(v, 2) if k == "ws" and isinstance(v, float) else compact(v)) for k, v in o.items()}
+        return {k: compact(v, k) for k, v in o.items()}
     if isinstance(o, list):
-        return [compact(v) for v in o]
+        return [compact(v, key) for v in o]
     if isinstance(o, float):
-        r = round(o, 1)
+        r = round(o, PRECISION.get(key, 1))
         return int(r) if r == int(r) else r
     return o
 
