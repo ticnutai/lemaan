@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>סקירת דפוס מדויק</title>
+<style>
+:root {
+  --bg: #eef1ee; --panel: #fff; --ink: #1f2a26; --muted: #66756d; --line: #d5ddd7;
+  --accent: #1d5a47; --ok: #1f8a4c; --bad: #c4372f; --warn: #d9861c; --mark: #d0216c; --focus: #1a73e8;
+}
+* { box-sizing: border-box; }
+body { margin: 0; font: 14px/1.45 "Segoe UI", Arial, sans-serif; color: var(--ink); background: var(--bg); height: 100vh; display: flex; flex-direction: column; }
+header { background: var(--accent); color: #fff; padding: 8px 14px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+header h1 { font-size: 17px; margin: 0; white-space: nowrap; }
+header select { font: inherit; padding: 4px 6px; border-radius: 6px; border: 0; }
+#pages { display: flex; gap: 4px; flex-wrap: wrap; }
+#pages button { font: inherit; font-size: 13px; border: 0; border-radius: 6px; padding: 3px 8px; cursor: pointer; background: #ffffff22; color: #fff; }
+#pages button.on { background: #fff; color: var(--accent); font-weight: 700; }
+#pages button .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-inline-start: 5px; vertical-align: middle; }
+.toolbar { background: var(--panel); border-bottom: 1px solid var(--line); padding: 6px 14px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.toolbar button, .toolbar label { font: inherit; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { border: 0; background: #fff; padding: 5px 10px; cursor: pointer; }
+.seg button.on { background: var(--accent); color: #fff; }
+.btn { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 5px 10px; cursor: pointer; }
+.btn.on { background: var(--mark); border-color: var(--mark); color: #fff; }
+#status { color: var(--muted); font-size: 12px; margin-inline-start: auto; }
+main { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 400px; min-height: 0; }
+#stage { overflow: auto; padding: 12px; direction: ltr; position: relative; }
+.pair { display: flex; gap: 14px; align-items: flex-start; width: max-content; }
+figure { margin: 0; }
+figcaption { direction: rtl; font-weight: 700; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+.wrap { position: relative; background: #fff; box-shadow: 0 2px 10px #0002; }
+.wrap img { display: block; width: 100%; height: auto; user-select: none; -webkit-user-drag: none; }
+.wrap svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.marking .wrap svg { cursor: crosshair; }
+.flag { fill: var(--warn); fill-opacity: .14; stroke: var(--warn); stroke-width: 2; }
+.focus { fill: var(--focus); fill-opacity: .16; stroke: var(--focus); stroke-width: 3; }
+.mark { fill: var(--mark); fill-opacity: .12; stroke: var(--mark); stroke-width: 3; }
+.mark-num { fill: var(--mark); font: 700 30px Arial; }
+.draft { fill: none; stroke: var(--mark); stroke-width: 3; stroke-dasharray: 10 6; }
+aside { background: var(--panel); border-inline-start: 1px solid var(--line); overflow: auto; padding: 12px; }
+.card { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; }
+.card h2 { font-size: 14px; margin: 0 0 8px; display: flex; justify-content: space-between; }
+.big { font-size: 26px; font-weight: 700; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+td, th { padding: 3px 4px; border-bottom: 1px solid #eef1ee; text-align: right; vertical-align: top; }
+th { color: var(--muted); font-weight: 600; }
+.ok { color: var(--ok); font-weight: 700; } .bad { color: var(--bad); font-weight: 700; } .muted { color: var(--muted); }
+.row { padding: 6px 4px; border-bottom: 1px solid #eef1ee; cursor: pointer; font-size: 13px; }
+.row:hover { background: #f4f8f5; }
+.row .lbl { font-size: 11px; color: var(--muted); }
+.cmp b { display: inline-block; min-width: 42px; color: var(--muted); font-weight: 600; }
+.tag { display: inline-block; font-size: 11px; border-radius: 4px; padding: 0 5px; background: #e8efe9; margin-inline-end: 4px; }
+#dialog { position: fixed; inset: 0; background: #0005; display: none; align-items: center; justify-content: center; z-index: 9; }
+#dialog .box { background: #fff; border-radius: 12px; padding: 16px; width: min(440px, 92vw); }
+#dialog select, #dialog textarea { width: 100%; font: inherit; margin: 6px 0; padding: 6px; border: 1px solid var(--line); border-radius: 6px; }
+#dialog textarea { min-height: 80px; }
+.legend span { display: inline-block; margin-inline-end: 10px; font-size: 12px; }
+.sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-inline-end: 4px; vertical-align: middle; }
+.hint { font-size: 12px; color: var(--muted); }
+@media (max-width: 1000px) {
+  main { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) 42vh; }
+  aside { border-inline-start: 0; border-top: 1px solid var(--line); }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>סקירת דפוס מדויק</h1>
+  <select id="tractate"></select>
+  <div id="pages"></div>
+</header>
+<div class="toolbar">
+  <div class="seg" id="modes">
+    <button data-m="side" class="on">זה לצד זה</button>
+    <button data-m="diff">שכבות הבדלים</button>
+    <button data-m="blink">הבהוב</button>
+  </div>
+  <label>זום <input type="range" id="zoom" min="15" max="200" value="40"></label>
+  <button class="btn" id="fit">התאם למסך</button>
+  <label><input type="checkbox" id="showFlags" checked> שורות שונות</label>
+  <button class="btn" id="markBtn" title="M">✎ מצב סימון</button>
+  <span class="legend" id="legend" hidden><span><i class="sw" style="background:#000"></i>באותו מקום</span><span><i class="sw" style="background:#dc2828"></i>רק בדפוס</span><span><i class="sw" style="background:#285ae6"></i>רק אצלנו</span></span>
+  <span id="status"></span>
+</div>
+<main>
+  <div id="stage"></div>
+  <aside id="panel"></aside>
+</main>
+<div id="dialog"><div class="box">
+  <h3 style="margin:0 0 6px">סימון חדש</h3>
+  <select id="cat">
+    <option>שבירת שורה שגויה</option>
+    <option>טקסט חסר</option>
+    <option>טקסט מיותר / כפול</option>
+    <option>מיקום או גובה לא נכון</option>
+    <option>גודל או סוג גופן</option>
+    <option>גמרא / רש"י / תוספות הוחלפו</option>
+    <option>אחר</option>
+  </select>
+  <textarea id="note" placeholder="מה לא בסדר כאן? (לא חובה)"></textarea>
+  <div style="display:flex;gap:8px;justify-content:flex-start">
+    <button class="btn" id="saveMark" style="background:var(--accent);color:#fff;border-color:var(--accent)">שמור</button>
+    <button class="btn" id="cancelMark">ביטול</button>
+  </div>
+</div></div>
+<script>
+const $ = (s) => document.querySelector(s);
+const NAME = { gemara: "גמרא", rashi: 'רש"י', tosafot: "תוספות" };
+const AMUD = (k) => k.replace(/^(\d+)([ab])$/, (_, n, a) => heb(+n) + (a === "a" ? "." : ":"));
+function heb(n) { const o = " אבגדהוזחט", t = " יכלמנסעפצ", h = { 1: "ק", 2: "ר", 3: "ש", 4: "ת" }; let s = ""; if (n >= 100) { s += h[Math.floor(n / 100)] || ""; n %= 100; } if (n === 15) return s + "טו"; if (n === 16) return s + "טז"; return s + (t[Math.floor(n / 10)] || "").trim() + (o[n % 10] || "").trim(); }
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+let T = null, DATA = null, AM = null, NOTES = {}, mode = "side", marking = false, focus = null, blinkT = null, draft = null;
+const ls = { get: (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
+
+async function init() {
+  const ts = await (await fetch("/api/tractates")).json();
+  $("#tractate").innerHTML = ts.map((t) => `<option>${t}</option>`).join("");
+  $("#tractate").onchange = () => loadTractate($("#tractate").value);
+  const last = ls.get("review.last") || {};
+  if (last.t && ts.includes(last.t)) $("#tractate").value = last.t;
+  if (ts.length) loadTractate($("#tractate").value, last.a);
+}
+async function loadTractate(t, amud) {
+  T = t;
+  DATA = await (await fetch(`/${t}/data.json?ts=${Date.now()}`)).json();
+  try { NOTES = await (await fetch(`/api/notes?tractate=${t}`)).json(); } catch { NOTES = ls.get("review.notes." + t) || {}; }
+  const keys = Object.keys(DATA.pages);
+  $("#pages").innerHTML = keys.map((k) => {
+    const p = DATA.pages[k], m = p.match ?? 0;
+    const c = m >= 0.97 ? "#3ccf7a" : m >= 0.9 ? "#f0b43c" : "#ff6b5e";
+    return `<button data-k="${k}">${AMUD(k)}<span class="dot" style="background:${c}"></span></button>`;
+  }).join("");
+  $("#pages").querySelectorAll("button").forEach((b) => (b.onclick = () => show(b.dataset.k)));
+  show(amud && DATA.pages[amud] ? amud : keys[0]);
+}
+
+function show(k) {
+  AM = k; focus = null;
+  ls.set("review.last", { t: T, a: k });
+  $("#pages").querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.k === k));
+  renderStage(); renderPanel(); fit();
+}
+
+function figure(kind, label) {
+  const p = DATA.pages[AM];
+  return `<figure><figcaption>${label}</figcaption><div class="wrap" data-kind="${kind}">
+    <img src="/${T}/${AM}-${kind}.png?ts=${p.match}" draggable="false">
+    <svg viewBox="0 0 ${p.img[0]} ${p.img[1]}" preserveAspectRatio="none"></svg></div></figure>`;
+}
+function renderStage() {
+  clearInterval(blinkT);
+  const st = $("#stage");
+  $("#legend").hidden = mode !== "diff";
+  if (mode === "side") st.innerHTML = `<div class="pair">${figure("ours", "הדף שלנו (טקסט חי)")}${figure("scan", "הסריקה (הדפוס)")}</div>`;
+  else if (mode === "diff") st.innerHTML = `<div class="pair">${figure("diff", "שכבות: שחור = זהה, אדום = רק בדפוס, כחול = רק אצלנו")}</div>`;
+  else {
+    st.innerHTML = `<div class="pair">${figure("scan", "הסריקה")}</div>`;
+    let on = false;
+    const flip = () => { on = !on; const img = st.querySelector("img"); img.src = `/${T}/${AM}-${on ? "ours" : "scan"}.png`; st.querySelector("figcaption").textContent = on ? "הדף שלנו" : "הסריקה"; };
+    blinkT = setInterval(flip, 900);
+  }
+  st.classList.toggle("marking", marking);
+  st.querySelectorAll(".wrap").forEach(bindWrap);
+  applyZoom(); drawOverlays();
+}
+function applyZoom() {
+  const z = +$("#zoom").value / 100, p = DATA.pages[AM];
+  document.querySelectorAll(".wrap").forEach((w) => (w.style.width = Math.round(p.img[0] * z) + "px"));
+}
+function fit() {
+  const st = $("#stage"), p = DATA.pages[AM], n = mode === "side" ? 2 : 1;
+  const z = Math.max(15, Math.min(200, Math.floor(((st.clientWidth - 40 - 14 * (n - 1)) / (p.img[0] * n)) * 100)));
+  $("#zoom").value = z; applyZoom();
+}
+
+function rect(b, cls, extra = "") { return `<rect class="${cls}" x="${b[0]}" y="${b[1]}" width="${b[2] - b[0]}" height="${b[3] - b[1]}" ${extra}/>`; }
+function drawOverlays() {
+  const p = DATA.pages[AM], marks = NOTES[AM] || [];
+  document.querySelectorAll(".wrap svg").forEach((svg) => {
+    let h = "";
+    if ($("#showFlags").checked) p.rows.filter(isFlag).forEach((r) => (h += rect(r.box, "flag")));
+    if (focus != null) h += rect(p.rows[focus].box, "focus");
+    marks.forEach((m, i) => { h += rect([m.x0, m.y0, m.x1, m.y1], "mark") + `<text class="mark-num" x="${m.x1 + 6}" y="${m.y0 + 26}">${i + 1}</text>`; });
+    if (draft) h += rect([Math.min(draft.x0, draft.x1), Math.min(draft.y0, draft.y1), Math.max(draft.x0, draft.x1), Math.max(draft.y0, draft.y1)], "draft");
+    svg.innerHTML = h;
+  });
+}
+const isFlag = (r) => r.readable && !(r.start_ok && r.end_ok);
+
+function toImg(svg, ev) {
+  const r = svg.getBoundingClientRect(), p = DATA.pages[AM];
+  return [((ev.clientX - r.left) / r.width) * p.img[0], ((ev.clientY - r.top) / r.height) * p.img[1]];
+}
+function bindWrap(w) {
+  const svg = w.querySelector("svg");
+  svg.addEventListener("mousedown", (ev) => {
+    const [x, y] = toImg(svg, ev);
+    if (!marking) { // לחיצה על שורה — מציגה את ההשוואה שלה
+      const p = DATA.pages[AM];
+      const i = p.rows.findIndex((r) => x >= r.box[0] && x <= r.box[2] && y >= r.box[1] && y <= r.box[3]);
+      if (i >= 0) setFocus(i, false);
+      return;
+    }
+    draft = { x0: x, y0: y, x1: x, y1: y };
+    const move = (e) => { [draft.x1, draft.y1] = toImg(svg, e); drawOverlays(); };
+    const up = () => {
+      window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up);
+      if (Math.abs(draft.x1 - draft.x0) < 8 && Math.abs(draft.y1 - draft.y0) < 8) { // לחיצה בלי גרירה: מסמנים את השורה שמתחת
+        const p = DATA.pages[AM], r = p.rows.find((r) => draft.x0 >= r.box[0] && draft.x0 <= r.box[2] && draft.y0 >= r.box[1] && draft.y0 <= r.box[3]);
+        if (r) draft = { x0: r.box[0], y0: r.box[1], x1: r.box[2], y1: r.box[3], line: r.i };
+        else { draft = null; drawOverlays(); return; }
+      }
+      drawOverlays(); openDialog();
+    };
+    window.addEventListener("mousemove", move); window.addEventListener("mouseup", up);
+  });
+}
+function openDialog() { $("#dialog").style.display = "flex"; $("#note").value = ""; $("#note").focus(); }
+function closeDialog() { $("#dialog").style.display = "none"; draft = null; drawOverlays(); }
+$("#cancelMark").onclick = closeDialog;
+$("#saveMark").onclick = async () => {
+  const d = draft, p = DATA.pages[AM];
+  const box = [Math.min(d.x0, d.x1), Math.min(d.y0, d.y1), Math.max(d.x0, d.x1), Math.max(d.y0, d.y1)].map(Math.round);
+  // השורות שבתוך הסימון — כדי שאדע בדיוק על איזה טקסט מדובר
+  const lines = p.rows.filter((r) => r.box[0] < box[2] && r.box[2] > box[0] && r.box[1] < box[3] && r.box[3] > box[1]).map((r) => r.i);
+  (NOTES[AM] = NOTES[AM] || []).push({ x0: box[0], y0: box[1], x1: box[2], y1: box[3], cat: $("#cat").value, text: $("#note").value.trim(), lines, ts: new Date().toISOString() });
+  closeDialog(); await persist(); renderPanel();
+};
+async function persist() {
+  ls.set("review.notes." + T, NOTES);
+  try {
+    const r = await fetch(`/api/notes?tractate=${T}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(NOTES) });
+    const j = await r.json(); $("#status").textContent = `נשמר (${j.saved} סימונים) — ${new Date().toLocaleTimeString("he-IL")}`;
+  } catch { $("#status").textContent = "נשמר בדפדפן בלבד (השרת לא זמין)"; }
+}
+
+function setFocus(i, scroll = true) {
+  focus = i; drawOverlays(); renderPanel();
+  if (scroll) {
+    const p = DATA.pages[AM], w = document.querySelector(".wrap"), st = $("#stage");
+    const k = w.getBoundingClientRect().width / p.img[0], b = p.rows[i].box;
+    st.scrollTo({ top: Math.max(0, b[1] * k - st.clientHeight / 3), behavior: "smooth" });
+  }
+}
+
+function renderPanel() {
+  const p = DATA.pages[AM], s = p.size, marks = NOTES[AM] || [];
+  const pct = (v) => (v == null ? "—" : (v * 100).toFixed(1) + "%");
+  const d = (a, b) => { const v = +(b - a).toFixed(1); return `<span class="${Math.abs(v) <= 2 ? "ok" : "bad"}">${v > 0 ? "+" : ""}${v}</span>`; };
+  const yes = (b) => (b ? '<span class="ok">✓</span>' : '<span class="bad">✗</span>');
+  let h = "";
+  if (focus != null) {
+    const r = p.rows[focus];
+    h += `<div class="card" style="border-color:var(--focus)"><h2>שורה ${r.i + 1} · ${NAME[r.s]} <a href="#" onclick="focus=null;drawOverlays();renderPanel();return false">סגור</a></h2>
+      <div class="cmp"><b>דפוס:</b> ${esc(r.print) || '<span class="muted">(ה-OCR לא קרא)</span>'}</div>
+      <div class="cmp"><b>אצלנו:</b> ${esc(r.ours) || '<span class="bad">(ריקה)</span>'}</div>
+      <div class="hint">התחלה ${yes(r.start_ok)} · סוף ${yes(r.end_ok)}${r.readable ? "" : " · ה-OCR של השורה לא קריא, אין השוואה אמינה"}</div></div>`;
+  }
+  h += `<div class="card"><h2>עמוד ${AMUD(AM)} <span class="muted">עמוד ${p.pdf_page} בקובץ</span></h2>
+    <div class="big">${pct(p.match)}</div><div class="hint">משטח הטקסט שבו השורות שלנו יושבות על שורות הדפוס</div>
+    <div style="margin-top:6px">${p.flagged} שורות שונות מתוך ${p.readable} שורות קריאות</div></div>`;
+  h += `<div class="card"><h2>מידות (נקודות)</h2><table>
+    <tr><th></th><th>דפוס</th><th>אצלנו</th><th>הפרש</th></tr>
+    <tr><td>רוחב</td><td>${s.print.w}</td><td>${s.ours.w}</td><td>${d(s.print.w, s.ours.w)}</td></tr>
+    <tr><td>גובה</td><td>${s.print.h}</td><td>${s.ours.h}</td><td>${d(s.print.h, s.ours.h)}</td></tr>
+    <tr><td>ראש הטקסט</td><td colspan="2" class="muted">שלנו לעומת הדפוס</td><td>${d(0, s.top_diff)}</td></tr>
+    <tr><td>תחתית</td><td colspan="2" class="muted">שלנו לעומת הדפוס</td><td>${d(0, s.bottom_diff)}</td></tr>
+    ${s.below ? `<tr><td>מתחת לטקסט</td><td>${s.below.print}</td><td>${s.below.ours}</td><td class="muted">מילת קישור / הערות</td></tr>` : ""}</table>
+    <div class="hint">שורה אחת ≈ 11 נק'. הפרש של עד 2 נק' אינו נראה לעין.</div></div>`;
+  h += `<div class="card"><h2>התחלה וסוף</h2>`;
+  for (const [k, e] of Object.entries(p.edges)) {
+    h += `<div style="margin:4px 0 2px"><span class="tag">${NAME[k]}</span><span class="muted">${e.lines} שורות</span></div>
+      <div class="row" onclick="setFocus(${e.first.i})"><span class="lbl">מתחיל ${yes(e.first.start_ok)}</span><div class="cmp"><b>דפוס:</b> ${esc(e.first.print.split(" ").slice(0, 6).join(" "))}</div><div class="cmp"><b>אצלנו:</b> ${esc(e.first.ours.split(" ").slice(0, 6).join(" "))}</div></div>
+      <div class="row" onclick="setFocus(${e.last.i})"><span class="lbl">מסתיים ${yes(e.last.end_ok)}</span><div class="cmp"><b>דפוס:</b> ${esc(e.last.print.split(" ").slice(-6).join(" "))}</div><div class="cmp"><b>אצלנו:</b> ${esc(e.last.ours.split(" ").slice(-6).join(" "))}</div></div>`;
+  }
+  h += `</div>`;
+  const fl = p.rows.filter(isFlag);
+  h += `<div class="card"><h2>שורות שונות (${fl.length})</h2>${fl.length ? "" : '<div class="muted">אין</div>'}`;
+  fl.forEach((r) => (h += `<div class="row" onclick="setFocus(${r.i})"><span class="lbl">${NAME[r.s]} · שורה ${r.i + 1} · ${r.start_ok ? "" : "התחלה ✗ "}${r.end_ok ? "" : "סוף ✗"}</span>
+    <div class="cmp"><b>דפוס:</b> ${esc(r.print)}</div><div class="cmp"><b>אצלנו:</b> ${esc(r.ours)}</div></div>`));
+  h += `</div>`;
+  h += `<div class="card"><h2>הסימונים שלך (${marks.length})</h2>
+    <div class="hint">לחצו "מצב סימון" (או M), ואז גררו מלבן על אחת התמונות — או לחצו על שורה כדי לסמן אותה.</div>`;
+  marks.forEach((m, i) => (h += `<div class="row"><span class="tag" style="background:#fbe3ee">${i + 1}</span><b>${esc(m.cat)}</b> ${esc(m.text)}
+    <a href="#" style="float:left;color:var(--bad)" onclick="delMark(${i});return false">מחק</a></div>`));
+  h += `</div>`;
+  $("#panel").innerHTML = h;
+}
+async function delMark(i) { NOTES[AM].splice(i, 1); await persist(); drawOverlays(); renderPanel(); }
+
+$("#modes").querySelectorAll("button").forEach((b) => (b.onclick = () => { mode = b.dataset.m; $("#modes").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b)); renderStage(); fit(); }));
+$("#zoom").oninput = applyZoom;
+$("#fit").onclick = fit;
+$("#showFlags").onchange = drawOverlays;
+function toggleMark() { marking = !marking; $("#markBtn").classList.toggle("on", marking); $("#stage").classList.toggle("marking", marking); }
+$("#markBtn").onclick = toggleMark;
+window.addEventListener("keydown", (e) => {
+  if (e.target.closest("textarea, input, select")) { if (e.key === "Escape") closeDialog(); return; }
+  if (e.key === "m" || e.key === "M" || e.key === "צ") toggleMark();
+  if (e.key === "Escape") { focus = null; drawOverlays(); renderPanel(); }
+  const keys = Object.keys(DATA?.pages || {}), i = keys.indexOf(AM);
+  if (e.key === "ArrowLeft" && i < keys.length - 1) show(keys[i + 1]);
+  if (e.key === "ArrowRight" && i > 0) show(keys[i - 1]);
+});
+window.addEventListener("resize", () => DATA && fit());
+init();
+</script>
+</body>
+</html>

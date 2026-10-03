@@ -686,6 +686,13 @@ def build_page(p, key, refs):
     glines = [r["w"] for b in blocks for r in b["rows"]]
     gtext, gcov, grange = anchor(glines, refs["gemara"][0], refs["gemara"][1:3], [(r["x0"], r["x1"]) for b in blocks for r in b["rows"]])
     report["gemara"] = {"lines": len(glines), "cover": round(gcov, 3)}
+    # מצב סקירה (review.py): כל שורה — מיקומה בסריקה, מה ה-OCR קרא בדפוס, ומה הצבנו אצלנו
+    review = report.setdefault("_lines", []) if os.environ.get("REVIEW") else None
+    edge = lambda r: (r.get("top", r["cy"] - 7), r.get("base", r["cy"] + 2))
+    if review is not None:
+        for r, t in zip((r for b in blocks for r in b["rows"]), gtext):
+            review.append({"s": "gemara", "x0": r["x0"], "x1": r["x1"], "top": edge(r)[0], "base": edge(r)[1],
+                           "print": " ".join(w["t"] for w in r["w"]), "ours": " ".join(t)})
     lh = pitch * s
     li = 0
     for bi, b in enumerate(blocks):
@@ -749,6 +756,10 @@ def build_page(p, key, refs):
                 best = (cand, res)
         ps, (stext, scov, _) = best
         report[st_] = {"lines": len(ps), "cover": round(scov, 3)}
+        if review is not None:
+            for pc, t in zip(ps, stext):
+                review.append({"s": st_, "x0": pc["x0"], "x1": pc["x1"], "top": edge(pc)[0], "base": edge(pc)[1],
+                               "print": " ".join(w["t"] for w in pc["w"]), "ours": " ".join(x.lstrip(DH) for x in t)})
         groups = []
         for i, (pc, t) in enumerate(zip(ps, stext)):
             g = groups[-1] if groups else None
@@ -886,6 +897,7 @@ def main(pdf, tractate, first_page, only=None):
             print(key, "pdf p", pg + 1, "FAILED", repr(e), flush=True)
             continue
         out[key] = lay
+        rep.pop("_lines", None)
         print(key, "pdf p", pg + 1, json.dumps(rep, ensure_ascii=False), flush=True)
     out = {k: out[k] for k in keys if k in out}  # סדר העמודים במסכת
     write_layouts(out_path, out)

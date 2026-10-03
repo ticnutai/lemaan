@@ -4,8 +4,26 @@
     {
       "name": "lemaan-dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--", "--port", "5173", "--strictPort"],
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "5173",
+        "--strictPort"
+      ],
       "port": 5173
+    },
+    {
+      "name": "daf-review",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-X",
+        "utf8",
+        "scripts/daf-pipeline/review_server.py",
+        "8790"
+      ],
+      "port": 8790
     }
   ]
 }
