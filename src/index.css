@@ -373,8 +373,15 @@
 .lemaan-print .daf-pline { display: block; white-space: nowrap; text-align: right; overflow: visible; }
 .lemaan-print .daf-print-side { text-align: justify; hyphens: none; }
 /* מילה תלויה בסוף העמוד — בצד שמאל כמו בדפוס */
-/* מפרשים בדפוס: דיבור המתחיל באותיות מרובעות; מילה פותחת מוגדלת לא מגדילה את השורה */
-.lemaan-print .daf-print-side b { font-family: Vilna, "Frank Ruhl Libre", serif; font-weight: 700; }
-/* מילה פותחת מוגדלת: כמו בדפוס — על קו הבסיס של השורה, מתנשאת כלפי מעלה, בלי להגדיל את השורה */
-.lemaan-print .daf-print-side big { font-size: 1.75em; line-height: 0; }
+/* מפרשים בדפוס (נמדד בסריקה): ד"ה של רש"י — כתב רש"י מודגש באותו גודל; ד"ה של תוספות — אותיות
+   מרובעות בגובה אותיות הפירוש (גוף האות המרובעת קטן פי 1.28 מכתב רש"י באותו גודל גופן),
+   והמילה הראשונה שלו מרובעת מודגשת ומוגדלת (פי ~1.55 מגובה השורה) */
+.lemaan-print .daf-print-side b { font-weight: 700; }
+.lemaan-print .daf-print-side i { font-style: normal; }
+.lemaan-print .daf-print-tosafot b { font-family: Vilna, "Frank Ruhl Libre", serif; font-weight: 400; font-size: 1.28em; line-height: 0; }
+/* גופן וילנא סטטי (משקל אחד): המילה המוגדלת בדפוס עבה יותר — עיבוי בקו מתאר */
+.lemaan-print .daf-print-tosafot b i { font-size: 1.21em; line-height: 0; -webkit-text-stroke: 0.035em currentColor; }
+/* מילה פותחת מוגדלת (פתיחת עמוד/פרק): מרובעת, על קו הבסיס, בלי להגדיל את השורה */
+.lemaan-print .daf-print-side big { font-family: Vilna, "Frank Ruhl Libre", serif; font-weight: 700; font-size: 1.75em; line-height: 0; -webkit-text-stroke: 0.035em currentColor; }
+.lemaan-print .daf-print-tosafot b big { font-size: 1.367em; }
 .lemaan-print .daf-pline.daf-hanging { text-align: left; width: 100%; }

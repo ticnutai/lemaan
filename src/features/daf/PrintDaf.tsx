@@ -155,7 +155,7 @@ export default function PrintDaf({ layout, width, style, query }: Props) {
       {slabs.map(({ slab, html }, i) => (
         <div
           key={i}
-          className={`absolute ${slab.s === "gemara" ? "daf-print-gemara" : "daf-print-side"}`}
+          className={`absolute ${slab.s === "gemara" ? "daf-print-gemara" : `daf-print-side daf-print-${slab.s}`}`}
           style={{
             left: slab.l * k, top: slab.t * k, width: slab.w * k, height: slab.h * k,
             fontSize: slab.fs * k, lineHeight: `${slab.lh * k}px`,

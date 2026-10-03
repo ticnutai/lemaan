@@ -62,7 +62,7 @@ def to_segments(body):
         if m:
             dh, punct, rest = m.group(1).strip(), m.group(2), m.group(3).strip()
             # בלי נקודה אחרי ה-</b>: הסימון קצר מהד"ה שבדפוס — ממשיכים עד הנקודה הראשונה (עד 8 מילים)
-            if not punct and rest:
+            if not punct and rest and not dh.endswith((".", ":")):
                 head, dot, tail = rest.partition(". ")
                 if dot and tail and len(head.split()) <= 8 and "(" not in head:
                     dh, rest = f"{dh} {head}", tail

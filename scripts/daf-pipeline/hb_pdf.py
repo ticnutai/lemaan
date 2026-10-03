@@ -117,7 +117,7 @@ def side_tokens(segs):
         if m:
             dh = [t for t in m.group(1).split() if HEB.search(t)]
             if dh:
-                dh[-1] = re.sub(r"[.:]*$", ".", dh[-1])
+                dh[-1] = dh[-1].rstrip(".:") + "."
             out += [DH + t for t in dh] + [t for t in m.group(2).split() if HEB.search(t)]
         else:
             toks = [t for t in s.split() if HEB.search(t)]
@@ -145,13 +145,18 @@ def no_quotes(toks):
     return out
 
 
-def line_html(tokens, drop=0):
-    """שורת מפרש: רצפי ד"ה מודגשים (<b>), כמו בדפוס; drop = מילים פותחות מוגדלות."""
+def line_html(tokens, drop=0, prev=None):
+    """שורת מפרש: רצפי ד"ה מודגשים (<b>), כמו בדפוס; drop = מילים פותחות מוגדלות.
+    המילה הראשונה של כל ד"ה מסומנת <i> (בתוספות היא מרובעת מוגדלת). prev = המילה הקודמת בזרם."""
     out, inb = [], False
     for k, t in enumerate(tokens):
-        if k < drop:
-            t = (DH if t.startswith(DH) else "") + "<big>" + t.lstrip(DH) + "</big>"
         b = t.startswith(DH)
+        start = b and (prev is None or not prev.startswith(DH) or prev.endswith((".", ":")))
+        prev = t
+        if k < drop:
+            t = (DH if b else "") + "<big>" + t.lstrip(DH) + "</big>"
+        elif start:
+            t = DH + "<i>" + t.lstrip(DH) + "</i>"
         if b and not inb:
             out.append("<b>"); inb = True
         elif not b and inb:
@@ -448,6 +453,22 @@ def image_rows(p, W, fL, fR, head):
                 same_col = all(abs(o["x0"] - l["x0"]) < 5 and abs(o["x1"] - l["x1"]) < 5 for o in (u, d))
                 if u["c"] == d["c"] != l["c"] and (abs(l["xh"] - thr) < 0.8 or same_col):
                     flips.append((l, u["c"]))
+            elif dn and not up:
+                # ראש עמודה: שורת מפרש שמתחילה במילה מוגדלת (ד"ה פותח) נמדדת גבוהה כגמרא — אם שתי
+                # השורות שמתחתיה הן מפרש באותה עמודה (קצה משותף), גם היא מפרש
+                d = min(dn, key=lambda o: o["base"])
+                d2 = [o for o in W_ if 4 < o["base"] - d["base"] < 15
+                      and min(o["x1"], l["x1"]) - max(o["x0"], l["x0"]) > 0.5 * min(wd(o), wd(l))]
+                edge = lambda o: abs(o["x0"] - l["x0"]) < 5 or abs(o["x1"] - l["x1"]) < 5
+                if l["c"] == "g" and d2:
+                    d2 = min(d2, key=lambda o: o["base"])
+                    if d["c"] == d2["c"] == "s" and edge(d):
+                        flips.append((l, "s"))
+        if os.environ.get("TOP_DEBUG"):
+            y0_ = min(l["base"] for l in W_)
+            for l in sorted(W_, key=lambda l: l["base"]):
+                if l["base"] < y0_ + 40:
+                    print("TOP", round(l["x0"], 1), round(l["x1"], 1), round(l["top"], 1), round(l["base"], 1), round(l["xh"], 2), l["c"], round(thr, 2))
         for l, c in flips:
             l["c"] = c
         for l in L:
@@ -457,6 +478,25 @@ def image_rows(p, W, fL, fR, head):
             nb = [o for o in W_ if o["x0"] - 3 <= cx <= o["x1"] + 3 and 4 < abs(o["base"] - l["base"]) < 15]
             # העמודה שהפיסה שייכת לה = השורה הצרה ביותר שמכילה אותה (עמודת רש"י, לא גמרא רחבה שמתחת)
             l["c"] = min(nb, key=lambda o: (wd(o), abs(o["base"] - l["base"])))["c"] if nb else ("g" if l["xh"] >= thr else "s")
+        # גמרא שמתרחבת לכל רוחב העמוד (ברווחים גדולים): מילה-שתיים באותיות גמרא באותה שורה ממש עם פיסת
+        # גמרא סמוכה — גמרא, גם אם היא יושבת מתחת לעמודת מפרש (שרשרת: "בת" ← "שלש שנים" ← שורת הגמרא)
+        # (אבל לא כשעמודת המפרש ממשיכה מתחתיה — אז זו מילה באותיות גדולות בתוך המפרש)
+        changed_ = True
+        while changed_:
+            changed_ = False
+            for l in L:
+                if wide(l) or l["c"] != "s" or l["xh"] < thr - 0.3:
+                    continue
+                if widened(l):
+                    l["c"] = "g"; changed_ = True
+
+    def widened(l):
+        """פיסה צמודה לפיסת גמרא באותה שורה ממש, ובלי שורת מפרש מתחתיה באותה עמודה."""
+        if not any(o is not l and o["c"] == "g" and abs(o["base"] - l["base"]) <= 1.5
+                   and min(abs(o["x0"] - l["x1"]), abs(l["x0"] - o["x1"])) < 25 for o in L):
+            return False
+        return not any(o["c"] == "s" and 4 < o["base"] - l["base"] < 15
+                       and min(o["x1"], l["x1"]) - max(o["x0"], l["x0"]) > 0.5 * min(wd(o), wd(l)) for o in L)
 
     def same_row(a, b):
         # שבר דק (רק ה"גג" או רק ה"בסיס" של מילה) — שייך לשורה שהפס שלה מכיל אותו
@@ -503,6 +543,15 @@ def image_rows(p, W, fL, fR, head):
     # שברי דיו שאינם שורה (סימוני הערה, כתמים): צרים ונמוכים מאוד
     L = [l for l in L if wd(l) >= 60 or l["xh"] >= 3.4]
     L.sort(key=lambda l: (l["base"], -l["x1"]))
+    # פיסות באותה שורה (קווי בסיס שונים בנקודה-שתיים) — מימין לשמאל, כסדר הקריאה
+    rows_, cur = [], []
+    for l in L:
+        if cur and l["base"] - cur[0]["base"] > 2.0:
+            rows_.append(cur); cur = []
+        cur.append(l)
+    if cur:
+        rows_.append(cur)
+    L = [l for r in rows_ for l in sorted(r, key=lambda l: -l["x1"])]
     # מילות ה-OCR לשורות (לפי מיקום — הגודל שה-OCR נתן להן לא משנה)
     for l in L:
         l["w"] = []
@@ -554,18 +603,25 @@ def image_rows(p, W, fL, fR, head):
             l["c"] = "h"
             heads_.append({"x0": min(w["x0"] for w in l["w"]), "y0": min(w["y0"] for w in l["w"]),
                            "size": st.median(w["size"] for w in l["w"]), "text": txt})
+        elif wd(l) < 60 and widened(l):
+            pass  # חלק משורת גמרא שמתרחבת לרוחב העמוד (פיסה סמוכה באותה שורה ממש)
         elif (len(nb) >= 2 and not ov) or (wd(l) < 60 and not any(
                 min(o["x1"], l["x1"]) - max(o["x0"], l["x0"]) > 0 and 0 < abs(o["base"] - l["base"]) < 40 for o in gl)):
             # וגם מילה-שתיים באותיות גדולות בלי שום שורת גמרא מעליה או מתחתיה (סוף עמודת מפרש)
             l["c"] = "s"
             l.setdefault("big", (l["x0"], l["x1"]))
+    if os.environ.get("TOP_DEBUG"):
+        for l in L:
+            print("PIECE", round(l["x0"], 1), round(l["x1"], 1), round(l["top"], 1), round(l["base"], 1), round(l["xh"], 2), l["c"], " ".join(w["t"] for w in l["w"])[:40])
     catch_ = []  # מילות הקישור מזוהות ב-build_page (שם יש את הטקסט של העמוד הבא)
     grows = [dict(l, cy=l["base"]) for l in L if l["c"] == "g"]
     pcs = []
     for l in L:
         if l["c"] == "s":
             pc = dict(l, cy=l["base"])
-            pc["side"] = "F" if wd(pc) > 0.8 * (fR - fL) else ("R" if (pc["x0"] + pc["x1"]) / 2 > mid else "L")
+            # רוחב מלא — או שורה ממורכזת (סוף דיבור) שחוצה את אמצע העמוד: עמודות צד אינן חוצות אותו
+            full_ = wd(pc) > 0.8 * (fR - fL) or (pc["x0"] < mid - 30 and pc["x1"] > mid + 30)
+            pc["side"] = "F" if full_ else ("R" if (pc["x0"] + pc["x1"]) / 2 > mid else "L")
             pcs.append(pc)
     fTop = min(l["top"] for l in L) - c_t
     if os.environ.get("FRAME_DEBUG"):
@@ -948,13 +1004,16 @@ def build_page(p, key, refs):
             cy0, pitch_b = fit_rows([pc["cy"] for pc in ps_], spitch)
             top = Y(cy0) - (BASE_S if use_img else 0.78) * slh
             lines = []
+            prev_t = None
             for pc, t in zip(ps_, g["t"]):
                 ind = max(0.0, (x1 - pc["x1"]) * s) if x1 - pc["x1"] > 3 else 0.0
                 full = (pc["x1"] - pc["x0"]) >= (x1 - x0) - 8 - ind / s
-                ln = {"t": line_html(t, pc.get("drop", 0)), "ws": None, "w": round(Rr - L_ - ind, 2) if full else None}
+                ln = {"t": line_html(t, pc.get("drop", 0), prev_t), "ws": None, "w": round(Rr - L_ - ind, 2) if full else None}
                 if ind:
                     ln["i"] = round(ind, 2)
                 lines.append(ln)
+                if t:
+                    prev_t = t[-1]
             slh_b = pitch_b * s
             slabs.append({"s": st_, "l": round(L_, 2), "t": round(top, 2), "w": round(Rr - L_, 2), "h": round(len(ps_) * slh_b, 2),
                           "fs": round(S_FS * slh / S_LH, 2), "lh": round(slh_b, 3), "lines": lines})
