@@ -227,6 +227,20 @@ def heb_num(n):
 
 
 # ---------- עיגון: כל מילת ייחוס → שורת דפוס ----------
+ANCHOR_INFO = {}
+
+
+def free_bounds(lines):
+    """גבולות שורה שה-OCR לא הכריע: לפחות אחת משתי המילים שבצדי הגבול לא הותאמה ישירות."""
+    J, M = ANCHOR_INFO.get("J", []), ANCHOR_INFO.get("M", set())
+    free, t = set(), 0
+    for i, ln in enumerate(lines[:-1]):
+        t += len(ln)
+        if 0 < t < len(J) and (J[t - 1] not in M or J[t] not in M):
+            free.add(i + 1)
+    return free
+
+
 def anchor(lines, ref, bounds=None, ext=None):
     """lines: [[ocr words]] בסדר קריאה. מחזיר טקסט נכון לכל שורה + כיסוי.
     bounds: (התחלה, סוף) של טקסט העמוד עצמו בתוך ref — ההשלמה לפני ההתאמה הראשונה
@@ -324,6 +338,9 @@ def anchor(lines, ref, bounds=None, ext=None):
                     out[a: b + 1] = new
         i = j + 1
     cover = len(pairs) / max(1, len(flat))
+    # לתיקון לפי רוחב: אילו מילות ייחוס הותאמו ישירות למילת OCR (J = סדר המילים בפלט)
+    ANCHOR_INFO.clear()
+    ANCHOR_INFO.update({"J": sorted(line_of), "M": {j for _, j in pairs}})
     return out, cover, (min(line_of), max(line_of))
 
 
@@ -750,6 +767,18 @@ def build_page(p, key, refs):
     # גמרא: עיגון
     glines = [r["w"] for b in blocks for r in b["rows"]]
     gtext, gcov, grange = anchor(glines, refs["gemara"][0], refs["gemara"][1:3], [(r["x0"], r["x1"]) for b in blocks for r in b["rows"]])
+    # תיקון שבירות לפי רוחב המילים בדפוס (fit_width.py). כבוי כברירת מחדל: נבדק על 10 עמודי מגילה
+    # (2026-10-03) — בלי הגבלה שבר 33 שורות ותיקן 2; רק בגבולות שה-OCR לא הכריע: תיקן 4, שבר 5.
+    # הפעלה לניסויים: FIT=1
+    fit_on = use_img and os.environ.get("FIT", "0") == "1"
+    if fit_on:
+        import fit_width as FW, img_lines as IL
+        fclip = fitz.Rect(fL - 4, fTop - 4, fR + 4, p.rect.height - 5)
+        fink = IL.ink_mask(p, fclip)
+        g_rows = [r for b in blocks for r in b["rows"]]
+        gtext, moved = FW.refit(gtext, FW.ink_widths(fink, IL.Z, g_rows, fclip.x0, fclip.y0), lambda t: "vilna",
+                                free=free_bounds(gtext))
+        report["fit"] = {"gemara": moved}
     report["gemara"] = {"lines": len(glines), "cover": round(gcov, 3)}
     # מצב סקירה (review.py): כל שורה — מיקומה בסריקה, מה ה-OCR קרא בדפוס, ומה הצבנו אצלנו
     review = report.setdefault("_lines", []) if os.environ.get("REVIEW") else None
@@ -818,8 +847,14 @@ def build_page(p, key, refs):
                 ref_ = print_order([pc["w"] for pc in cand], ref_, lo_, hi_, refs[st_][3])
             res = anchor([pc["w"] for pc in cand], ref_, (lo_, hi_), [(pc["x0"], pc["x1"]) for pc in cand])
             if best is None or res[1] > best[1][1] + 0.01:
-                best = (cand, res)
-        ps, (stext, scov, _) = best
+                best = (cand, res, dict(ANCHOR_INFO))
+        ps, (stext, scov, _), info_ = best
+        ANCHOR_INFO.clear(); ANCHOR_INFO.update(info_)
+        if fit_on:
+            locked = [i for i, pc in enumerate(ps) if pc.get("drop") or pc.get("big")]
+            stext, moved = FW.refit(stext, FW.ink_widths(fink, IL.Z, ps, fclip.x0, fclip.y0),
+                                    lambda t: "vilna" if t.startswith(DH) else "rashi", locked, free=free_bounds(stext))
+            report["fit"][st_] = moved
         report[st_] = {"lines": len(ps), "cover": round(scov, 3)}
         if review is not None:
             for pc, t in zip(ps, stext):
