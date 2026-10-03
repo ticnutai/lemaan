@@ -86,8 +86,11 @@ export default function PrintDaf({ layout, width, style, query }: Props) {
                 const justify = line.ws == null ? (line.w && !hanging ? "text-align-last:justify" : "") : `word-spacing:${(line.ws * k).toFixed(2)}px`;
                 const width = line.w && !hanging ? `;width:${(line.w * k).toFixed(1)}px` : "";
                 const indent = line.i ? `;margin-right:${(line.i * k).toFixed(1)}px` : "";
+                // גובה קבוע לכל שורה: ד"ה באותיות מרובעות (גופן אחר, יחסי גובה אחרים) הגביה את שורתו ב-4%,
+                // והסטייה הצטברה לאורך העמודה
+                const fixedH = `;height:${(slab.lh * k).toFixed(3)}px`;
                 const stream = slab.s === "gemara" ? "main" : slab.s === "rashi" ? "inner" : "outer";
-                return `<span class="daf-seg daf-pline${hanging ? " daf-hanging" : ""}" data-stream="${stream}" data-i="${i}" style="${justify}${width}${indent}">${sanitizeSegment(line.t, query) || "&nbsp;"}</span>`;
+                return `<span class="daf-seg daf-pline${hanging ? " daf-hanging" : ""}" data-stream="${stream}" data-i="${i}" style="${justify}${width}${indent}${fixedH}">${sanitizeSegment(line.t, query) || "&nbsp;"}</span>`;
               })
               .join("")
           : `<span class="daf-seg" data-stream="${slab.s === "rashi" ? "inner" : "outer"}">${sideHtml(slab.text ?? "", query)}</span>`,

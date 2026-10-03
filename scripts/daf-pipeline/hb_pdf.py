@@ -30,16 +30,36 @@ BASE_G, BASE_S = float(os.environ.get("BASE_G", 0.785)), float(os.environ.get("B
 
 # ---------- מילים עם גודל/הדגשה ----------
 def page_words(p):
-    D = p.get_text("dict")
+    """מילות ה-OCR עם גודל גופן, נבנות מהתווים עצמם.
+    סימני ההפניה הקטנים בגמרא (מספרים/אותיות של תורה אור, עין משפט, מסורת הש"ס, הגהות) נקראים
+    כתווים קטנים שנדבקים למילה ("5׳ביום"): מסירים תווים קטנים בבירור מגוף המילה, וגרש/מקף בתחילתה."""
+    D = p.get_text("rawdict")
     out = []
-    for x0, y0, x1, y1, t, b, l, _ in p.get_text("words"):
-        try:
-            spans = D["blocks"][b]["lines"][l]["spans"]
-        except (IndexError, KeyError):
-            continue
-        cx = (x0 + x1) / 2
-        sp = min(spans, key=lambda s: 0 if s["bbox"][0] <= cx <= s["bbox"][2] else min(abs(cx - s["bbox"][0]), abs(cx - s["bbox"][2])))
-        out.append({"x0": x0, "y0": y0, "x1": x1, "y1": y1, "t": t, "size": sp["size"], "bold": "Bold" in sp["font"]})
+    for blk in D["blocks"]:
+        for ln in blk.get("lines", []):
+            cur = []
+            def flush():
+                if not cur:
+                    return
+                cnt = {}
+                for c, sp in cur:
+                    cnt[round(sp["size"], 1)] = cnt.get(round(sp["size"], 1), 0) + 1
+                size = max(cnt, key=lambda z: (cnt[z], z))
+                keep = [(c, sp) for c, sp in cur if sp["size"] >= 0.8 * size]
+                t = re.sub(r"^[׳'״\"־■\-]+", "", "".join(c["c"] for c, _ in keep))
+                if t:
+                    xs = [c["bbox"] for c, _ in keep]
+                    font = max(keep, key=lambda cs: cs[1]["size"])[1]["font"]
+                    out.append({"x0": min(b_[0] for b_ in xs), "y0": min(b_[1] for b_ in xs), "x1": max(b_[2] for b_ in xs),
+                                "y1": max(b_[3] for b_ in xs), "t": t, "size": size, "bold": "Bold" in font})
+                cur.clear()
+            for sp in ln["spans"]:
+                for c in sp["chars"]:
+                    if c["c"].isspace():
+                        flush()
+                    else:
+                        cur.append((c, sp))
+            flush()
     return out
 
 
@@ -397,7 +417,9 @@ def image_rows(p, W, fL, fR, head):
         if a["c"] != b["c"]:
             return False  # שורת גמרא ושורת מפרש שבמקרה באותו גובה
         if a["c"] == "g":
-            return True  # לגמרא עמודה אחת — רווח גדול (או "נהר" של כמה שורות) בתוכה הוא רווחי מילים
+            # לגמרא עמודה אחת — רווח גדול (או "נהר" של כמה שורות) בתוכה הוא רווחי מילים; אבל מרווח עמודות
+            # אמיתי (נהר לבן לאורך עשרות שורות) מפריד בין שורת גמרא לשורת כותרת/מפרש באותיות גדולות שלצדה
+            return gutter_between(a, b) < 60
         # שני מפרשים זה לצד זה נפרדים רק במרווח שבאמצע העמוד
         return not (gap >= 9 and b["x1"] <= mid - 3 and a["x0"] >= mid + 3)
 
@@ -443,6 +465,10 @@ def image_rows(p, W, fL, fR, head):
             min(c, key=lambda l: abs(cy - (l["top"] + l["base"]) / 2))["w"].append(w)
     for l in L:
         l["w"].sort(key=lambda w: -w["x1"])
+        # סימן הפניה שנקרא כמילה נפרדת (אות/מספר קטנים בתוך שורת גמרא או מפרש) — לא טקסט
+        if len(l["w"]) >= 3:
+            med_sz = st.median(w["size"] for w in l["w"])
+            l["w"] = [w for w in l["w"] if not (w["size"] < 0.75 * med_sz and len(w["t"]) <= 3)]
         # מילה פותחת מוגדלת בראש שורת מפרש (תחילת מסכת/פרק): ה-OCR נותן לה גופן גדול בבירור מיתר השורה
         if l["c"] == "s" and len(l["w"]) >= 3 and not l.get("big"):
             med_ = st.median(w["size"] for w in l["w"])
@@ -460,6 +486,23 @@ def image_rows(p, W, fL, fR, head):
     c_s = med([st.median(w["y1"] for w in l["w"]) - l["base"] for l in full("s")], 1.6)
     c_t = med([l["top"] - min(w["y0"] for w in l["w"]) for l in full("g") + full("s")], 2.5)
     # cy = קו הבסיס האמיתי של השורה (מהפיקסלים). תיבות ה-OCR אינן עקביות בין עמודים (±0.3 נק')
+    # שורה "גמרא" (אותיות גדולות) שאינה בעמודת הגמרא — אין לה שכנה מעליה/מתחתיה בגמרא שחופפת אותה
+    # אופקית — היא שורת מפרש באותיות גדולות (דיבור המתחיל מודגש ברשימה, "לקמיצה") או כותרת "הדרן עלך"
+    heads_ = []
+    gl = [l for l in L if l["c"] == "g" and wd(l) >= 40]
+    for l in [l for l in L if l["c"] == "g"]:
+        nb = [o for o in gl if o is not l and 0 < abs(o["base"] - l["base"]) < 30]
+        ov = [o for o in nb if min(o["x1"], l["x1"]) - max(o["x0"], l["x0"]) > 0.5 * min(wd(o), wd(l))]
+        txt = " ".join(w["t"] for w in l["w"])
+        above = [o for o in ov if 3 < l["base"] - o["base"] < 16]
+        # "הדרן עלך" בעמודת מפרש: אין מעליה שורת גמרא (מתחתיה יכולה להתחיל גמרא רחבה)
+        if "הדרן" in txt and nb and not above and wd(l) < 0.5 * (fR - fL):
+            l["c"] = "h"
+            heads_.append({"x0": min(w["x0"] for w in l["w"]), "y0": min(w["y0"] for w in l["w"]),
+                           "size": st.median(w["size"] for w in l["w"]), "text": txt})
+        elif len(nb) >= 2 and not ov:
+            l["c"] = "s"
+            l.setdefault("big", (l["x0"], l["x1"]))
     grows = [dict(l, cy=l["base"]) for l in L if l["c"] == "g"]
     pcs = []
     for l in L:
@@ -470,7 +513,7 @@ def image_rows(p, W, fL, fR, head):
     fTop = min(l["top"] for l in L) - c_t
     if os.environ.get("FRAME_DEBUG"):
         print(f"image rows: gemara {len(grows)}, commentary {len(pcs)}, xh g/s {cg:.2f}/{cs:.2f}, calib {c_g:.2f} {c_s:.2f} {c_t:.2f}")
-    return grows, pcs, fTop
+    return grows, pcs, fTop, heads_
 
 
 # ---------- עמוד ----------
@@ -549,9 +592,10 @@ def build_page(p, key, refs):
     gem = [w for w in gem if inside(w)]
     # מקור הגיאומטריה: התמונה עצמה (ברירת מחדל) או שורות ה-OCR (GEOM=ocr, וגם כגיבוי אם התמונה נכשלת)
     use_img = os.environ.get("GEOM", "image") == "image"
+    side_heads = []
     if use_img:
         try:
-            grows, pcs, fTop = image_rows(p, W, fL, fR, head)
+            grows, pcs, fTop, side_heads = image_rows(p, W, fL, fR, head)
         except Exception as e:
             print(key, "image geometry failed, using OCR rows:", repr(e), flush=True)
             use_img = False
@@ -851,6 +895,10 @@ def build_page(p, key, refs):
                         if by1 - by0 > 12 and bx1 - bx0 > 40:
                             box = {"l": round(X(bx0), 2), "t": round(Y(by0), 2), "w": round((bx1 - bx0) * s, 2),
                                    "h": round((by1 - by0) * s, 2), "text": gref[0]}
+    # כותרות "הדרן עלך" שבעמודות המפרשים (מודפסות שם, לא חלק מטקסט רש"י/תוספות)
+    for hd_ in (side_heads if use_img else []):
+        header.append({"l": round(X(hd_["x0"]), 2), "t": round(Y(hd_["y0"]), 2), "fs": round(hd_["size"] * s, 2),
+                       "text": re.sub(r"[^א-ת׳'\" ]", "", hd_["text"]).strip()})
     lay_box = {"box": box} if box else {}
     lay = {"page": {"w": PAGE_W, "h": round(Y(p.rect.height), 2)}, "slabs": slabs, "header": header, **lay_box,
            "src": [round(fL, 1), round(fR, 1), round(fTop, 1)]}

@@ -33,7 +33,12 @@ def gutters(ink, min_w=7.0, min_h=34.0):
     up = np.maximum.accumulate(np.where(~wide, idy, -1), axis=0)
     dn = np.minimum.accumulate(np.where(~wide, idy, H)[::-1, :], axis=0)[::-1, :]
     vrun = dn - up - 1
-    return wide & (vrun >= min_h * Z), vrun
+    gut = wide & (vrun >= min_h * Z)
+    # מרווח עמודות "עובר": הנהר הלבן ממשיך לפחות 12 נק' גם מעל וגם מתחת לנקודה. נהר שרק מסתיים בשורה
+    # (שורת גמרא רחבה שחוצה את סוף מרווח העמודות שמעליה) אינו חותך אותה
+    T = 12 * Z
+    through = gut & ((idy - up - 1) >= T) & ((dn - idy - 1) >= T)
+    return gut, through, vrun
 
 
 def find_lines(page, fL, fR, y_top, y_bot, debug=None):
@@ -41,11 +46,11 @@ def find_lines(page, fL, fR, y_top, y_bot, debug=None):
     pad = 3
     clip = fitz.Rect(fL - pad, y_top - pad, fR + pad, y_bot + pad)
     ink = ink_mask(page, clip)
-    gut, vrun = gutters(ink)
+    gut, through, vrun = gutters(ink)
     # צפיפות דיו אופקית בחלון 24 נק' (נמדד): גג האותיות ~0.6–0.8, גוף ~0.15–0.25, בסיס ~0.35,
     # אזור הזנבות (ל למעלה, ק/ך/ן למטה) ~0.03–0.07, בין שורות 0
     dens = ndi.uniform_filter1d(ink.astype(np.float32), size=24 * Z, axis=1, mode="constant")
-    core = (dens >= 0.11) & ~gut
+    core = (dens >= 0.11) & ~through
     lab, n = ndi.label(core)
     lines = []
     gap_px = int(9.5 * Z)
@@ -113,23 +118,26 @@ def find_lines(page, fL, fR, y_top, y_bot, debug=None):
         from PIL import Image, ImageDraw
         rgb = np.full(ink.shape + (3,), 255, np.uint8)
         rgb[ink] = (0, 0, 0)
-        rgb[gut] = (255, 235, 150)
+        rgb[through] = (255, 235, 150)
         im = Image.fromarray(rgb); d = ImageDraw.Draw(im)
         for l in lines:
             col = (220, 0, 0) if l["xh"] >= debug.get("split", 5.0) else (0, 90, 220)
             d.rectangle([(l["x0"] - clip.x0) * Z, (l["top"] - clip.y0) * Z, (l["x1"] - clip.x0) * Z, (l["base"] - clip.y0) * Z], outline=col, width=2)
         im.save(debug["path"])
     def gutter_between(a, b):
-        """גובה (בנק') הנהר הלבן הגבוה ביותר שעובר בין שתי פיסות שעל אותה שורה; 0 אם אין.
-        נהר גבוה = מרווח עמודות אמיתי; נהר של 3–4 שורות יכול להיות רווחי מילים שהתיישרו במקרה."""
+        """גובה (בנק') הנהר הלבן שעובר בין שתי פיסות שעל אותה שורה וממשיך מעל ומתחת לה; 0 אם אין.
+        מרווח עמודות אמיתי ארוך (מאות נק'); "נהר" מקרי של רווחי מילים — 3–4 שורות."""
         l, r = (a, b) if a["x1"] <= b["x0"] else (b, a)
         ya, yb = max(a["top"], b["top"]), min(a["base"], b["base"])
         if yb <= ya:
             ya, yb = min(a["top"], b["top"]), max(a["base"], b["base"])
         ys_ = slice(int((ya - clip.y0) * Z), int((yb - clip.y0) * Z) + 1)
         xs_ = slice(int((l["x1"] - clip.x0) * Z), int((r["x0"] - clip.x0) * Z) + 1)
-        g = gut[ys_, xs_]
-        return float(vrun[ys_, xs_][g].max()) / Z if g.any() else 0.0
+        g = through[ys_, xs_]
+        if not g.size:
+            return 0.0
+        cols = g.all(axis=0)  # עמודות פיקסלים לבנות לכל גובה השורה, בתוך נהר שעובר את השורה
+        return float(vrun[ys_, xs_][:, cols].max()) / Z if cols.any() else 0.0
     return lines, gutter_between
 
 
