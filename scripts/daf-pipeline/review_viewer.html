@@ -37,6 +37,7 @@ figcaption { direction: rtl; font-weight: 700; font-size: 13px; color: var(--mut
 .marking .wrap svg { cursor: crosshair; }
 .flag { fill: var(--warn); fill-opacity: .14; stroke: var(--warn); stroke-width: 2; }
 .focus { fill: var(--focus); fill-opacity: .16; stroke: var(--focus); stroke-width: 3; }
+.space { fill: #7b3fbf; fill-opacity: .12; stroke: #7b3fbf; stroke-width: 2; stroke-dasharray: 8 5; }
 .mark { fill: var(--mark); fill-opacity: .12; stroke: var(--mark); stroke-width: 3; }
 .mark-num { fill: var(--mark); font: 700 30px Arial; }
 .draft { fill: none; stroke: var(--mark); stroke-width: 3; stroke-dasharray: 10 6; }
@@ -81,6 +82,7 @@ th { color: var(--muted); font-weight: 600; }
   <label>זום <input type="range" id="zoom" min="15" max="200" value="40"></label>
   <button class="btn" id="fit">התאם למסך</button>
   <label><input type="checkbox" id="showFlags" checked> שורות שונות</label>
+  <label><input type="checkbox" id="showSpace" checked> מרווחים חריגים</label>
   <button class="btn" id="markBtn" title="M">✎ מצב סימון</button>
   <span class="legend" id="legend" hidden><span><i class="sw" style="background:#000"></i>באותו מקום</span><span><i class="sw" style="background:#dc2828"></i>רק בדפוס</span><span><i class="sw" style="background:#285ae6"></i>רק אצלנו</span></span>
   <span id="status"></span>
@@ -183,6 +185,7 @@ function drawOverlays() {
   document.querySelectorAll(".wrap svg").forEach((svg) => {
     let h = "";
     if ($("#showFlags").checked) p.rows.filter(isFlag).forEach((r) => (h += rect(r.box, "flag")));
+    if ($("#showSpace").checked) p.rows.filter((r) => r.spacing).forEach((r) => (h += rect(r.box, "space")));
     if (focus != null) h += rect(p.rows[focus].box, "focus");
     marks.forEach((m, i) => { h += rect([m.x0, m.y0, m.x1, m.y1], "mark") + `<text class="mark-num" x="${m.x1 + 6}" y="${m.y0 + 26}">${i + 1}</text>`; });
     if (draft) h += rect([Math.min(draft.x0, draft.x1), Math.min(draft.y0, draft.y1), Math.max(draft.x0, draft.x1), Math.max(draft.y0, draft.y1)], "draft");
@@ -283,6 +286,11 @@ function renderPanel() {
   fl.forEach((r) => (h += `<div class="row" onclick="setFocus(${r.i})"><span class="lbl">${NAME[r.s]} · שורה ${r.i + 1} · ${r.start_ok ? "" : "התחלה ✗ "}${r.end_ok ? "" : "סוף ✗"}</span>
     <div class="cmp"><b>דפוס:</b> ${esc(r.print)}</div><div class="cmp"><b>אצלנו:</b> ${esc(r.ours)}</div></div>`));
   h += `</div>`;
+  const sp = p.rows.filter((r) => r.spacing);
+  h += `<div class="card"><h2>מרווחים חריגים (${sp.length})</h2><div class="hint">שורה מתוחה = כנראה חסרה בה מילה; דחוסה = כנראה מילה עודפת. לפי כמה המילים שלנו ממלאות את השורה לעומת שאר השורות באותו זרם.</div>${sp.length ? "" : '<div class="muted">אין</div>'}`;
+  sp.forEach((r) => (h += `<div class="row" onclick="setFocus(${r.i})"><span class="lbl">${NAME[r.s]} · שורה ${r.i + 1} · ${r.spacing === "loose" ? "מתוחה" : "דחוסה"} (${Math.round(r.fill_rel * 100)}%)${isFlag(r) ? " · גם שונה מהדפוס" : ""}</span>
+    <div class="cmp"><b>דפוס:</b> ${esc(r.print)}</div><div class="cmp"><b>אצלנו:</b> ${esc(r.ours)}</div></div>`));
+  h += `</div>`;
   h += `<div class="card"><h2>הסימונים שלך (${marks.length})</h2>
     <div class="hint">לחצו "מצב סימון" (או M), ואז גררו מלבן על אחת התמונות — או לחצו על שורה כדי לסמן אותה.</div>`;
   marks.forEach((m, i) => (h += `<div class="row"><span class="tag" style="background:#fbe3ee">${i + 1}</span><b>${esc(m.cat)}</b> ${esc(m.text)}
@@ -296,6 +304,7 @@ $("#modes").querySelectorAll("button").forEach((b) => (b.onclick = () => { mode 
 $("#zoom").oninput = applyZoom;
 $("#fit").onclick = fit;
 $("#showFlags").onchange = drawOverlays;
+$("#showSpace").onchange = drawOverlays;
 function toggleMark() { marking = !marking; $("#markBtn").classList.toggle("on", marking); $("#stage").classList.toggle("marking", marking); }
 $("#markBtn").onclick = toggleMark;
 window.addEventListener("keydown", (e) => {

@@ -117,7 +117,7 @@ def side_tokens(segs):
         if m:
             dh = [t for t in m.group(1).split() if HEB.search(t)]
             if dh:
-                dh[-1] = re.sub(r"[.:]?$", ".", dh[-1])
+                dh[-1] = re.sub(r"[.:]*$", ".", dh[-1])
             out += [DH + t for t in dh] + [t for t in m.group(2).split() if HEB.search(t)]
         else:
             toks = [t for t in s.split() if HEB.search(t)]
@@ -175,10 +175,46 @@ def window(tokens_of, keys, key, before=60, after=90):
     return prev + cur + nxt, len(prev), len(prev) + len(cur)
 
 
-def make_refs(shas, ws, keys, key):
+_HE = {}
+_WARNED = {}
+
+
+def tractate_he(slug):
+    """שם המסכת בעברית (מ-index.json)."""
+    if slug and not _HE:
+        for m in json.load(open(f"{ROOT}/shas/index.json", encoding="utf-8"))["masechtot"]:
+            _HE[m["slug"]] = m["he"]
+    return _HE.get(slug)
+
+
+def clean_segments(segs, he=None):
+    """תיקוני נוסח של ספריא במפרשים: פסקה כפולה ברצף נשארת פעם אחת; בהפניה לאותה מסכת
+    ספריא מוסיפה את שם המסכת ("מגילה דף כו.") ובדפוס וילנא אין אותו ("דף כו.")."""
+    out, prev = [], None
+    for sg in segs:
+        key = fold(re.sub(r"[^א-ת ]", "", TAGS.sub(" ", sg)))[:400]
+        if prev is not None and key and fuzz.ratio(key, prev) >= 92:
+            continue
+        prev = key
+        if he:
+            sg = re.sub(r"\(((?:לקמן|לעיל)\s+)?" + re.escape(he) + r"\s+", lambda m: "(" + (m.group(1) or ""), sg)
+        out.append(sg)
+    return out
+
+
+def make_refs(shas, ws, keys, key, slug=None):
     """טקסט הייחוס לעמוד: גמרא (ויקיטקסט), רש"י ותוספות (ספריא) — עם הקשר מהעמודים הסמוכים.
     למפרשים מצורפת גם החלוקה לדיבורים, כדי שאפשר יהיה לסדר אותם לפי סדרם בדף המודפס."""
-    com = lambda k, c: next((x["segments"] for x in shas[k]["commentaries"] if x["key"] == c), [])
+    he = tractate_he(slug)
+    # רש"י ותוספות: נוסח אורייתא (ספריית אוצריא). ספריא רק כגיבוי אם אין קובץ — עם אזהרה
+    import orayta
+    src = {c: (orayta.load(he, c) if he else None) for c in ("rashi", "tosafot")}
+    for c, d in src.items():
+        if d is None and not _WARNED.get((slug, c)):
+            print(f"!! {slug} {c}: no Orayta text, falling back to Sefaria", flush=True)
+            _WARNED[(slug, c)] = True
+    com = lambda k, c: (src[c].get(k, []) if src[c] is not None else
+                        clean_segments(next((x["segments"] for x in shas[k]["commentaries"] if x["key"] == c), []), he))
     refs = {"gemara": window(lambda k: gem_tokens(ws.get(k) or shas[k]["gemara"]), keys, key)}
     for c in ("rashi", "tosafot"):
         refs[c] = window(lambda k: side_tokens(com(k, c)), keys, key) + ([side_tokens([sg]) for sg in com(key, c)],)
@@ -419,7 +455,8 @@ def image_rows(p, W, fL, fR, head):
                 continue
             cx = (l["x0"] + l["x1"]) / 2
             nb = [o for o in W_ if o["x0"] - 3 <= cx <= o["x1"] + 3 and 4 < abs(o["base"] - l["base"]) < 15]
-            l["c"] = min(nb, key=lambda o: abs(o["base"] - l["base"]))["c"] if nb else ("g" if l["xh"] >= thr else "s")
+            # העמודה שהפיסה שייכת לה = השורה הצרה ביותר שמכילה אותה (עמודת רש"י, לא גמרא רחבה שמתחת)
+            l["c"] = min(nb, key=lambda o: (wd(o), abs(o["base"] - l["base"])))["c"] if nb else ("g" if l["xh"] >= thr else "s")
 
     def same_row(a, b):
         # שבר דק (רק ה"גג" או רק ה"בסיס" של מילה) — שייך לשורה שהפס שלה מכיל אותו
@@ -1000,7 +1037,7 @@ def main(pdf, tractate, first_page, only=None):
         pg = first_page - 1 + idx
         if pg >= len(doc):
             break
-        refs = make_refs(shas, ws, keys, key)
+        refs = make_refs(shas, ws, keys, key, tractate)
         try:
             lay, rep = build_page(doc[pg], key, refs)
         except Exception as e:  # עמוד חריג לא עוצר את המסכת — מדווחים וממשיכים

@@ -75,7 +75,7 @@ def main():
     # 1. בנייה מחדש של העמודים (עם נתוני השורות לסקירה)
     reports = {}
     for a in amudim:
-        lay, rep = H.build_page(doc[first - 1 + keys.index(a)], a, H.make_refs(shas, ws, keys, a))
+        lay, rep = H.build_page(doc[first - 1 + keys.index(a)], a, H.make_refs(shas, ws, keys, a, tractate))
         lays[a] = lay
         reports[a] = rep
     H.write_layouts(path, {k: lays[k] for k in keys if k in lays})
@@ -134,6 +134,32 @@ def main():
             rows.append({"i": i, "s": ln["s"], "print": ln["print"], "ours": ln["ours"], **c,
                          "box": [round((ln["x0"] - crop.x0) * Z), round((ln["top"] - crop.y0) * Z) - 4,
                                  round((ln["x1"] - crop.x0) * Z), round((ln["base"] - crop.y0) * Z) + 4]})
+        # מרווחים: כמה המילים שלנו ממלאות כל שורה מלאה (ביישור לשני הצדדים) במרווח רגיל.
+        # שורה מתוחה = חסרה מילה; שורה דחוסה = מילה עודפת. היחס מנורמל לחציון של אותו זרם בעמוד
+        import fit_width as FW
+        for st_ in ("gemara", "rashi", "tosafot"):
+            ls_ = [(sl, ln) for sl in lay["slabs"] if sl["s"] == st_ for ln in sl["lines"]]
+            rs_ = [r for r in rows if r["s"] == st_]
+            fills = []
+            for (sl, ln), r in zip(ls_, rs_):
+                toks = re.findall(r"<b>.*?</b>|\S+", ln["t"])
+                words = []
+                for tk in toks:
+                    bold = tk.startswith("<b>")
+                    for w in re.sub(r"<[^>]+>", "", tk).split():
+                        words.append((w, "vilna" if st_ == "gemara" or bold else "rashi"))
+                if not ln.get("w") or len(words) < 3:
+                    continue
+                space = FW.word_w(" ", "vilna" if st_ == "gemara" else "rashi")
+                nat = (sum(FW.word_w(w, f) for w, f in words) + space * (len(words) - 1)) * sl["fs"]
+                r["fill"] = round(nat / ln["w"], 3)
+                fills.append(r["fill"])
+            if len(fills) >= 5:
+                med = sorted(fills)[len(fills) // 2]
+                for r in rs_:
+                    if "fill" in r:
+                        r["fill_rel"] = round(r["fill"] / med, 3)
+                        r["spacing"] = "tight" if r["fill_rel"] > 1.25 else "loose" if r["fill_rel"] < 0.72 else None
         edges = {}
         for st_ in ("gemara", "rashi", "tosafot"):
             rs = [r for r in rows if r["s"] == st_ and not r["empty"]]
