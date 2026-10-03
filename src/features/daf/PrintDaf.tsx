@@ -18,6 +18,8 @@ export interface PrintLayout {
   header: { l: number; t: number; fs: number; text: string }[];
   /** דף פתיחת מסכת: המילה הראשונה במסגרת מעוטרת */
   box?: { l: number; t: number; w: number; h: number; text: string };
+  /** מילות הקישור בתחתית העמוד: המילה הראשונה של העמוד הבא, בגופן הזרם שלה; base = קו הבסיס */
+  catch?: { s: PrintSlab["s"]; l: number; base: number; fs: number; text: string }[];
 }
 
 /**
@@ -106,7 +108,7 @@ export default function PrintDaf({ layout, width, style, query }: Props) {
       style={{
         width,
         // גובה לפי תחתית הגוש האחרון (ולא כל שולי הדף הריקים של הסריקה)
-        height: (Math.min(layout.page.h, Math.max(...layout.slabs.map((sl) => sl.t + sl.h)) + 14)) * k,
+        height: (Math.min(layout.page.h, Math.max(...layout.slabs.map((sl) => sl.t + sl.h), ...(layout.catch ?? []).map((c) => c.base + 3)) + 14)) * k,
         position: "relative",
         overflow: "hidden",
       }}
@@ -125,6 +127,19 @@ export default function PrintDaf({ layout, width, style, query }: Props) {
           <span className="daf-seg" data-stream="main" dangerouslySetInnerHTML={{ __html: sanitizeSegment(layout.box.text, query) }} />
         </div>
       )}
+      {(layout.catch ?? []).map((c, i) => (
+        <span
+          key={`c${i}`}
+          className="absolute whitespace-nowrap daf-seg"
+          data-stream={c.s === "gemara" ? "main" : c.s === "rashi" ? "inner" : "outer"}
+          style={{
+            left: c.l * k, top: (c.base - c.fs) * k, fontSize: c.fs * k, lineHeight: `${c.fs * k}px`,
+            fontFamily: c.s === "gemara" ? FONT_FAMILY.Vilna : FONT_FAMILY.Rashi, fontWeight: c.s === "gemara" ? 600 : 400,
+            color: colorOf(c.s),
+          }}
+          dangerouslySetInnerHTML={{ __html: sanitizeSegment(c.text, query) }}
+        />
+      ))}
       {layout.header.map((hl, i) => (
         <span
           key={`h${i}`}

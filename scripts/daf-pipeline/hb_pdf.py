@@ -500,9 +500,12 @@ def image_rows(p, W, fL, fR, head):
             l["c"] = "h"
             heads_.append({"x0": min(w["x0"] for w in l["w"]), "y0": min(w["y0"] for w in l["w"]),
                            "size": st.median(w["size"] for w in l["w"]), "text": txt})
-        elif len(nb) >= 2 and not ov:
+        elif (len(nb) >= 2 and not ov) or (wd(l) < 60 and not any(
+                min(o["x1"], l["x1"]) - max(o["x0"], l["x0"]) > 0 and 0 < abs(o["base"] - l["base"]) < 40 for o in gl)):
+            # וגם מילה-שתיים באותיות גדולות בלי שום שורת גמרא מעליה או מתחתיה (סוף עמודת מפרש)
             l["c"] = "s"
             l.setdefault("big", (l["x0"], l["x1"]))
+    catch_ = []  # מילות הקישור מזוהות ב-build_page (שם יש את הטקסט של העמוד הבא)
     grows = [dict(l, cy=l["base"]) for l in L if l["c"] == "g"]
     pcs = []
     for l in L:
@@ -513,7 +516,7 @@ def image_rows(p, W, fL, fR, head):
     fTop = min(l["top"] for l in L) - c_t
     if os.environ.get("FRAME_DEBUG"):
         print(f"image rows: gemara {len(grows)}, commentary {len(pcs)}, xh g/s {cg:.2f}/{cs:.2f}, calib {c_g:.2f} {c_s:.2f} {c_t:.2f}")
-    return grows, pcs, fTop, heads_
+    return grows, pcs, fTop, heads_, catch_
 
 
 # ---------- עמוד ----------
@@ -592,10 +595,28 @@ def build_page(p, key, refs):
     gem = [w for w in gem if inside(w)]
     # מקור הגיאומטריה: התמונה עצמה (ברירת מחדל) או שורות ה-OCR (GEOM=ocr, וגם כגיבוי אם התמונה נכשלת)
     use_img = os.environ.get("GEOM", "image") == "image"
-    side_heads = []
+    side_heads, catches = [], []
     if use_img:
         try:
-            grows, pcs, fTop, side_heads = image_rows(p, W, fL, fR, head)
+            grows, pcs, fTop, side_heads, catches = image_rows(p, W, fL, fR, head)
+            # מילת הקישור לעמוד הבא: פיסה קצרה (מילה-שתיים) בחלק התחתון של העמוד, שהטקסט שלה הוא
+            # המילה הראשונה של העמוד הבא באחד הזרמים. מוצאים אותה מהזרמים ומציגים בנפרד
+            nxt_word = {}
+            for st_ in ("gemara", "rashi", "tosafot"):
+                ref_, hi_ = refs[st_][0], refs[st_][2]
+                nw = [t.lstrip(DH) for t in ref_[hi_: hi_ + 3] if not re.match(r"^(מתני|גמ)[׳']?\.?$", t.lstrip(DH))]
+                if nw:
+                    nxt_word[st_] = nw[0]
+            page_h = p.rect.height
+            for coll, kinds in ((grows, ("gemara",)), (pcs, ("rashi", "tosafot"))):
+                for r in list(coll):
+                    if r["x1"] - r["x0"] > 60 or not r["w"] or len(r["w"]) > 2 or r["base"] < fTop + 0.55 * (page_h - fTop):
+                        continue
+                    o_ = fold(norm_token(r["w"][0]["t"]))
+                    best_ = max(((fuzz.ratio(o_, fold(norm_token(nxt_word[k]))), k) for k in kinds if k in nxt_word), default=(0, None))
+                    if best_[0] >= 60:
+                        coll.remove(r)
+                        catches.append({"x0": r["x0"], "base": r["base"], "stream": best_[1], "text": nxt_word[best_[1]]})
         except Exception as e:
             print(key, "image geometry failed, using OCR rows:", repr(e), flush=True)
             use_img = False
@@ -895,11 +916,17 @@ def build_page(p, key, refs):
                         if by1 - by0 > 12 and bx1 - bx0 > 40:
                             box = {"l": round(X(bx0), 2), "t": round(Y(by0), 2), "w": round((bx1 - bx0) * s, 2),
                                    "h": round((by1 - by0) * s, 2), "text": gref[0]}
+    # מילות הקישור (זוהו למעלה): בגופן ובגודל של הזרם שלהן
+    catch_out = [{"s": c_["stream"], "l": round(X(c_["x0"]), 2), "base": round(Y(c_["base"]), 2),
+                  "fs": round(G_FS * lh / G_LH if c_["stream"] == "gemara" else S_FS * slh / S_LH, 2),
+                  "text": re.sub(r"<[^>]+>", "", c_["text"])} for c_ in catches]
     # כותרות "הדרן עלך" שבעמודות המפרשים (מודפסות שם, לא חלק מטקסט רש"י/תוספות)
     for hd_ in (side_heads if use_img else []):
         header.append({"l": round(X(hd_["x0"]), 2), "t": round(Y(hd_["y0"]), 2), "fs": round(hd_["size"] * s, 2),
                        "text": re.sub(r"[^א-ת׳'\" ]", "", hd_["text"]).strip()})
     lay_box = {"box": box} if box else {}
+    if catch_out:
+        lay_box["catch"] = catch_out
     lay = {"page": {"w": PAGE_W, "h": round(Y(p.rect.height), 2)}, "slabs": slabs, "header": header, **lay_box,
            "src": [round(fL, 1), round(fR, 1), round(fTop, 1)]}
     return lay, report
