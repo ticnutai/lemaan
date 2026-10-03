@@ -664,10 +664,13 @@ def build_page(p, key, refs):
             page_h = p.rect.height
             for coll, kinds in ((grows, ("gemara",)), (pcs, ("rashi", "tosafot"))):
                 for r in list(coll):
+                    if all(k in {c_["stream"] for c_ in catches} for k in kinds):
+                        break
                     if r["x1"] - r["x0"] > 60 or not r["w"] or len(r["w"]) > 2 or r["base"] < fTop + 0.55 * (page_h - fTop):
                         continue
                     o_ = fold(norm_token(r["w"][0]["t"]))
-                    best_ = max(((fuzz.ratio(o_, fold(norm_token(nxt_word[k]))), k) for k in kinds if k in nxt_word), default=(0, None))
+                    have_ = {c_["stream"] for c_ in catches}
+                    best_ = max(((fuzz.ratio(o_, fold(norm_token(nxt_word[k]))), k) for k in kinds if k in nxt_word and k not in have_), default=(0, None))
                     if best_[0] >= 60:
                         coll.remove(r)
                         catches.append({"x0": r["x0"], "base": r["base"], "stream": best_[1], "text": nxt_word[best_[1]]})
@@ -798,6 +801,32 @@ def build_page(p, key, refs):
                 pc["s"] = "rashi"
             elif m < -12:
                 pc["s"] = "tosafot"
+    if use_img:
+        # גיבוי מתוך מילות ה-OCR: לפעמים שורת ההערות שבתחתית ("תורה אור") צמודה למילת הקישור,
+        # ובתמונה שתיהן התמזגו לשורה דקה אחת שנפסלה. מחפשים מילה שאינה בשום שורה, מיד מתחת
+        # לשורה האחרונה של עמודה, שהטקסט שלה הוא המילה הראשונה של העמוד הבא באותו זרם
+        # (כאן, אחרי שיוך המפרשים — הזרם נקבע לפי השורה שמעליה, גם כששלושת הזרמים מתחילים באותה מילה)
+        have = {c_["stream"] for c_ in catches}
+        assigned = {id(w) for r in grows + pcs for w in r["w"]}
+        side_sz = st.median([w["size"] for r in pcs for w in r["w"]] or [7.5])
+        page_h = p.rect.height
+        for w in sorted(W, key=lambda w: -w["y1"]):
+            if id(w) in assigned or len(w["t"]) < 2 or w["size"] < 0.8 * side_sz or w["y1"] < fTop + 0.55 * (page_h - fTop):
+                continue
+            o_ = fold(norm_token(w["t"]))
+            cands = [k for k in nxt_word if k not in have and fuzz.ratio(o_, fold(norm_token(nxt_word[k]))) >= 70]
+            if not cands:
+                continue
+            cx = (w["x0"] + w["x1"]) / 2
+            col = [r for r in grows + pcs if r["x0"] - 12 <= cx <= r["x1"] + 3]
+            above = [r for r in col if 0 < w["y1"] - r["base"] < 25]
+            if not above or any(r["base"] > w["y1"] + 2 for r in col):
+                continue  # צריכה להיות מתחת לשורה האחרונה של העמודה
+            a_ = max(above, key=lambda r: r["base"])
+            st_ = "gemara" if any(a_ is g for g in grows) else a_.get("s")
+            if st_ in cands:
+                catches.append({"x0": w["x0"], "base": w["y1"] - 0.18 * w["size"], "stream": st_, "text": nxt_word[st_]})
+                have.add(st_)
     gbottom = max((g[1] for g in gspan), default=0)
 
     slabs, report = [], {}
