@@ -558,7 +558,9 @@ def image_rows(p, W, fL, fR, head):
     hd_ids = {id(w) for w in hd}
     # מילת פתיחת המסכת במסגרת המעוטרת (פי 3–4 מהגופן הרגיל) — לא שייכת לשום שורה; מילה פותחת
     # מוגדלת של רש"י/תוספות (פי 1.5–2) כן שייכת לשורה שלה
-    title_sz = 2.2 * st.median(w["size"] for w in W)
+    # (גם מעל פי 1.5 מגופן הגמרא: בעמוד שרובו מפרשים, ה-OCR נותן להם גופן קטן והחציון יורד)
+    szs = sorted(w["size"] for w in W)
+    title_sz = max(2.2 * st.median(szs), 1.5 * szs[int(0.9 * (len(szs) - 1))])
     for w in W:
         if id(w) in hd_ids or w["size"] >= title_sz:
             continue
@@ -630,12 +632,36 @@ def image_rows(p, W, fL, fR, head):
 
 
 # ---------- עמוד ----------
-def build_page(p, key, refs):
-    W = [w for w in page_words(p) if HEB.search(w["t"])]
-    # גדלי הגופן משתנים מעמוד לעמוד ובין מקורות ה-OCR (HebrewBooks: גמרא 9.5/11, מפרשים 6.5–7.5,
-    # שוליים 5–6.5; ABBYY של אוצריא: גמרא 8.5–10, מפרשים 6.5–8, שוליים 4.5–5.5), ולפעמים רש"י ותוספות
-    # באותו עמוד בשני גדלים. לכן: הגמרא = הגודל הגדול הנפוץ; המפרשים = כל מה שקטן ממנה (ולא זעיר) —
-    # ובתוך המסגרת, שנמצאת גיאומטרית (ראו למטה) ולא לפי גודל.
+def image_frame(p):
+    """קצות המסגרת לפי עמודות לבנות כמעט לגמרי לאורך גוף העמוד: ה"פנימית" ביותר בכל צד שנותנת
+    רוחב סביר (55%–80% מרוחב הדף). → (fL, fR) או None."""
+    import img_lines as IL
+    import numpy as np
+    r = p.rect
+    ink = IL.ink_mask(p, fitz.Rect(0, r.height * 0.12, r.width, r.height * 0.9))
+    Z = IL.Z
+    k = int(3 * Z)
+    sm = np.convolve(ink.mean(axis=0), np.ones(k) / k, mode="same")
+    for thr_ in (0.004, 0.01):
+        white = sm < thr_
+        runs = []
+        for i in np.flatnonzero(white):
+            if runs and i == runs[-1][1] + 1:
+                runs[-1][1] = i
+            else:
+                runs.append([i, i])
+        runs = [(a / Z, b / Z) for a, b in runs if (b - a) / Z >= 3]
+        Ls = [b for a, b in runs if 0.05 * r.width < b < 0.35 * r.width]
+        Rs = [a for a, b in runs if 0.65 * r.width < a < 0.95 * r.width]
+        pairs = [(R_ - L_, L_, R_) for L_ in Ls for R_ in Rs if 0.55 * r.width <= R_ - L_ <= 0.8 * r.width]
+        if pairs:
+            _, L_, R_ = min(pairs)
+            return L_, R_
+    return None
+
+
+def frame_of(p, W):
+    """מסגרת הטקסט (קצה שמאל/ימין) לפי יישור קצוות השורות. → (fL, fR, ציון, G, side, gem, head)"""
     hist = {}
     for w in W:
         hist[round(w["size"] * 2) / 2] = hist.get(round(w["size"] * 2) / 2, 0) + 1
@@ -683,8 +709,50 @@ def build_page(p, key, refs):
         xs0 = sorted(w["x0"] for w in side if w["x0"] > 0.14 * PW)
         xs1 = sorted(w["x1"] for w in side if w["x1"] < 0.9 * PW)
         fL, fR = xs0[int(0.02 * len(xs0))], xs1[int(0.98 * len(xs1)) - 1]
+    return fL, fR, (best_[0] if best_ else 0), G, side, gem, head
+
+
+FRAME_W = 411.0  # רוחב מסגרת וילנא הטיפוסי בסריקות (נק'); הספים בקוד מכוילים אליו
+_scaled_docs = []
+
+
+def scaled_page(p, k):
+    """עותק של העמוד בקנה מידה k (תמונה ושכבת טקסט יחד) — לעמודים שנסרקו מחדש בגודל אחר."""
+    nd = fitz.open()
+    sp = nd.new_page(width=p.rect.width * k, height=p.rect.height * k)
+    sp.show_pdf_page(sp.rect, p.parent, p.number)
+    _scaled_docs.append(nd)  # שהמסמך לא ייאסף
+    return sp
+
+
+def build_page(p, key, refs, _scaled=False):
+    W = [w for w in page_words(p) if HEB.search(w["t"])]
+    # גדלי הגופן משתנים מעמוד לעמוד ובין מקורות ה-OCR (HebrewBooks: גמרא 9.5/11, מפרשים 6.5–7.5,
+    # שוליים 5–6.5; ABBYY של אוצריא: גמרא 8.5–10, מפרשים 6.5–8, שוליים 4.5–5.5), ולפעמים רש"י ותוספות
+    # באותו עמוד בשני גדלים. לכן: הגמרא = הגודל הגדול הנפוץ; המפרשים = כל מה שקטן ממנה (ולא זעיר) —
+    # ובתוך המסגרת, שנמצאת גיאומטרית (ראו למטה) ולא לפי גודל.
+    fL, fR, score_, G, side, gem, head = frame_of(p, W)
+    small_ = lambda w: 0.55 * G <= w["size"] < G - 0.6
+    gem_ = lambda w: G - 0.6 <= w["size"] < G + 0.8
+    bigcap = lambda w: G + 0.8 <= w["size"] < 14
+    # ציון נמוך (עמוד שרובו גמרא ומעט שורות מפרש מיושרות): המסגרת מהתמונה — הרצועות הלבנות הארוכות
+    # שבין עמודות השוליים לטקסט. (לא מעמודים סמוכים: עמודים שנסרקו מחדש בקנה מידה אחר)
+    if score_ < 25:
+        fi = image_frame(p)
+        if fi:
+            fL, fR = fi
+        elif os.environ.get("FRAME_DEBUG"):
+            print(key, "frame: low score and no image gutters")
+    # עמוד בקנה מידה אחר (סריקה חלופית): בונים מעותק מוקטן/מוגדל לרוחב הטיפוסי
+    if not _scaled and abs((fR - fL) / FRAME_W - 1) > 0.05:
+        k_ = FRAME_W / (fR - fL)
+        if os.environ.get("FRAME_DEBUG"):
+            print(key, f"rescaled page x{k_:.3f}")
+        lay_, rep_ = build_page(scaled_page(p, k_), key, refs, _scaled=True)
+        rep_["k"] = k_
+        return lay_, rep_
     if os.environ.get("FRAME_DEBUG"):
-        print(key, "frame", fL, fR, "score", best_ and best_[0])
+        print(key, "frame", fL, fR, "score", score_)
     inside = lambda w: w["x0"] >= fL - 3 and w["x1"] <= fR + 3
     # גודל המפרשים העיקרי; טקסט קטן ממנו שנמצא מתחת לשורת המפרש האחרונה = הערות תחתית
     # (ציטוטי "תורה אור", הגהות) — לא רש"י ולא תוספות

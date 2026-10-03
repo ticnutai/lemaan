@@ -75,11 +75,16 @@ def main():
     # 1. בנייה מחדש של העמודים (עם נתוני השורות לסקירה)
     reports = {}
     for a in amudim:
-        lay, rep = H.build_page(doc[first - 1 + keys.index(a)], a, H.make_refs(shas, ws, keys, a, tractate))
+        try:
+            lay, rep = H.build_page(doc[first - 1 + keys.index(a)], a, H.make_refs(shas, ws, keys, a, tractate))
+        except Exception as e:  # עמוד חריג (סריקה חלופית וכד') — נשאר הקיים, ולא עוצר את השאר
+            print(f"{a} FAILED: {e!r} — kept previous layout")
+            continue
         lays[a] = lay
         reports[a] = rep
     H.write_layouts(path, {k: lays[k] for k in keys if k in lays})
     H.update_index()
+    amudim = [a for a in amudim if a in reports]
 
     # 2. צילום הדף שלנו מהאפליקציה
     subprocess.run(["node", os.path.join(HERE, "shot.mjs"), tractate, out, ",".join(amudim)], check=True)
@@ -95,6 +100,8 @@ def main():
         bot_pt = max([fTop + (bottom_u - V_TOP) / s] + [ln["base"] for ln in lines]) + 8
         crop = fitz.Rect(fL - PAD, fTop - HEAD, fR + PAD, bot_pt)
         pg = doc[first - 1 + keys.index(a)]
+        if rep.get("k"):  # נבנה מעותק בקנה מידה אחר — גם הסריקה נחתכת ממנו
+            pg = H.scaled_page(pg, rep["k"])
         pix = pg.get_pixmap(matrix=fitz.Matrix(Z, Z), clip=crop)
         scan = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
         scan.save(os.path.join(out, f"{a}-scan.png"))

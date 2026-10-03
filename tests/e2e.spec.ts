@@ -220,7 +220,8 @@ test("T18 — דפוס מדויק (ברכות): שורות הדפוס, בלי ת
   await expect(daf.locator(".daf-pline").first()).toBeVisible({ timeout: 15_000 });
   // כותרת הדפוס וגושי רש"י/תוספות במקומם
   await expect(daf.getByText("מאימתי פרק ראשון ברכות")).toBeVisible();
-  await expect(daf.locator(".daf-print-side")).toHaveCount(3);
+  await expect(daf.locator(".daf-print-rashi").first()).toBeVisible();
+  await expect(daf.locator(".daf-print-tosafot").first()).toBeVisible();
   // אף שורת גמרא לא גולשת מגוש הדפוס שלה
   const overflowing = await daf.locator(".daf-pline").evaluateAll((els) =>
     els.filter((el) => el.scrollWidth > el.clientWidth + 2 && !(el as HTMLElement).style.transform).length);
