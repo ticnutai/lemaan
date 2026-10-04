@@ -218,8 +218,19 @@ def make_refs(shas, ws, keys, key, slug=None):
         if d is None and not _WARNED.get((slug, c)):
             print(f"!! {slug} {c}: no Orayta text, falling back to Sefaria", flush=True)
             _WARNED[(slug, c)] = True
-    com = lambda k, c: (src[c].get(k, []) if src[c] is not None else
-                        clean_segments(next((x["segments"] for x in shas[k]["commentaries"] if x["key"] == c), []), he))
+    import ws_commentary
+
+    def com(k, c):
+        if src[c] is None:
+            return clean_segments(next((x["segments"] for x in shas[k]["commentaries"] if x["key"] == c), []), he)
+        if k in src[c]:
+            return src[c][k]
+        # עמוד בודד שחסר באורייתא (בבא קמא עא. בתוספות): מוויקיטקסט, לא מספריא
+        ws_ = ws_commentary.page(he, k, c)
+        if ws_ and not _WARNED.get((slug, c, k)):
+            print(f"!! {slug} {k} {c}: missing in Orayta, using Wikisource", flush=True)
+            _WARNED[(slug, c, k)] = True
+        return ws_ or []
     refs = {"gemara": window(lambda k: gem_tokens(ws.get(k) or shas[k]["gemara"]), keys, key)}
     for c in ("rashi", "tosafot"):
         refs[c] = window(lambda k: side_tokens(com(k, c)), keys, key) + ([side_tokens([sg]) for sg in com(key, c)],)
@@ -1233,7 +1244,10 @@ def build_page(p, key, refs, _scaled=False, tractate=None):
         if gref and gs:
             g0 = gs[0]
             first_shown = re.sub(r"<[^>]+>", "", g0["lines"][0]["t"]).split()[:1]
-            if first_shown and fold(norm_token(first_shown[0])) != fold(norm_token(gref[0])):
+            # המילה עצמה נכנסה לשורה הראשונה (כשה-OCR קרא סימן קטן לפני המילה הבאה, למשל בבבא קמא ב.)
+            # — המסגרת עדיין נמדדת, והמילה מוסרת מהשורה כי היא מוצגת במסגרת
+            dup = bool(first_shown) and fold(norm_token(first_shown[0])) == fold(norm_token(gref[0]))
+            if first_shown:
                 # המסגרת נמדדת מהתמונה: הדיו בעמודת הגמרא, בין ראשי המפרשים (הרחבים) לשורת הגמרא הראשונה
                 import img_lines as IL
                 heads = [sl for sl in slabs if sl["s"] != "gemara" and sl["w"] >= 0.4 * V_W and sl["t"] + sl["h"] <= g0["t"] + 2]
@@ -1250,6 +1264,8 @@ def build_page(p, key, refs, _scaled=False, tractate=None):
                         if by1 - by0 > 12 and bx1 - bx0 > 40:
                             box = {"l": round(X(bx0), 2), "t": round(Y(by0), 2), "w": round((bx1 - bx0) * s, 2),
                                    "h": round((by1 - by0) * s, 2), "text": gref[0]}
+                            if dup:
+                                g0["lines"][0]["t"] = g0["lines"][0]["t"].split(" ", 1)[1] if " " in g0["lines"][0]["t"] else ""
     # מילות הקישור (זוהו למעלה): בגופן ובגודל של הזרם שלהן
     catch_out = [{"s": c_["stream"], "l": round(X(c_["x0"]), 2), "base": round(Y(c_["base"]), 2),
                   "fs": round(G_FS * lh / G_LH if c_["stream"] == "gemara" else S_FS * slh / S_LH, 2),

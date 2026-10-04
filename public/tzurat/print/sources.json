@@ -1,4 +1,10 @@
 {
+ "bava_kamma": {
+  "built": "2026-10-04",
+  "file": "בבא קמא.pdf",
+  "pages": 236,
+  "sha256": "a5dd73812ef4705c8e755a23ec119ee8f79b5cb5163ea1a92f5db1345fa14d94"
+ },
  "berakhot": {
   "built": "2026-10-04",
   "file": "ברכות.pdf",
