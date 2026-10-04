@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef } from "react";
+import { useId, useLayoutEffect, useMemo, useRef } from "react";
 import { sanitizeSegment } from "./buildHtml";
 import { FONT_FAMILY, type DafStyle } from "./dafStyle";
 
@@ -118,13 +118,13 @@ export default function PrintDaf({ layout, width, style, query }: Props) {
           className="absolute flex items-center justify-center font-bold"
           style={{
             left: layout.box.l * k, top: layout.box.t * k, width: layout.box.w * k, height: layout.box.h * k,
-            border: `${Math.max(2, 3 * k).toFixed(1)}px double ${style.colors.headers}`,
             fontFamily: FONT_FAMILY.Vilna, color: style.colors.main,
-            fontSize: Math.min(layout.box.h * 0.5, (layout.box.w * 0.8) / Math.max(2, layout.box.text.length * 0.62)) * k,
+            fontSize: Math.min(layout.box.h * 0.5, (layout.box.w * 0.72) / Math.max(2, layout.box.text.length * 0.62)) * k,
             lineHeight: 1,
           }}
         >
-          <span className="daf-seg" data-stream="main" dangerouslySetInnerHTML={{ __html: sanitizeSegment(layout.box.text, query) }} />
+          <OrnateFrame w={layout.box.w * k} h={layout.box.h * k} color={style.colors.main} />
+          <span className="daf-seg relative" data-stream="main" dangerouslySetInnerHTML={{ __html: sanitizeSegment(layout.box.text, query) }} />
         </div>
       )}
       {(layout.catch ?? []).map((c, i) => (
@@ -169,5 +169,34 @@ export default function PrintDaf({ layout, width, style, query }: Props) {
         />
       ))}
     </div>
+  );
+}
+
+/**
+ * המסגרת המעוטרת של מילת הפתיחה במסכת — כמו בדפוס וילנא: קו חיצוני וקו פנימי, וביניהם פס של
+ * טבעות שזורות (דוגמה חוזרת). ב-SVG, בצבע הטקסט, כך שהיא משתנה עם ערכת הנושא.
+ */
+function OrnateFrame({ w, h, color }: { w: number; h: number; color: string }) {
+  const id = useId().replace(/:/g, "");
+  const b = Math.max(4, Math.min(w, h) * 0.13); // עובי הפס המעוטר
+  const t = b; // גודל אריח הדוגמה
+  const sw = Math.max(0.6, b * 0.07);
+  const band = `M0 0H${w}V${h}H0Z M${b} ${b}V${h - b}H${w - b}V${b}Z`;
+  return (
+    <svg className="absolute inset-0" width={w} height={h} aria-hidden="true" style={{ overflow: "visible" }}>
+      <defs>
+        <pattern id={`orn${id}`} width={t} height={t} patternUnits="userSpaceOnUse">
+          <circle cx={t / 2} cy={t / 2} r={t * 0.3} fill="none" stroke={color} strokeWidth={sw} />
+          <circle cx={t / 2} cy={t / 2} r={t * 0.1} fill={color} />
+          <path d={`M0 ${t / 2}Q${t / 4} ${t * 0.15} ${t / 2} ${t * 0.2}M${t / 2} ${t * 0.8}Q${t * 0.75} ${t * 0.85} ${t} ${t / 2}`}
+            fill="none" stroke={color} strokeWidth={sw} />
+          <path d={`M${t / 2} 0Q${t * 0.85} ${t / 4} ${t * 0.8} ${t / 2}M${t * 0.2} ${t / 2}Q${t * 0.15} ${t * 0.75} ${t / 2} ${t}`}
+            fill="none" stroke={color} strokeWidth={sw} />
+        </pattern>
+      </defs>
+      <path d={band} fill={`url(#orn${id})`} fillRule="evenodd" />
+      <rect x={sw / 2} y={sw / 2} width={w - sw} height={h - sw} fill="none" stroke={color} strokeWidth={sw * 1.6} />
+      <rect x={b} y={b} width={w - 2 * b} height={h - 2 * b} fill="none" stroke={color} strokeWidth={sw * 1.3} />
+    </svg>
   );
 }

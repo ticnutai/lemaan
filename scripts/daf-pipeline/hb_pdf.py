@@ -1257,6 +1257,18 @@ def build_page(p, key, refs, _scaled=False, tractate=None):
                 clip = fitz.Rect(ux(g0["l"]) - 2, uy(top_u) + 1, ux(g0["l"] + g0["w"]) + 2, uy(g0["t"]) - 0.5)
                 if clip.height > 12:
                     ink = IL.ink_mask(p, clip)
+                    # המסגרת = רצועת השורות הרציפה הגבוהה ביותר (רווחים של עד 2 נק' בתוכה) — בלי
+                    # ראשי האותיות של שורת הגמרא שמתחתיה (קידושין ב.: המסגרת "ירדה" 13 נק' עד הטקסט)
+                    rr = ink.any(axis=1).nonzero()[0]
+                    runs_ = []
+                    for r_ in rr:
+                        if runs_ and r_ - runs_[-1][1] <= 3 * IL.Z:
+                            runs_[-1][1] = r_
+                        else:
+                            runs_.append([r_, r_])
+                    if runs_:
+                        a_, b_ = max(runs_, key=lambda ab: ab[1] - ab[0])
+                        ink = ink.copy(); ink[:a_] = False; ink[b_ + 1:] = False
                     rows_, cols_ = ink.any(axis=1).nonzero()[0], ink.any(axis=0).nonzero()[0]
                     if len(rows_) and len(cols_):
                         bx0, bx1 = clip.x0 + cols_[0] / IL.Z, clip.x0 + (cols_[-1] + 1) / IL.Z
