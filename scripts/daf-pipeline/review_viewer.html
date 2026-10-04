@@ -269,6 +269,7 @@ function renderPanel() {
       ${r.k == null ? "" : `<div class="fix"><div class="hint" style="margin-top:8px"><b>תיקון קבוע</b> — נשמר בקובץ ונשאר בכל בנייה מחדש:</div>
         <label>השורה מסתיימת במילה <input id="fixEnd" value="${esc(ovrOf(r, "end"))}" placeholder="${esc((r.print || "").split(" ").filter(Boolean).slice(-1)[0] || "")}"></label>
         <label>השורה מתחילה במילה <input id="fixStart" value="${esc(ovrOf(r, "start"))}" placeholder="${esc((r.print || "").split(" ").filter(Boolean)[0] || "")}"></label>
+        <label>מילה שאינה בדפוס (תוסר) <input id="fixDrop" value="${esc(ovrOf(r, "drop"))}"></label>
         <div style="display:flex;gap:6px;margin-top:6px"><button class="btn" onclick="saveFix(${r.i})">שמור תיקון</button>
         <button class="btn" onclick="rebuild()">בנה מחדש את העמוד</button></div></div>`}</div>`;
   }
@@ -279,7 +280,7 @@ function renderPanel() {
     <div class="hint">מוכן = התאמה ≥ ${Math.round((DATA.status?.ready_threshold ?? 0.97) * 100)}% ובלי מילים חסרות או כפולות</div>
     ${(p.audit || []).length ? p.audit.map((a) => `<div class="row"><span class="lbl">${NAME[a.stream]} · ${{ missing: "חסר", extra: "מיותר", duplicate: "כפול" }[a.type]} ${a.n} מילים</span><div class="cmp">${esc(a.words)}</div></div>`).join("") : '<div class="muted">בדיקת שלמות: כל מילות המקור מופיעות פעם אחת ובסדר</div>'}</div>`;
   const fixes = OVR[AM] || [];
-  if (fixes.length) h += `<div class="card"><h2>תיקונים קבועים בעמוד (${fixes.length})</h2>${fixes.map((o) => `<div class="row"><span class="lbl">${NAME[o.s]} · שורה ${o.k + 1} בזרם</span> ${o.end ? "מסתיימת ב" + esc(o.end) : ""}${o.start ? " מתחילה ב" + esc(o.start) : ""}</div>`).join("")}</div>`;
+  if (fixes.length) h += `<div class="card"><h2>תיקונים קבועים בעמוד (${fixes.length})</h2>${fixes.map((o) => `<div class="row"><span class="lbl">${NAME[o.s]} · שורה ${o.k + 1} בזרם</span> ${o.end ? "מסתיימת ב" + esc(o.end) : ""}${o.start ? " מתחילה ב" + esc(o.start) : ""}${o.drop ? " בלי המילה " + esc(o.drop) : ""}</div>`).join("")}</div>`;
   h += `<div class="card"><h2>מידות (נקודות)</h2><table>
     <tr><th></th><th>דפוס</th><th>אצלנו</th><th>הפרש</th></tr>
     <tr><td>רוחב</td><td>${s.print.w}</td><td>${s.ours.w}</td><td>${d(s.print.w, s.ours.w)}</td></tr>
@@ -315,8 +316,8 @@ function renderPanel() {
 function ovrOf(r, kind) { const o = (OVR[AM] || []).find((x) => x.s === r.s && x.k === r.k && x[kind]); return o ? o[kind] : ""; }
 async function saveFix(i) {
   const r = DATA.pages[AM].rows[i];
-  for (const kind of ["end", "start"]) {
-    const word = $(kind === "end" ? "#fixEnd" : "#fixStart").value.trim();
+  for (const kind of ["end", "start", "drop"]) {
+    const word = $({ end: "#fixEnd", start: "#fixStart", drop: "#fixDrop" }[kind]).value.trim();
     if (word === ovrOf(r, kind)) continue;
     const res = await fetch("/api/override", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ tractate: T, amud: AM, s: r.s, k: r.k, kind, word }) });

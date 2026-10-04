@@ -1,4 +1,10 @@
 {
+ "berakhot": {
+  "built": "2026-10-04",
+  "file": "ברכות.pdf",
+  "pages": 125,
+  "sha256": "bcf8e3349ad99a4ad62a682bfb3197ed763c546ba0502638eeaa2711f1ac8874"
+ },
  "kiddushin": {
   "built": "2026-10-04",
   "file": "קידושין.pdf",

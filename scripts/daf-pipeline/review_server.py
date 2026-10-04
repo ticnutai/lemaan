@@ -99,7 +99,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         d = tractate_data(b.get("tractate", ""))
         kind = b.get("kind")
         if (not d or not b.get("amud") or b.get("s") not in ("gemara", "rashi", "tosafot")
-                or not isinstance(b.get("k"), int) or kind not in ("end", "start")):
+                or not isinstance(b.get("k"), int) or kind not in ("end", "start", "drop")):
             return self._json({"error": "bad request"}, 400)
         os.makedirs(OVR, exist_ok=True)
         p = os.path.join(OVR, safe(d["tractate"]) + ".json")

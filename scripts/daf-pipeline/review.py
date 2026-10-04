@@ -94,7 +94,7 @@ def main():
         lays[a] = lay
         reports[a] = rep
     if os.environ.get("DEDUPE", "1") != "0":  # DEDUPE=0 — לניסוי השוואה בלבד
-        print("boundary duplicates removed:", H.dedupe_boundaries(lays, keys), "words")
+        print("boundary duplicates removed:", H.dedupe_boundaries(lays, keys, ref_of=H.ref_lookup(shas, ws, keys, tractate)), "words")
     H.write_layouts(path, {k: lays[k] for k in keys if k in lays})
     H.record_source(tractate, pdf, len(doc))
     H.update_index()

@@ -38,6 +38,18 @@ def shown(lay, stream):
     return [t for t in out if H.HEB.search(t)]
 
 
+def strip_hadran(seq, keys_, names):
+    """כותרות "הדרן עלך <פרק>" הן כותרות, לא טקסט של זרם — מוציאים אותן משני הצדדים."""
+    out, outk, i = [], [], 0
+    while i < len(seq):
+        if seq[i] == "הדרנ" and i + 1 < len(seq) and seq[i + 1] == "עלכ":
+            n = 2 + max((len(nm) for nm in names if seq[i + 2: i + 2 + len(nm)] == nm), default=0)
+            i += n
+            continue
+        out.append(seq[i]); outk.append(keys_[i]); i += 1
+    return out, outk
+
+
 def audit(tractate, only=None, path=None, save=True):
     slug = tractate.lower()
     lays = json.loads(gzip.decompress(open(path or f"{H.ROOT}/tzurat/print/{slug}.json.gz", "rb").read()))
@@ -56,6 +68,11 @@ def audit(tractate, only=None, path=None, save=True):
     if cur:
         runs.append(cur)
     refs = {k: H.make_refs(shas, ws, allk, k, tractate) for k in keys}
+    # שמות הפרקים כפי שהם בכותרות ההדרן שבמקור
+    names = set()
+    for k in allk:
+        for m in re.finditer(r"הדרן עלך ([^<:]+)", " ".join(ws.get(k) or [])):
+            names.add(tuple(norm(t) for t in m.group(1).split() if norm(t)))
     res = {"tractate": tractate, "amudim": len(keys), "streams": {}, "pages": {k: [] for k in keys}}
     for s in STREAMS:
         tot_ref = tot_ok = 0
@@ -70,6 +87,8 @@ def audit(tractate, only=None, path=None, save=True):
                 for t in shown(lays[k], s):
                     if norm(t):
                         D.append(norm(t)); Dk.append(k)
+            R, Rk = strip_hadran(R, Rk, names)
+            D, Dk = strip_hadran(D, Dk, names)
             sm = difflib.SequenceMatcher(None, R, D, autojunk=False)
             ops = [o for o in sm.get_opcodes()]
             tot_ref += len(R)
@@ -99,6 +118,9 @@ def audit(tractate, only=None, path=None, save=True):
         res["streams"][s] = {"words": tot_ref, "in_order": round(tot_ok / tot_ref, 4) if tot_ref else None,
                              "issues": len(issues), "missing_words": sum(i["n"] for i in issues if i["type"] == "missing"),
                              "extra_words": sum(i["n"] for i in issues if i["type"] != "missing")}
+        # מילים שהוסרו בכוונה (תיקון "drop": במקור אך לא בדפוס) אינן חוסר
+        drops = {(k, norm(o["drop"])) for k in keys for o in H.overrides_for(tractate, k) if o.get("drop") and o.get("s") == s}
+        issues = [i for i in issues if not (i["type"] == "missing" and (i["amud"], i["words"]) in drops)]
         for i in issues:
             res["pages"].setdefault(i["amud"], []).append(i)
     if not save:
@@ -116,7 +138,8 @@ if __name__ == "__main__":
         path = f"{H.ROOT}/tzurat/print/{t.lower()}.json.gz"
         lays = json.loads(gzip.decompress(open(path, "rb").read()))
         rep = []
-        n = H.dedupe_boundaries(lays, list(H.load(f"{H.ROOT}/shas/{t}.json.gz")), rep)
+        shas_, ws_ = H.load(f"{H.ROOT}/shas/{t}.json.gz"), H.load(f"{H.ROOT}/shas-ws/{t}.json.gz")
+        n = H.dedupe_boundaries(lays, list(shas_), rep, ref_of=H.ref_lookup(shas_, ws_, list(shas_), t))
         H.write_layouts(path, lays)
         print("fix: removed", n, "duplicated words:", rep)
     r = audit(t, only)

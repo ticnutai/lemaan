@@ -419,6 +419,27 @@ def running_header(head, fL, fR, p):
 
 
 # ---------- שורות מהתמונה ----------
+def hadran_like(txt):
+    """שורה שהיא כותרת "הדרן עלך ..." — בסבילות לשגיאות OCR ("הדק עלך")."""
+    ws_ = [re.sub(r"[^א-ת]", "", w) for w in txt.split()][:3]
+    return (any(fuzz.ratio(w, "הדרן") >= 50 for w in ws_[:2]) and any(fuzz.ratio(w, "עלך") >= 66 for w in ws_)
+            and len(txt.split()) >= 3)
+
+
+def hadran_text(ocr, refs):
+    """נוסח הכותרת מהמקור: "הדרן עלך <שם הפרק>" מתוך טקסטי הייחוס, לפי הדמיון לקריאת ה-OCR."""
+    n = len(ocr.split())
+    cands = set()
+    for v in refs.values():
+        toks = [t.lstrip(DH) for t in v[0]]
+        for i in range(len(toks) - 2):
+            if re.sub(r"[^א-ת]", "", toks[i]) == "הדרן" and re.sub(r"[^א-ת]", "", toks[i + 1]) == "עלך":
+                for m in range(max(3, n - 1), n + 2):
+                    cands.add(re.sub(r"[^א-ת׳'\" ]", "", " ".join(toks[i:i + m])).strip())
+    best = max(cands, key=lambda c: fuzz.ratio(c, ocr), default=None)
+    return best if best and fuzz.ratio(best, ocr) >= 60 else re.sub(r"[^א-ת׳'\" ]", "", ocr).strip()
+
+
 def image_rows(p, W, fL, fR, head):
     """שורות הגמרא והמפרשים כפי שהן בפיקסלים של הסריקה (img_lines), עם מילות ה-OCR שבתוכן.
     הסוג (גמרא/מפרש) נקבע לפי גובה גוף האות שנמדד בתמונה — לא לפי גודל הגופן שה-OCR ניחש.
@@ -612,8 +633,10 @@ def image_rows(p, W, fL, fR, head):
         ov = [o for o in nb if min(o["x1"], l["x1"]) - max(o["x0"], l["x0"]) > 0.5 * min(wd(o), wd(l))]
         txt = " ".join(w["t"] for w in l["w"])
         above = [o for o in ov if 3 < l["base"] - o["base"] < 16]
-        # "הדרן עלך" בעמודת מפרש: אין מעליה שורת גמרא (מתחתיה יכולה להתחיל גמרא רחבה)
-        if "הדרן" in txt and nb and not above and wd(l) < 0.5 * (fR - fL):
+        # "הדרן עלך" בעמודת מפרש: אין מעליה שורת גמרא (מתחתיה יכולה להתחיל גמרא רחבה);
+        # או כותרת ממורכזת בין הזרמים (גם כשה-OCR קרא "הדק עלך")
+        centered = abs((l["x0"] + l["x1"]) / 2 - mid) < 0.12 * (fR - fL)
+        if hadran_like(txt) and wd(l) < 0.5 * (fR - fL) and ((nb and not above) or (centered and not above)):
             l["c"] = "h"
             heads_.append({"x0": min(w["x0"] for w in l["w"]), "y0": min(w["y0"] for w in l["w"]),
                            "size": st.median(w["size"] for w in l["w"]), "text": txt})
@@ -730,7 +753,8 @@ _ovr_cache = {}
 
 def overrides_for(tractate, key):
     """תיקונים ידניים קבועים (overrides/<Tractate>.json) — נשמרים בכל בנייה מחדש.
-    מבנה: {"2a": [{"s": "gemara", "k": 12, "end": "שמע"}, {"s": "rashi", "k": 3, "start": "פירוש"}]}
+    מבנה: {"2a": [{"s": "gemara", "k": 12, "end": "שמע"}, {"s": "rashi", "k": 3, "start": "פירוש"},
+                  {"s": "rashi", "k": 9, "drop": "גמ'"}]}   (drop = מילה במקור שאינה בדפוס)
     k = מספר השורה בזרם (מ-0, בסדר הקריאה, כמו בכלי הסקירה); end/start = המילה שבה השורה
     צריכה להסתיים/להתחיל בדפוס. הגבול זז רק עד 8 מילים, ורק אם המילה נמצאת שם."""
     if tractate not in _ovr_cache:
@@ -749,9 +773,24 @@ def apply_overrides(lines, stream, ovr, applied):
     for ln in lines:
         cum.append(cum[-1] + len(ln))
     plain = lambda t: fold(norm_token(re.sub(r"<[^>]+>", "", t.lstrip(DH))))
+    # מילה שאינה בדפוס (למשל "גמ'" שנוסף במקור): מוסרים את המופע הקרוב בשורה k (או בשכנותיה)
+    for o in mine:
+        k, w_ = o.get("k"), o.get("drop")
+        if not w_ or not isinstance(k, int) or not 0 <= k < len(lines):
+            continue
+        target = plain(w_)
+        for kk in (k, k - 1, k + 1):
+            if 0 <= kk < len(lines):
+                i = next((i for i in range(cum[kk], cum[kk + 1]) if plain(toks[i]) == target), None)
+                if i is not None:
+                    del toks[i]
+                    for j in range(kk + 1, len(cum)):
+                        cum[j] -= 1
+                    applied.append(dict(o, stream=stream))
+                    break
     for o in mine:
         k = o.get("k")
-        if not isinstance(k, int) or not 0 <= k < len(lines):
+        if not isinstance(k, int) or not 0 <= k < len(lines) or o.get("drop"):
             continue
         word = o.get("end") or o.get("start")
         if not word:
@@ -796,7 +835,8 @@ def build_page(p, key, refs, _scaled=False, tractate=None):
     bigcap = lambda w: G + 0.8 <= w["size"] < 14
     # ציון נמוך (עמוד שרובו גמרא ומעט שורות מפרש מיושרות): המסגרת מהתמונה — הרצועות הלבנות הארוכות
     # שבין עמודות השוליים לטקסט. (לא מעמודים סמוכים: עמודים שנסרקו מחדש בקנה מידה אחר)
-    if score_ < 25:
+    # (מסגרת ה-OCR ברוחב הטיפוסי — נשארת גם בציון נמוך: הרצועות הלבנות בתמונה לא תמיד חד-משמעיות)
+    if score_ < 25 and abs((fR - fL) / FRAME_W - 1) > 0.03:
         fi = image_frame(p)
         if fi:
             fL, fR = fi
@@ -1122,7 +1162,9 @@ def build_page(p, key, refs, _scaled=False, tractate=None):
             short_ok = nxt is None or abs(nxt["x1"] - pc["x1"]) > 8
             # שורה מוזחת מימין (ליד אות פותחת מוגדלת) — אותו קצה שמאלי, הזחה קטנה
             indented = g is not None and abs(pc["x0"] - g["x0"]) < 6 and 0 < g["x1"] - pc["x1"] < 40
-            if g and (abs(pc["x1"] - g["x1"]) < 8 or indented) and (abs(pc["x0"] - g["x0"]) < 8 or short_ok) and 0 < pc["cy"] - g["ps"][-1]["cy"] < 2.2 * spitch:
+            # (שורה קצרה — לא שורה *רחבה* מהגוש: שורה ברוחב מלא מתחת לעמודה צרה פותחת גוש חדש)
+            wider = pc["x0"] < g["x0"] - 8 if g else False
+            if g and not wider and (abs(pc["x1"] - g["x1"]) < 8 or indented) and (abs(pc["x0"] - g["x0"]) < 8 or short_ok) and 0 < pc["cy"] - g["ps"][-1]["cy"] < 2.2 * spitch:
                 g["ps"].append(pc); g["t"].append(t)
             else:
                 groups.append({"x1": pc["x1"], "x0": pc["x0"], "ps": [pc], "t": [t]})
@@ -1215,7 +1257,7 @@ def build_page(p, key, refs, _scaled=False, tractate=None):
     # כותרות "הדרן עלך" שבעמודות המפרשים (מודפסות שם, לא חלק מטקסט רש"י/תוספות)
     for hd_ in (side_heads if use_img else []):
         header.append({"l": round(X(hd_["x0"]), 2), "t": round(Y(hd_["y0"]), 2), "fs": round(hd_["size"] * s, 2),
-                       "text": re.sub(r"[^א-ת׳'\" ]", "", hd_["text"]).strip()})
+                       "text": hadran_text(hd_["text"], refs)})
     lay_box = {"box": box} if box else {}
     if catch_out:
         lay_box["catch"] = catch_out
@@ -1253,7 +1295,7 @@ def _drop_last_words(html, n):
     return re.sub(r"<(b|i|big)></>", "", out).strip()
 
 
-def dedupe_boundaries(lays, keys, report=None):
+def dedupe_boundaries(lays, keys, report=None, ref_of=None):
     """גבול בין עמודים: אם סוף זרם בעמוד א חוזר בדיוק על תחילת אותו זרם בעמוד ב (המילים
     "נדחסו" לשורה האחרונה של א), מורידים אותן מ-א. תחילת ב מעוגנת בשורה הראשונה שלו, ולכן אמינה.
     מחזיר כמה מילים הורדו."""
@@ -1273,6 +1315,13 @@ def dedupe_boundaries(lays, keys, report=None):
             n = next((n for n in range(min(len(An), len(Bn), 80), 0, -1) if An[-n:] == Bn[:n]), 0)
             if n == 1 and len(An[-1]) < 3:  # מילה קצרה אחת ("לא", "על") יכולה לחזור באמת
                 n = 0
+            if n and ref_of is not None:
+                # הביטוי חוזר פעמיים ברצף גם במקור (סוף עמוד א + תחילת ב) — זו לא כפילות שלנו
+                # (מוסרים רק עודף: כשמוצג יותר פעמים ממה שיש במקור באותו קטע)
+                cnt = lambda seq, ph: sum(1 for i in range(len(seq) - len(ph) + 1) if seq[i:i + len(ph)] == ph)
+                ph = An[-n:]
+                if cnt(An[-80:] + Bn[:80], ph) <= cnt(ref_of(a, s)[-80:] + ref_of(b, s)[:80], ph):
+                    n = 0
             if not n:
                 continue
             # מורידים מהשורות האחרונות של א, שורה אחר שורה
@@ -1286,6 +1335,19 @@ def dedupe_boundaries(lays, keys, report=None):
             if report is not None:
                 report.append({"amud": a, "stream": s, "removed": n})
     return total
+
+
+def ref_lookup(shas, ws, keys, tractate):
+    """לדה-דופליקציה: מילות המקור המנורמלות של כל עמוד לפי זרם (רק העמוד עצמו)."""
+    nrm = lambda t: fold(norm_token(re.sub(r"[\"'״׳.,:;()\[\]]", "", t.lstrip(DH))))
+    cache = {}
+
+    def ref_of(k, s):
+        if k not in cache:
+            r = make_refs(shas, ws, keys, k, tractate)
+            cache[k] = {st_: [nrm(t) for t in v[0][v[1]:v[2]] if nrm(t)] for st_, v in r.items()}
+        return cache[k][s]
+    return ref_of
 
 
 def write_layouts(path, layouts):
@@ -1316,7 +1378,7 @@ def main(pdf, tractate, first_page, only=None):
         rep.pop("_lines", None)
         print(key, "pdf p", pg + 1, json.dumps(rep, ensure_ascii=False), flush=True)
     out = {k: out[k] for k in keys if k in out}  # סדר העמודים במסכת
-    print("boundary duplicates removed:", dedupe_boundaries(out, keys), "words")
+    print("boundary duplicates removed:", dedupe_boundaries(out, keys, ref_of=ref_lookup(shas, ws, keys, tractate)), "words")
     write_layouts(out_path, out)
     record_source(tractate, pdf, len(doc))
     print("→", out_path, len(out), "amudim")
