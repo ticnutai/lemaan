@@ -304,6 +304,16 @@ def anchor(lines, ref, bounds=None, ext=None):
             if abs(off[k] - st.median(nb)) <= 8:
                 keep.append(pr)
         pairs = keep
+    # זנב: התאמה אחרונה שקופצת קדימה בטקסט הרבה יותר ממה שה-OCR התקדם, אל מעבר לסוף העמוד
+    # (מילת קישור או הערה שהותאמה לראש העמוד הבא) — לא עוגן; אחרת כל מה שביניהן נדחס לשורה האחרונה
+    # (גם אשכול שלם: ביטוי שחוזר פעמיים ברצף — סוף העמוד וראש הבא — והשורה האחרונה הותאמה למופע השני)
+    m = len(pairs)
+    while m > 0 and pairs[m - 1][1] >= hi:
+        m -= 1
+    if 0 < m < len(pairs):
+        (ia, ja), (ib, jb) = pairs[m - 1], pairs[m]
+        if (jb - ja) - (ib - ia) > 6:
+            pairs = pairs[:m]
     if not pairs:
         return [[] for _ in lines], 0.0, None
     line_of = {}
@@ -346,7 +356,9 @@ def anchor(lines, ref, bounds=None, ext=None):
             li = max(0, bisect.bisect_right(starts, x) - 1)
             line_of[j] = min(max(li, flat[ia][0]), flat[ib][0])
     i1, j1 = pairs[-1]
-    for k in range(1, min(len(flat) - 1 - i1, len(ref) - 1 - j1) + 1):
+    # אחרי ההתאמה האחרונה: לא חורגים מסוף העמוד (אלא אם הדפוס עצמו כבר המשיך מעבר לו)
+    lim_ = (hi - 1 - j1) if j1 < hi else (len(ref) - 1 - j1)
+    for k in range(1, min(len(flat) - 1 - i1, lim_) + 1):
         line_of[j1 + k] = flat[i1 + k][0]
     out = [[] for _ in lines]
     for j in sorted(line_of):
@@ -712,7 +724,7 @@ def frame_of(p, W):
     return fL, fR, (best_[0] if best_ else 0), G, side, gem, head
 
 
-OVERRIDES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "overrides")
+OVERRIDES_DIR = os.environ.get("OVERRIDES_DIR") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "overrides")
 _ovr_cache = {}
 
 
@@ -1250,14 +1262,17 @@ def dedupe_boundaries(lays, keys, report=None):
                 for j, ln in enumerate(sl.get("lines", [])) for t in re.sub(r"<[^>]+>", " ", ln.get("t", "")).split() if HEB.search(t)]
     nrm = lambda t: fold(norm_token(re.sub(r"[\"'״׳.,:;()\[\]]", "", t)))
     total = 0
-    ks = [k for k in keys if k in lays and lays[k].get("slabs")]
+    # רק עמודים מהצינור הנוכחי (יש להם "src"); בפריסות ישנות המילה האחרונה היא מילת הקישור — נשארת
+    ks = [k for k in keys if k in lays and lays[k].get("slabs") and lays[k].get("src")]
     for a, b in zip(ks, ks[1:]):
         if keys.index(b) != keys.index(a) + 1:
             continue
         for s in ("gemara", "rashi", "tosafot"):
             A, B = words(lays[a], s), words(lays[b], s)
             An, Bn = [nrm(t) for _, _, t in A], [nrm(t) for _, _, t in B]
-            n = next((n for n in range(min(len(An), len(Bn), 80), 1, -1) if An[-n:] == Bn[:n]), 0)
+            n = next((n for n in range(min(len(An), len(Bn), 80), 0, -1) if An[-n:] == Bn[:n]), 0)
+            if n == 1 and len(An[-1]) < 3:  # מילה קצרה אחת ("לא", "על") יכולה לחזור באמת
+                n = 0
             if not n:
                 continue
             # מורידים מהשורות האחרונות של א, שורה אחר שורה

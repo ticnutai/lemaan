@@ -38,9 +38,9 @@ def shown(lay, stream):
     return [t for t in out if H.HEB.search(t)]
 
 
-def audit(tractate, only=None):
+def audit(tractate, only=None, path=None, save=True):
     slug = tractate.lower()
-    lays = json.loads(gzip.decompress(open(f"{H.ROOT}/tzurat/print/{slug}.json.gz", "rb").read()))
+    lays = json.loads(gzip.decompress(open(path or f"{H.ROOT}/tzurat/print/{slug}.json.gz", "rb").read()))
     shas = H.load(f"{H.ROOT}/shas/{tractate}.json.gz")
     ws = H.load(f"{H.ROOT}/shas-ws/{tractate}.json.gz")
     keys = [k for k in shas if k in lays and lays[k].get("src")]  # רק עמודים מהצינור הנוכחי
@@ -81,7 +81,10 @@ def audit(tractate, only=None):
                 seq = R[i1:i2]
                 k_ = Dk[min(j1, len(Dk) - 1)] if Dk else Rk[i1]
                 # הוזז: אותו רצף בדיוק מופיע כתוספת בעמוד זה או בסמוך
-                mv = next((n for n, (a, b, _) in enumerate(ins) if n not in used and D[a:b] == seq
+                # (התאמה מקורבת: מילה-שתיים בקצה הרצף יכולות להיות שונות — חלוקת המילים בין רצפים)
+                same = lambda x, y: x == y or (min(len(x), len(y)) >= 5 and
+                                               difflib.SequenceMatcher(None, x, y, autojunk=False).ratio() >= 0.9)
+                mv = next((n for n, (a, b, _) in enumerate(ins) if n not in used and same(D[a:b], seq)
                            and abs(allk.index(Dk[a]) - allk.index(Rk[i1])) <= 1), None)
                 if mv is not None:
                     used.add(mv)
@@ -98,6 +101,8 @@ def audit(tractate, only=None):
                              "extra_words": sum(i["n"] for i in issues if i["type"] != "missing")}
         for i in issues:
             res["pages"].setdefault(i["amud"], []).append(i)
+    if not save:
+        return res
     os.makedirs(os.path.join(OUT, slug), exist_ok=True)
     json.dump(res, open(os.path.join(OUT, slug, "audit.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     return res
