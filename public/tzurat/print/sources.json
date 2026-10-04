@@ -28,5 +28,11 @@
   "file": "שבת.pdf",
   "pages": 312,
   "sha256": "9ff2405d787a40a0a13bdb8d88647b04103aa439b78677cccd672ae098346eb1"
+ },
+ "taanit": {
+  "built": "2026-10-04",
+  "file": "תענית.pdf",
+  "pages": 59,
+  "sha256": "3b09cd4c305094ccd6e1d2ec69541741bd2f2db957232cbcb1942670a5efe384"
  }
 }

@@ -754,7 +754,10 @@ def frame_of(p, W):
     else:  # גיבוי: אחוזונים של קצוות עמודות המפרשים
         xs0 = sorted(w["x0"] for w in side if w["x0"] > 0.14 * PW)
         xs1 = sorted(w["x1"] for w in side if w["x1"] < 0.9 * PW)
-        fL, fR = xs0[int(0.02 * len(xs0))], xs1[int(0.98 * len(xs1)) - 1]
+        if xs0 and xs1:
+            fL, fR = xs0[int(0.02 * len(xs0))], xs1[int(0.98 * len(xs1)) - 1]
+        else:  # ה-OCR לא נתן גדלים שמזהים מפרשים (ברכות כד.) — ציון 0, והמסגרת תימדד מהתמונה
+            fL, fR = 0.17 * PW, 0.83 * PW
     return fL, fR, (best_[0] if best_ else 0), G, side, gem, head
 
 
