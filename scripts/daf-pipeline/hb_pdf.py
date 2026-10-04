@@ -239,7 +239,11 @@ def make_refs(shas, ws, keys, key, slug=None):
             ws_ = ws_commentary.page(he, k, c) if he else None
             if ws_:
                 return ws_
-            return clean_segments(next((x["segments"] for x in shas[k]["commentaries"] if x["key"] == c), []), he)
+            sef = clean_segments(next((x["segments"] for x in shas[k]["commentaries"] if x["key"] == c), []), he)
+            if sef:
+                return sef
+            # הוריות ט. והלאה: אין תוספות בדף — במקומם תוספות הרא"ש
+            return (ws_commentary.alt_tosafot(he, k) if c == "tosafot" and he else None) or []
         if k in src[c]:
             return src[c][k]
         # עמוד בודד שחסר באורייתא (בבא קמא עא. בתוספות): מוויקיטקסט, לא מספריא
