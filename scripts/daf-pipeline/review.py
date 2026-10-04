@@ -61,6 +61,7 @@ def ink_bbox(a):
 
 
 READY = 0.97  # סף "מוכן": אחוז ההתאמה לסריקה
+PUBLISH_MIN = 0.80  # מתחת לזה העמוד לא מתפרסם בדפוס מדויק
 
 
 GUTTER_TOL = 2.0  # נק' — סטייה מהרווח הקבוע בין העמודות (בדפוס: 14.3 נק' ± 0.4 ב-710 עמודים)
@@ -104,6 +105,7 @@ def main():
 
     # 1. בנייה מחדש של העמודים (עם נתוני השורות לסקירה)
     reports = {}
+    prev_lays = {a: lays[a] for a in amudim if a in lays}  # לשחזור עמוד שנבנה גרוע (PUBLISH_MIN)
     for a in amudim:
         try:
             lay, rep = H.build_page(doc[first - 1 + keys.index(a)], a, H.make_refs(shas, ws, keys, a, tractate), tractate=tractate)
@@ -219,6 +221,24 @@ def main():
         print(a, "match", q and q["match"], "| lines", len(rows), "| flagged", len(flagged), "| size", size, flush=True)
         os.remove(os.path.join(out, f"o-{a}.png"))
     data["pages"] = {k: data["pages"][k] for k in keys if k in data["pages"]}
+    # עמוד שנבנה עכשיו בהתאמה נמוכה מ-PUBLISH_MIN לא מתפרסם בדפוס מדויק: חוזרת הפריסה הקודמת
+    # שלו, ואם לא הייתה — העמוד יוצג בתצוגה הרגילה של צורת הדף (עדיף על פריסה שבורה)
+    held = []
+    for a in amudim:
+        pg_ = data["pages"].get(a)
+        if pg_ and (pg_.get("match") or 0) < PUBLISH_MIN:
+            held.append(a)
+            pg_["held"] = True
+            if a in prev_lays:
+                lays[a] = prev_lays[a]
+            else:
+                lays.pop(a, None)
+        elif pg_:
+            pg_.pop("held", None)
+    if held:
+        H.write_layouts(path, {k: lays[k] for k in keys if k in lays})
+        H.update_index()
+        print(f"held back (match < {PUBLISH_MIN:.0%}):", ",".join(held), flush=True)
     data["pdf"] = os.path.abspath(pdf)  # לבנייה מחדש מתוך כלי הסקירה
     # 5. בדיקת שלמות (audit.py) וסטטוס לכל עמוד: "מוכן" = התאמה ≥ READY ובלי מילים חסרות/כפולות
     import audit as AU
@@ -239,6 +259,19 @@ def main():
         st_[pg_["status"]] = st_.get(pg_["status"], 0) + 1
     data["status"] = {"ready_threshold": READY, "counts": st_, "audit": au["streams"]}
     print("status:", st_, "| audit:", {k: (v["missing_words"], v["extra_words"]) for k, v in au["streams"].items()})
+    # חיסכון במקום (REVIEW_LEAN=1): תמונות נשמרות רק לעמודים "לבדיקה" — עמוד "מוכן" לא צריך עין
+    if os.environ.get("REVIEW_LEAN") == "1":
+        for k in amudim:
+            pg_ = data["pages"].get(k)
+            if pg_ and pg_["status"] == "ready":
+                for kind in ("scan", "ours", "diff"):
+                    try:
+                        os.remove(os.path.join(out, f"{k}-{kind}.png"))
+                    except OSError:
+                        pass
+                pg_["noimg"] = True
+            elif pg_:
+                pg_.pop("noimg", None)
     json.dump(data, open(data_path, "w", encoding="utf-8"), ensure_ascii=False)
     print("→", out)
 

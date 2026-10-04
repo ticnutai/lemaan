@@ -216,12 +216,16 @@ def make_refs(shas, ws, keys, key, slug=None):
     src = {c: (orayta.load(he, c) if he else None) for c in ("rashi", "tosafot")}
     for c, d in src.items():
         if d is None and not _WARNED.get((slug, c)):
-            print(f"!! {slug} {c}: no Orayta text, falling back to Sefaria", flush=True)
+            print(f"!! {slug} {c}: no Orayta text, using Wikisource per amud (Sefaria only if Wikisource lacks it)", flush=True)
             _WARNED[(slug, c)] = True
     import ws_commentary
 
     def com(k, c):
         if src[c] is None:
+            # אין קובץ באורייתא למסכת (הוריות — תוספות): ויקיטקסט עמוד-עמוד; ספריא רק אם גם שם אין
+            ws_ = ws_commentary.page(he, k, c) if he else None
+            if ws_:
+                return ws_
             return clean_segments(next((x["segments"] for x in shas[k]["commentaries"] if x["key"] == c), []), he)
         if k in src[c]:
             return src[c][k]

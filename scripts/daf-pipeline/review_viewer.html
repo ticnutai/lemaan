@@ -160,6 +160,10 @@ function figure(kind, label) {
 function renderStage() {
   clearInterval(blinkT);
   const st = $("#stage");
+  if (DATA.pages[AM].noimg) { // עמוד "מוכן" שנבנה במצב חיסכון — בלי תמונות
+    st.innerHTML = `<div class="card" style="margin:20px">העמוד <b>מוכן</b> (התאמה ${(DATA.pages[AM].match * 100).toFixed(1)}%). כדי לחסוך מקום בדיסק לא נשמרו לו תמונות. <button class="btn" onclick="rebuild()">בנה מחדש עם תמונות</button></div>`;
+    return;
+  }
   $("#legend").hidden = mode !== "diff";
   if (mode === "side") st.innerHTML = `<div class="pair">${figure("ours", "הדף שלנו (טקסט חי)")}${figure("scan", "הסריקה (הדפוס)")}</div>`;
   else if (mode === "diff") st.innerHTML = `<div class="pair">${figure("diff", "שכבות: שחור = זהה, אדום = רק בדפוס, כחול = רק אצלנו")}</div>`;
