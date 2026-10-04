@@ -53,6 +53,12 @@
   "pages": 61,
   "sha256": "a8fee881216bca228ac955f2660c2e0864b91687ea3b335106e59d8233e1aa99"
  },
+ "sanhedrin": {
+  "built": "2026-10-05",
+  "file": "סנהדרין.pdf",
+  "pages": 224,
+  "sha256": "71750f8982c04395f3dedb1c02bd7e0af9063a70e96479d09f0414f5f7049bdc"
+ },
  "shabbat": {
   "built": "2026-10-04",
   "file": "שבת.pdf",
