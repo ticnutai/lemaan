@@ -1,9 +1,21 @@
 {
+ "bava_batra": {
+  "built": "2026-10-04",
+  "file": "בבא בתרא.pdf",
+  "pages": 350,
+  "sha256": "4670723a9605b93f03bd31598db99c48a8a42f8abeb1f70679c4e53b39142077"
+ },
  "bava_kamma": {
   "built": "2026-10-04",
   "file": "בבא קמא.pdf",
   "pages": 236,
   "sha256": "a5dd73812ef4705c8e755a23ec119ee8f79b5cb5163ea1a92f5db1345fa14d94"
+ },
+ "bava_metzia": {
+  "built": "2026-10-04",
+  "file": "בבא מציעא.pdf",
+  "pages": 235,
+  "sha256": "c5e36d9495c4fc7fd03729671f26d4ba39137774b94cc7fa4b7423c565b2a28f"
  },
  "berakhot": {
   "built": "2026-10-04",
@@ -22,6 +34,12 @@
   "file": "קידושין.pdf",
   "pages": 162,
   "sha256": "092ac0a9a72d354405c9f7f8995a5e8681b24f86483ce153c60150cc7a248b5e"
+ },
+ "makkot": {
+  "built": "2026-10-04",
+  "file": "מכות.pdf",
+  "pages": 46,
+  "sha256": "e6d24d1befab390498a9119c55177a9b1179d6996d36ad18a0e55a14b8d37f1b"
  },
  "megillah": {
   "built": "2026-10-04",

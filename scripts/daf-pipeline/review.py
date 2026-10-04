@@ -62,6 +62,8 @@ def ink_bbox(a):
 
 READY = 0.97  # סף "מוכן": אחוז ההתאמה לסריקה
 PUBLISH_MIN = 0.80  # מתחת לזה העמוד לא מתפרסם בדפוס מדויק
+HB_MIN = 0.85  # מתחת לזה — שבירות השורה שונות מהדפוס לפי היברובוקס → לבדיקה
+REGRESS_TOL = 0.005  # ירידה גדולה מזו לעומת הבנייה הקודמת = נסיגה → נשארת הפריסה הקודמת
 
 
 GUTTER_TOL = 2.0  # נק' — סטייה מהרווח הקבוע בין העמודות (בדפוס: 14.3 נק' ± 0.4 ב-710 עמודים)
@@ -96,7 +98,7 @@ def main():
     out = sys.argv[4] if len(sys.argv) > 4 else os.path.join(DEFAULT_OUT, tractate.lower())
     os.makedirs(out, exist_ok=True)
     shas = H.load(f"{H.ROOT}/shas/{tractate}.json.gz")
-    ws = H.load(f"{H.ROOT}/shas-ws/{tractate}.json.gz")
+    ws = H.load_ws(tractate)
     keys = list(shas)
     doc = fitz.open(pdf)
     first = H.first_page_of(doc, tractate)
@@ -214,7 +216,8 @@ def main():
             q = qa_scan.compare(pg, lay, os.path.join(out, f"o-{a}.png"))
         except Exception as e:
             print(a, "qa failed:", repr(e))
-        data["pages"][a] = {"pdf_page": first + keys.index(a), "size": size, "edges": edges, "rows": rows,
+        prev_match = (data["pages"].get(a) or {}).get("match")
+        data["pages"][a] = {"prev_match": prev_match, "pdf_page": first + keys.index(a), "size": size, "edges": edges, "rows": rows,
                             "flagged": len(flagged), "readable": sum(1 for r in rows if r["readable"]),
                             "match": q and q["match"], "img": [scan.width, scan.height],
                             "cover": {k: rep[k]["cover"] for k in ("gemara", "rashi", "tosafot") if k in rep}}
@@ -224,8 +227,18 @@ def main():
     # עמוד שנבנה עכשיו בהתאמה נמוכה מ-PUBLISH_MIN לא מתפרסם בדפוס מדויק: חוזרת הפריסה הקודמת
     # שלו, ואם לא הייתה — העמוד יוצג בתצוגה הרגילה של צורת הדף (עדיף על פריסה שבורה)
     held = []
+    kept = []
     for a in amudim:
         pg_ = data["pages"].get(a)
+        # מניעת נסיגה: עמוד שנבנה עכשיו גרוע מהבנייה הקודמת שלו — חוזרת הפריסה הקודמת
+        pm = pg_.get("prev_match") if pg_ else None
+        if pg_ and pm is not None and a in prev_lays and (pg_.get("match") or 0) < pm - REGRESS_TOL:
+            kept.append(f"{a} ({pm:.3f}→{pg_['match']:.3f})")
+            lays[a] = prev_lays[a]
+            pg_["kept_previous"] = True
+            continue
+        if pg_:
+            pg_.pop("kept_previous", None)
         if pg_ and (pg_.get("match") or 0) < PUBLISH_MIN:
             held.append(a)
             pg_["held"] = True
@@ -235,14 +248,39 @@ def main():
                 lays.pop(a, None)
         elif pg_:
             pg_.pop("held", None)
-    if held:
+    if held or kept:
         H.write_layouts(path, {k: lays[k] for k in keys if k in lays})
         H.update_index()
+    if held:
         print(f"held back (match < {PUBLISH_MIN:.0%}):", ",".join(held), flush=True)
+    if kept:
+        print("regression - previous layout kept:", ", ".join(kept), flush=True)
     data["pdf"] = os.path.abspath(pdf)  # לבנייה מחדש מתוך כלי הסקירה
     # 5. בדיקת שלמות (audit.py) וסטטוס לכל עמוד: "מוכן" = התאמה ≥ READY ובלי מילים חסרות/כפולות
     import audit as AU
     au = AU.audit(tractate)
+    # בדיקה צולבת מול היברובוקס (שבירות שורה בגמרא וברש"י, בלתי תלויה ב-OCR): רק מסמנת
+    if os.environ.get("HB_CHECK", "1") == "1":
+        import hb_check as HB
+        from align import norm_token, fold
+        nrm = lambda w: fold(norm_token(w))
+        mno = next((m["key"] for m in json.load(open(f"{H.ROOT}/shas/index.json", encoding="utf-8"))["masechtot"] if m["slug"] == tractate), None)
+        for a in amudim:
+            pg_ = data["pages"].get(a)
+            if not pg_ or a not in lays or mno is None:
+                continue
+            try:
+                theirs = HB.hb_lines(mno, tractate.lower(), a)
+            except Exception:
+                theirs = None
+            if not theirs:
+                continue
+            res = {}
+            for s_ in ("gemara", "rashi"):
+                ours = [re.sub(r"<[^>]+>", " ", ln["t"]) for sl in lays[a]["slabs"] if sl.get("s") == s_ for ln in sl.get("lines", [])]
+                if theirs.get(s_):
+                    res[s_] = HB.agreement(ours, theirs[s_], nrm)
+            pg_["hb"] = res
     # בדיקת חריגות (רק מסמנת, לא משנה את הדף): רווח בין עמודות שרחוק מהרווח הטיפוסי של המסכת
     import statistics as st
     gut = {k: gutters_of(pg_) for k, pg_ in data["pages"].items()}
@@ -253,6 +291,9 @@ def main():
         pg_["gutters"] = gut[k]
         pg_["flags"] = [f"רווח {'שמאלי' if i == 0 else 'ימני'} בין העמודות {v} נק' (בדרך כלל {typical:.1f})"
                         for i, v in enumerate(gut[k] or ()) if v is not None and abs(v - typical) > GUTTER_TOL]
+        for s_, v in (pg_.get("hb") or {}).items():
+            if v is not None and v < HB_MIN:
+                pg_["flags"].append(f"שבירות שורה ב{'גמרא' if s_ == 'gemara' else 'רש״י'}: {v:.0%} תואמות להיברובוקס")
         pg_["status"] = status_of(pg_)
     st_ = {}
     for pg_ in data["pages"].values():

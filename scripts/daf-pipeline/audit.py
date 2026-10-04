@@ -54,7 +54,7 @@ def audit(tractate, only=None, path=None, save=True):
     slug = tractate.lower()
     lays = json.loads(gzip.decompress(open(path or f"{H.ROOT}/tzurat/print/{slug}.json.gz", "rb").read()))
     shas = H.load(f"{H.ROOT}/shas/{tractate}.json.gz")
-    ws = H.load(f"{H.ROOT}/shas-ws/{tractate}.json.gz")
+    ws = H.load_ws(tractate)
     keys = [k for k in shas if k in lays and lays[k].get("src")]  # רק עמודים מהצינור הנוכחי
     if only:
         keys = [k for k in keys if k in only]
@@ -138,7 +138,7 @@ if __name__ == "__main__":
         path = f"{H.ROOT}/tzurat/print/{t.lower()}.json.gz"
         lays = json.loads(gzip.decompress(open(path, "rb").read()))
         rep = []
-        shas_, ws_ = H.load(f"{H.ROOT}/shas/{t}.json.gz"), H.load(f"{H.ROOT}/shas-ws/{t}.json.gz")
+        shas_, ws_ = H.load(f"{H.ROOT}/shas/{t}.json.gz"), H.load_ws(t)
         n = H.dedupe_boundaries(lays, list(shas_), rep, ref_of=H.ref_lookup(shas_, ws_, list(shas_), t))
         H.write_layouts(path, lays)
         print("fix: removed", n, "duplicated words:", rep)

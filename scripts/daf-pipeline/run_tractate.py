@@ -47,6 +47,9 @@ def ensure_sources(m):
     if not os.path.exists(ws):
         print("   fetching gemara text (Wikisource) …", flush=True)
         subprocess.run([sys.executable, "-X", "utf8", os.path.join(HERE, "fetch_ws.py"), m["slug"]], check=True)
+    if not os.path.exists(f"{H.ROOT}/shas-wsraw/{m['slug']}.json.gz"):
+        print("   fetching gemara text (Wikisource daf pages, printed forms) …", flush=True)
+        subprocess.run([sys.executable, "-X", "utf8", os.path.join(HERE, "fetch_ws_raw.py"), m["slug"]], check=False)
     import orayta
     for c in ("rashi", "tosafot"):
         d = orayta.load(m["he"], c)
@@ -71,7 +74,7 @@ def run_one(slug, args):
         r = subprocess.run([sys.executable, "-X", "utf8", os.path.join(HERE, "review.py"), pdf, slug, ",".join(part)],
                            capture_output=True, text=True, encoding="utf-8", errors="replace", env=env)
         for line in (r.stdout + r.stderr).splitlines():
-            if any(x in line for x in ("FAILED", "status:", "Traceback", "Error", "!!", "held back")):
+            if any(x in line for x in ("FAILED", "status:", "Traceback", "Error", "!!", "held back", "regression")):
                 print("     ", line[:220], flush=True)
         if r.returncode:
             print(f"      part {i} exited with {r.returncode}", flush=True)

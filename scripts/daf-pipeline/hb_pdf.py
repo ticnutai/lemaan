@@ -171,6 +171,19 @@ def gem_tokens(segs):
     return [t for t in NIKUD.sub("", TAGS.sub(" ", " ".join(segs))).split() if HEB.search(t)]
 
 
+def load_ws(tractate):
+    """נוסח הגמרא: דפי ויקיטקסט עצמם (shas-wsraw — הצורה המודפסת של שמות וראשי תיבות) כשקיימים,
+    ולכל עמוד שחסר בהם — התעתיק דרך ספריא (shas-ws)."""
+    out = {}
+    p_old = f"{ROOT}/shas-ws/{tractate}.json.gz"
+    p_raw = f"{ROOT}/shas-wsraw/{tractate}.json.gz"
+    if os.path.exists(p_old):
+        out.update(load(p_old))
+    if os.path.exists(p_raw) and os.environ.get("WS_SOURCE", "raw") == "raw":
+        out.update(load(p_raw))
+    return out
+
+
 def window(tokens_of, keys, key, before=60, after=90):
     """הטקסט של העמוד + זנב הקודם + ראש הבא (גלישה בין עמודים)."""
     i = keys.index(key)
@@ -1392,7 +1405,7 @@ def write_layouts(path, layouts):
 
 def main(pdf, tractate, first_page, only=None):
     shas = load(f"{ROOT}/shas/{tractate}.json.gz")
-    ws = load(f"{ROOT}/shas-ws/{tractate}.json.gz")
+    ws = load_ws(tractate)
     keys = list(shas.keys())
     doc = fitz.open(pdf)
     out_path = f"{ROOT}/tzurat/print/{tractate.lower()}.json.gz"
