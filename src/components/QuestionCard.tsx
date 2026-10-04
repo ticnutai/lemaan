@@ -70,18 +70,25 @@ export default function QuestionCard({ card, revealed, selected, onSelect, bread
                 className={cn(
                   "w-full text-right rounded-lg border bg-card px-3 py-3 transition-colors flex items-center gap-3 shadow-sm",
                   !revealed && "hover:bg-secondary hover:border-gold",
-                  revealed && isCorrect && "border-gold bg-gold/15 font-medium",
-                  revealed && isSelected && !isCorrect && "border-destructive bg-destructive/10",
+                  // אחרי בחירה — כמו במקור: הנכונה בירוק עם ✓, הבחירה השגויה באדום עם ✗, השאר מעומעמות
+                  revealed && isCorrect && "border-2 border-green-500 bg-green-50 dark:bg-green-500/15 font-medium",
+                  revealed && isSelected && !isCorrect && "border-2 border-red-500 bg-red-50 dark:bg-red-500/15",
                   revealed && !isSelected && !isCorrect && "opacity-60"
                 )}
                 style={{ fontSize: `${0.875 * fontScale}rem` }}
+                data-result={revealed ? (isCorrect ? "correct" : isSelected ? "wrong" : undefined) : undefined}
               >
-                <span className="h-7 w-7 shrink-0 rounded-md bg-gradient-navy text-primary-foreground text-sm font-bold flex items-center justify-center">
+                <span
+                  className={cn(
+                    "h-7 w-7 shrink-0 rounded-md text-sm font-bold flex items-center justify-center text-white",
+                    revealed && isCorrect ? "bg-green-600" : revealed && isSelected ? "bg-red-600" : "bg-gradient-navy text-primary-foreground"
+                  )}
+                >
                   {OPTION_LETTERS[i] ?? i + 1}
                 </span>
                 <span className="flex-1 leading-snug">{option}</span>
-                {revealed && isCorrect && <Check className="h-4 w-4 shrink-0 text-gold" />}
-                {revealed && isSelected && !isCorrect && <X className="h-4 w-4 shrink-0 text-destructive" />}
+                {revealed && isCorrect && <Check className="h-5 w-5 shrink-0 text-green-600" aria-label="תשובה נכונה" />}
+                {revealed && isSelected && !isCorrect && <X className="h-5 w-5 shrink-0 text-red-600" aria-label="תשובה שגויה" />}
               </button>
             );
           })}

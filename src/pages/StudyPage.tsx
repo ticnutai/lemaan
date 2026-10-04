@@ -164,7 +164,10 @@ export default function StudyPage() {
     shownAt.current = Date.now();
   }, [index]);
 
+  const advanceTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(advanceTimer.current), []);
   const grade = async (quality: 0 | 1 | 2 | 3 | 4 | 5) => {
+    window.clearTimeout(advanceTimer.current); // לחיצה על "הבא" בזמן הסימון — בלי ציון כפול
     if (!current) return;
     const correct = quality >= 3;
     const srs = applyReview(current, quality, algorithm ?? "sm2");
@@ -189,15 +192,15 @@ export default function StudyPage() {
     setIndex((i) => i + 1);
   };
 
-  /** בחירת אפשרות: במצב "מיידי" עוברים ישר לשאלה הבאה, כמו במקור. */
-  const selectOption = async (i: number) => {
-    if (!current) return;
+  /** בחירת אפשרות: מסמנים מיד נכון (ירוק ✓) / שגוי (אדום ✗) כמו במקור; במצב "מיידי" עוברים
+   *  לשאלה הבאה אחרי הצצה קצרה בסימון (שגיאה מוצגת זמן ארוך יותר, כדי לראות את התשובה הנכונה). */
+  const selectOption = (i: number) => {
+    if (!current || revealed) return;
+    setSelected(i);
+    setRevealed(true);
     if (instant) {
       const ok = isSelectionCorrect(current, i);
-      await grade(ok ? 4 : 0);
-    } else {
-      setSelected(i);
-      setRevealed(true);
+      advanceTimer.current = window.setTimeout(() => { void grade(ok ? 4 : 0); }, ok ? 900 : 1800);
     }
   };
 
