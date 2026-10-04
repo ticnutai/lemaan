@@ -76,5 +76,11 @@
   "file": "תענית.pdf",
   "pages": 59,
   "sha256": "3b09cd4c305094ccd6e1d2ec69541741bd2f2db957232cbcb1942670a5efe384"
+ },
+ "yevamot": {
+  "built": "2026-10-05",
+  "file": "יבמות.pdf",
+  "pages": 242,
+  "sha256": "97fe3a7efdbf2f7b51b39c012b67f976e5ac6799b0444d025e19fb639153b5be"
  }
 }
