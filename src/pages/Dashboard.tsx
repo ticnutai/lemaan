@@ -33,7 +33,17 @@ export default function Dashboard() {
   const [importError, setImportError] = useState<string | null>(null);
 
   const totalCards = useLiveQuery(() => db.cards.count(), []);
-  const dueCount = useLiveQuery(() => db.cards.where("srs.dueAt").belowOrEqual(Date.now()).count(), []);
+  // "ממתינות לחזרה" = שאלות שכבר תורגלו והגיע זמן החזרה שלהן; שאלה שעוד לא תורגלה היא "חדשה"
+  // (גם לה dueAt בעבר — מיום הייבוא — ולכן הספירה הישנה הראתה את כל המאגר כממתין)
+  const queueCounts = useLiveQuery(async () => {
+    let due = 0, fresh = 0;
+    await db.cards.where("srs.dueAt").belowOrEqual(Date.now()).each((c) => {
+      if (c.srs.lastReviewedAt == null) fresh++; else due++;
+    });
+    return { due, fresh };
+  }, []);
+  const dueCount = queueCounts?.due;
+  const newCount = queueCounts?.fresh;
   const todayLogs = useLiveQuery(() => db.reviewLogs.where("at").aboveOrEqual(startOfDay(Date.now())).toArray(), []);
   const logDays = useLiveQuery(async () => {
     const all = await db.reviewLogs.toArray();
@@ -63,7 +73,7 @@ export default function Dashboard() {
 
   const stats = [
     { label: "שאלות במאגר", value: totalCards ?? "…", icon: Library, gold: false },
-    { label: "ממתינות לחזרה", value: dueCount ?? "…", icon: CalendarClock, gold: true },
+    { label: "ממתינות לחזרה", value: dueCount ?? "…", icon: CalendarClock, gold: true, sub: newCount ? `${newCount.toLocaleString()} חדשות שעוד לא תורגלו` : undefined },
     { label: "חזרות היום", value: todayLogs?.length ?? "…", icon: CheckCircle2, gold: false },
     { label: "רצף ימים", value: streak, icon: Flame, gold: true },
   ];
@@ -82,7 +92,7 @@ export default function Dashboard() {
       <TodayCard />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map(({ label, value, icon: Icon, gold }) => (
+        {stats.map(({ label, value, icon: Icon, gold, sub }) => (
           <div key={label} className="card-panel flex items-center gap-4">
             <div className={`h-11 w-11 rounded-full flex items-center justify-center ${gold ? "bg-gradient-gold shadow-gold" : "bg-gradient-navy"}`}>
               <Icon className={`h-5 w-5 ${gold ? "text-navy" : "text-primary-foreground"}`} />
@@ -90,6 +100,7 @@ export default function Dashboard() {
             <div>
               <div className="text-2xl font-bold">{value}</div>
               <div className="text-xs text-muted-foreground">{label}</div>
+              {sub && <div className="text-[11px] text-muted-foreground/80" data-testid="new-count">{sub}</div>}
             </div>
           </div>
         ))}
@@ -117,7 +128,11 @@ export default function Dashboard() {
         <div>
           <h3 className="font-display text-xl font-bold">חזרה יומית</h3>
           <p className="text-sm opacity-80 mt-1">
-            {dueCount ? `${dueCount} שאלות ממתינות לך` : "אין שאלות ממתינות — כל הכבוד!"}
+            {dueCount
+              ? `${dueCount.toLocaleString()} שאלות ממתינות לחזרה`
+              : newCount
+                ? `אין שאלות לחזרה כרגע · ${newCount.toLocaleString()} שאלות חדשות מחכות לתרגול ראשון`
+                : "אין שאלות ממתינות — כל הכבוד!"}
             {todayLogs?.length ? ` · ענית נכון על ${todayCorrect} מתוך ${todayLogs.length} היום` : ""}
           </p>
         </div>
