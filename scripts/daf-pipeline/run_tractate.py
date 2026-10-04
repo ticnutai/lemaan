@@ -5,7 +5,7 @@
 תישמר גם אם משהו נעצר באמצע. במצב חיסכון (ברירת מחדל) נשמרות תמונות רק לעמודים "לבדיקה".
 
 שימוש:
-  python run_tractate.py <Tractate> [--pdf path] [--chunk 80] [--skip 8a,8b] [--images]
+  python run_tractate.py <Tractate> [--pdf path] [--chunk 80] [--skip 8a,8b] [--only 2a,2b] [--images]
   python run_tractate.py Bava_Metzia Bava_Batra Sanhedrin        (כמה מסכתות ברצף)
 """
 import sys, os, subprocess, time, json, urllib.request, urllib.parse
@@ -63,7 +63,8 @@ def run_one(slug, args):
     print(f"=== {slug} ({m['he']}, {m['amud_count']} amudim) {time.strftime('%H:%M:%S')}", flush=True)
     pdf = args[args.index("--pdf") + 1] if "--pdf" in args else ensure_pdf(m)
     ensure_sources(m)
-    keys = [k for k in H.load(f"{H.ROOT}/shas/{slug}.json.gz") if k not in skip]
+    only = set(args[args.index("--only") + 1].split(",")) if "--only" in args else None
+    keys = [k for k in H.load(f"{H.ROOT}/shas/{slug}.json.gz") if k not in skip and (only is None or k in only)]
     parts = [keys[i:i + chunk] for i in range(0, len(keys), chunk)]
     env = dict(os.environ)
     if "--images" not in args:
@@ -74,7 +75,7 @@ def run_one(slug, args):
         r = subprocess.run([sys.executable, "-X", "utf8", os.path.join(HERE, "review.py"), pdf, slug, ",".join(part)],
                            capture_output=True, text=True, encoding="utf-8", errors="replace", env=env)
         for line in (r.stdout + r.stderr).splitlines():
-            if any(x in line for x in ("FAILED", "status:", "Traceback", "Error", "!!", "held back", "regression")):
+            if any(x in line for x in ("FAILED", "status:", "Traceback", "Error", "!!", "held back", "regression", "not photographed")):
                 print("     ", line[:220], flush=True)
         if r.returncode:
             print(f"      part {i} exited with {r.returncode}", flush=True)
@@ -83,7 +84,7 @@ def run_one(slug, args):
 
 def main():
     args = sys.argv[1:]
-    flags_with_value = {"--pdf", "--chunk", "--skip"}
+    flags_with_value = {"--pdf", "--chunk", "--skip", "--only"}
     slugs, i = [], 0
     while i < len(args):
         if args[i] in flags_with_value:

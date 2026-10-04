@@ -1,4 +1,10 @@
 {
+ "avodah_zarah": {
+  "built": "2026-10-04",
+  "file": "עבודה זרה.pdf",
+  "pages": 150,
+  "sha256": "fe5d81e6fb1edb92c1f88008d76967cbe645468ba7d6cde15fa44f30e1c33ac2"
+ },
  "bava_batra": {
   "built": "2026-10-04",
   "file": "בבא בתרא.pdf",
@@ -52,6 +58,12 @@
   "file": "שבת.pdf",
   "pages": 312,
   "sha256": "9ff2405d787a40a0a13bdb8d88647b04103aa439b78677cccd672ae098346eb1"
+ },
+ "shevuot": {
+  "built": "2026-10-04",
+  "file": "שבועות.pdf",
+  "pages": 96,
+  "sha256": "6b22c12f959790efa8dd33e399a9368d1af9cb66a5627d9fbc003abd09e240a8"
  },
  "taanit": {
   "built": "2026-10-04",

@@ -125,6 +125,11 @@ def main():
 
     # 2. צילום הדף שלנו מהאפליקציה
     subprocess.run(["node", os.path.join(HERE, "shot.mjs"), tractate, out, ",".join(amudim)], check=True)
+    # עמוד שלא צולם (נתקע בטעינה) לא נבדק — לא מתפרסם בבנייה החדשה; חוזרת הפריסה הקודמת שלו
+    unshot = [a for a in amudim if not os.path.exists(os.path.join(out, f"o-{a}.png"))]
+    if unshot:
+        print("not photographed - previous layout kept:", ",".join(unshot), flush=True)
+    amudim = [a for a in amudim if a not in unshot]
 
     data_path = os.path.join(out, "data.json")
     data = json.load(open(data_path, encoding="utf-8")) if os.path.exists(data_path) else {"tractate": tractate, "pages": {}}
@@ -228,6 +233,11 @@ def main():
     # שלו, ואם לא הייתה — העמוד יוצג בתצוגה הרגילה של צורת הדף (עדיף על פריסה שבורה)
     held = []
     kept = []
+    for a in unshot:
+        if a in prev_lays:
+            lays[a] = prev_lays[a]
+        else:
+            lays.pop(a, None)
     for a in amudim:
         pg_ = data["pages"].get(a)
         # מניעת נסיגה: עמוד שנבנה עכשיו גרוע מהבנייה הקודמת שלו — חוזרת הפריסה הקודמת
@@ -248,7 +258,7 @@ def main():
                 lays.pop(a, None)
         elif pg_:
             pg_.pop("held", None)
-    if held or kept:
+    if held or kept or unshot:
         H.write_layouts(path, {k: lays[k] for k in keys if k in lays})
         H.update_index()
     if held:
