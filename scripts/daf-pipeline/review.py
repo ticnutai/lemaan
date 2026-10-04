@@ -221,7 +221,10 @@ def main():
             q = qa_scan.compare(pg, lay, os.path.join(out, f"o-{a}.png"))
         except Exception as e:
             print(a, "qa failed:", repr(e))
-        prev_match = (data["pages"].get(a) or {}).get("match")
+        # הציון של הפריסה שמפורסמת עכשיו (לא של הבנייה האחרונה — היא אולי לא פורסמה)
+        old = data["pages"].get(a) or {}
+        prev_match = old["pub_match"] if "pub_match" in old else (
+            old.get("prev_match") if (old.get("kept_previous") or old.get("held")) else old.get("match"))
         data["pages"][a] = {"prev_match": prev_match, "pdf_page": first + keys.index(a), "size": size, "edges": edges, "rows": rows,
                             "flagged": len(flagged), "readable": sum(1 for r in rows if r["readable"]),
                             "match": q and q["match"], "img": [scan.width, scan.height],
@@ -246,6 +249,7 @@ def main():
             kept.append(f"{a} ({pm:.3f}→{pg_['match']:.3f})")
             lays[a] = prev_lays[a]
             pg_["kept_previous"] = True
+            pg_["pub_match"] = pm
             continue
         if pg_:
             pg_.pop("kept_previous", None)
@@ -254,10 +258,13 @@ def main():
             pg_["held"] = True
             if a in prev_lays:
                 lays[a] = prev_lays[a]
+                pg_["pub_match"] = pm
             else:
                 lays.pop(a, None)
+                pg_["pub_match"] = None
         elif pg_:
             pg_.pop("held", None)
+            pg_["pub_match"] = pg_.get("match")
     if held or kept or unshot:
         H.write_layouts(path, {k: lays[k] for k in keys if k in lays})
         H.update_index()
