@@ -159,6 +159,35 @@ export default function StudyPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, categories, allCards]);
 
+  // כניסה מתוכנית לימוד: /study?m=<מסכת>&daf=<n>[&amud=1|2] — עמוד/דף אחד;
+  // /study?m=<מסכת>&from=<n>&to=<n>&due=1 — "חזרה מהירה": השאלות שהגיע זמנן בטווח שנלמד
+  const linkStarted = useRef(false);
+  useEffect(() => {
+    const m = searchParams.get("m");
+    if (!m || linkStarted.current) return;
+    linkStarted.current = true;
+    (async () => {
+      const one = searchParams.get("daf");
+      const from = parseInt(searchParams.get("from") ?? one ?? "", 10);
+      const to = parseInt(searchParams.get("to") ?? one ?? "", 10);
+      const amud = searchParams.get("amud") as "1" | "2" | null;
+      const dueOnly = searchParams.get("due") === "1";
+      const all = await db.cards.where("masechta").equals(m).toArray();
+      const inRange = all.filter((c) => {
+        const n = parseInt(c.daf ?? "", 10);
+        return Number.isFinite(n) && n >= from && n <= to && (!amud || c.amud == null || c.amud === amud);
+      });
+      const now = Date.now();
+      const due = inRange.filter((c) => c.srs.lastReviewedAt != null && c.srs.dueAt <= now);
+      const range = from <= 2 && to >= 500 ? "" // כל המסכת
+        : from === to ? `דף ${hebrewDaf(from)}${amud ? ` · ${AMUD_LABELS[amud]}` : ""}` : `דפים ${hebrewDaf(from)}–${hebrewDaf(to)}`;
+      if (dueOnly && due.length) beginSession(due, `חזרה מהירה: ${m} ${range}`.trim());
+      else beginSession(inRange, `${m} ${range}`.trim());
+      setSearchParams({}, { replace: true });
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
   const current = queue?.[index];
   useEffect(() => {
     shownAt.current = Date.now();

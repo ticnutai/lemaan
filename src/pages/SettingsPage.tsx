@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { AlertTriangle, Brain, Cloud, CloudDownload, CloudUpload, Copy, Download, Settings, Upload } from "lucide-react";
+import { AlertTriangle, Brain, Cloud, CloudDownload, CloudUpload, Copy, Download, Heart, Settings, Upload } from "lucide-react";
 import { db, setSetting } from "../db";
 import { getSyncCode, pullSnapshot, pushSnapshot } from "../db/sync";
 import PageBanner from "../components/PageBanner";
@@ -14,6 +14,8 @@ export default function SettingsPage() {
   const [syncMsg, setSyncMsg] = useState("");
   const algorithm = useLiveQuery(async () => ((await db.settings.get("srs-algo"))?.value ?? "sm2") as SrsAlgorithm, []);
   const syncCode = useLiveQuery(async () => (await db.settings.get("sync-code"))?.value as string | undefined, []);
+  const dedication = useLiveQuery(async () => (await db.settings.get("dedication"))?.value ?? "", []);
+  const [dedDraft, setDedDraft] = useState<string | null>(null);
 
   const doPush = async () => {
     setBusy(true);
@@ -106,6 +108,17 @@ export default function SettingsPage() {
       <AccountSection />
 
       <ThemeStudio />
+
+      <div className="card-panel space-y-3">
+        <h3 className="font-semibold flex items-center gap-2"><Heart className="h-4 w-4 text-gold" /> הקדשה</h3>
+        <p className="text-xs text-muted-foreground">שורה שתופיע בעמוד הבית מתחת לכותרת. השאירו ריק כדי לא להציג.</p>
+        <div className="flex gap-2">
+          <input className="input flex-1" placeholder='למשל: לעילוי נשמת…' aria-label="טקסט ההקדשה"
+            value={dedDraft ?? dedication ?? ""} onChange={(e) => setDedDraft(e.target.value)} />
+          <button className="btn-primary" disabled={dedDraft === null || dedDraft === dedication}
+            onClick={async () => { await setSetting("dedication", (dedDraft ?? "").trim()); setDedDraft(null); }}>שמירה</button>
+        </div>
+      </div>
 
       <div className="card-panel space-y-3">
         <h3 className="font-semibold flex items-center gap-2"><Brain className="h-4 w-4 text-gold" /> אלגוריתם חזרה מרווחת</h3>

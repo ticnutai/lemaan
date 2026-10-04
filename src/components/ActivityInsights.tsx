@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { Link } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Flame, TrendingUp } from "lucide-react";
 import { db } from "../db";
@@ -13,6 +14,28 @@ const DAY_NAMES = ["א'", "ב'", "ג'", "ד'", "ה'", "ו'", "ש'"];
  */
 export default function ActivityInsights() {
   const logs = useLiveQuery(() => db.reviewLogs.toArray(), []);
+
+  // הצלחה לפי מסכת ב-7 הימים האחרונים — החלשות קודם
+  const byMasechta = useLiveQuery(async () => {
+    const since = dayStart(Date.now()) - 6 * DAY;
+    const recent = await db.reviewLogs.where("at").aboveOrEqual(since).toArray();
+    if (!recent.length) return [];
+    const ids = [...new Set(recent.map((l) => l.cardId))];
+    const cards = await db.cards.bulkGet(ids);
+    const mOf = new Map(ids.map((id, i) => [id, cards[i]?.masechta ?? null]));
+    const agg = new Map<string, { total: number; correct: number }>();
+    for (const l of recent) {
+      const m = mOf.get(l.cardId);
+      if (!m) continue;
+      const e = agg.get(m) ?? { total: 0, correct: 0 };
+      e.total++; if (l.correct) e.correct++;
+      agg.set(m, e);
+    }
+    return [...agg.entries()]
+      .map(([m, e]) => ({ m, ...e, pct: Math.round((e.correct / e.total) * 100) }))
+      .sort((a, b) => a.pct - b.pct || b.total - a.total)
+      .slice(0, 5);
+  }, []);
 
   const { week, heat } = useMemo(() => {
     const today = dayStart(Date.now());
@@ -82,6 +105,28 @@ export default function ActivityInsights() {
           })}
         </div>
       </div>
+
+      {/* הצלחה לפי מסכת (7 ימים) */}
+      {(byMasechta ?? []).length > 0 && (
+        <div className="gold-frame bg-card p-4 space-y-2 md:col-span-2 order-last" data-testid="by-masechta">
+          <h3 className="font-bold flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-gold" /> הצלחה לפי מסכת · 7 ימים
+            <span className="text-xs text-muted-foreground font-normal">(החלשות קודם)</span>
+          </h3>
+          <ul className="space-y-1.5">
+            {byMasechta!.map((r) => (
+              <li key={r.m} className="flex items-center gap-2 text-sm">
+                <span className="w-24 shrink-0 font-medium truncate">{r.m}</span>
+                <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
+                  <div className={`h-full ${r.pct >= 80 ? "bg-green-500" : r.pct >= 60 ? "bg-amber-400" : "bg-red-500"}`} style={{ width: `${r.pct}%` }} />
+                </div>
+                <span className="w-24 shrink-0 text-xs text-muted-foreground text-left">{r.pct}% ({r.correct}/{r.total})</span>
+                <Link className="text-xs text-gold hover:underline shrink-0" to={`/study?m=${encodeURIComponent(r.m)}&from=1&to=999&due=1`}>חזרה</Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* מפת חום */}
       <div className="gold-frame bg-card p-4 space-y-3">

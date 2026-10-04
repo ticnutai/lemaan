@@ -6,6 +6,7 @@ import { db } from "../db";
 import { importLibrary, type ImportProgress } from "../db/importLibrary";
 import StudyPlansSection from "../components/StudyPlansSection";
 import ActivityInsights from "../components/ActivityInsights";
+import TodayCard from "../components/TodayCard";
 
 function startOfDay(ts: number): number {
   const d = new Date(ts);
@@ -58,6 +59,8 @@ export default function Dashboard() {
 
   // הייבוא האוטומטי רץ ברמת האפליקציה (useAutoImport ב-Layout) בכל עמוד.
 
+  const dedication = useLiveQuery(async () => (await db.settings.get("dedication"))?.value ?? "", []);
+
   const stats = [
     { label: "שאלות במאגר", value: totalCards ?? "…", icon: Library, gold: false },
     { label: "ממתינות לחזרה", value: dueCount ?? "…", icon: CalendarClock, gold: true },
@@ -73,7 +76,10 @@ export default function Dashboard() {
         </h2>
         <p className="text-2xl font-bold mt-3">מערכת לימוד וחזרות</p>
         <p className="text-muted-foreground mt-1">עקוב אחר ההתקדמות שלך וקבל תובנות מתקדמות</p>
+        {dedication && <p className="mt-3 text-sm font-medium text-gold" data-testid="dedication">{dedication}</p>}
       </header>
+
+      <TodayCard />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map(({ label, value, icon: Icon, gold }) => (

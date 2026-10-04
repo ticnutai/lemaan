@@ -187,10 +187,11 @@ test("T15 — ניהול: מוסתר בלי חשבון, כפתור הערה בת
 test("T16 — תוכניות לימוד: יצירה מתבנית, סימון היום, מחיקה", async () => {
   await page.goto("/#/");
   await page.getByRole("button", { name: "הוסף תוכנית" }).click();
+  await page.getByRole("button", { name: /חומש, תנ"ך, משנה ועוד/ }).click();
   await page.getByRole("button", { name: /חומש — פרק ליום/ }).click();
   await page.getByRole("button", { name: "צור תוכנית" }).click();
   await expect(page.getByText(/היום: פרק 1/)).toBeVisible();
-  await page.getByRole("button", { name: /סמן את של היום/ }).click();
+  await page.getByRole("button", { name: "סיימתי" }).click();
   await expect(page.getByText(/היום: פרק 2/)).toBeVisible();
   await expect(page.getByText(/1\/187/)).toBeVisible();
   page.once("dialog", (d) => d.accept());
@@ -253,4 +254,20 @@ test("T19 — חיפוש בכל הדפוס המדויק: סינון לפי זר�
   // לחיצה על תוצאה פותחת את העמוד בדפוס המדויק עם המילים מודגשות
   await page.locator("ul.divide-y li button").first().click();
   await expect(page.locator(".lemaan-print mark.daf-hit").first()).toBeAttached({ timeout: 15_000 });
+});
+
+test("T20 — בית: תוכנית ש\"ס (הבאה לסימון, סיימתי, תרגול העמוד) וכרטיס היום", async () => {
+  await page.goto("/#/");
+  await expect(page.getByTestId("today-card")).toContainText("ללמוד היום", { timeout: 15_000 });
+  await page.getByRole("button", { name: /הוסף תוכנית/ }).click();
+  await page.getByLabel("מסכת").selectOption("ברכות");
+  await page.getByRole("button", { name: "צור תוכנית" }).click();
+  const card = page.getByTestId("plan-card").filter({ hasText: "ברכות" }).first();
+  await expect(card).toContainText('הבאה לסימון: ברכות ב\' ע"א');
+  await card.getByRole("button", { name: "סיימתי" }).click();
+  await expect(card).toContainText('הבאה לסימון: ברכות ב\' ע"ב');
+  await expect(page.getByTestId("today-card")).toContainText('ברכות ב\' ע"ב');
+  // תרגול העמוד הבא — סשן של השאלות של אותו עמוד
+  await card.getByRole("link", { name: /תרגול/ }).click();
+  await expect(page.getByRole("heading", { name: /ברכות דף ב · עמוד ב'/ })).toBeVisible({ timeout: 10_000 });
 });

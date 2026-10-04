@@ -91,4 +91,6 @@ export interface StudyPlan {
   completedUnits: number;
   createdAt: number;
   updatedAt: number;
+  /** תוכנית ש"ס: היחידות הן עמודים/דפים אמיתיים של המסכת (planUnits.ts) */
+  shas?: { masechta: string; slug: string; unit: "amud" | "daf"; startIndex: number };
 }
