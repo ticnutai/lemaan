@@ -277,7 +277,8 @@ function renderPanel() {
     <div class="big">${pct(p.match)}</div><div class="hint">משטח הטקסט שבו השורות שלנו יושבות על שורות הדפוס</div>
     <div style="margin-top:6px">${p.flagged} שורות שונות מתוך ${p.readable} שורות קריאות</div></div>`;
   if (p.status) h += `<div class="card"><h2>סטטוס: ${p.status === "ready" ? '<span class="ok">מוכן</span>' : '<span class="bad">לבדיקה</span>'}</h2>
-    <div class="hint">מוכן = התאמה ≥ ${Math.round((DATA.status?.ready_threshold ?? 0.97) * 100)}% ובלי מילים חסרות או כפולות</div>
+    <div class="hint">מוכן = התאמה ≥ ${Math.round((DATA.status?.ready_threshold ?? 0.97) * 100)}%, בלי מילים חסרות או כפולות, ובלי חריגה ברווח בין העמודות</div>
+    ${(p.flags || []).map((f) => `<div class="row"><span class="lbl bad">חריגה</span> ${esc(f)}</div>`).join("")}
     ${(p.audit || []).length ? p.audit.map((a) => `<div class="row"><span class="lbl">${NAME[a.stream]} · ${{ missing: "חסר", extra: "מיותר", duplicate: "כפול" }[a.type]} ${a.n} מילים</span><div class="cmp">${esc(a.words)}</div></div>`).join("") : '<div class="muted">בדיקת שלמות: כל מילות המקור מופיעות פעם אחת ובסדר</div>'}</div>`;
   const fixes = OVR[AM] || [];
   if (fixes.length) h += `<div class="card"><h2>תיקונים קבועים בעמוד (${fixes.length})</h2>${fixes.map((o) => `<div class="row"><span class="lbl">${NAME[o.s]} · שורה ${o.k + 1} בזרם</span> ${o.end ? "מסתיימת ב" + esc(o.end) : ""}${o.start ? " מתחילה ב" + esc(o.start) : ""}${o.drop ? " בלי המילה " + esc(o.drop) : ""}</div>`).join("")}</div>`;

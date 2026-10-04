@@ -63,10 +63,29 @@ def ink_bbox(a):
 READY = 0.97  # סף "מוכן": אחוז ההתאמה לסריקה
 
 
+GUTTER_TOL = 2.0  # נק' — סטייה מהרווח הקבוע בין העמודות (בדפוס: 14.3 נק' ± 0.4 ב-710 עמודים)
+
+
+def gutters_of(page):
+    """הרווח (בנק') בין עמודת הגמרא לעמודות הצד, לפי השורות שזוהו בעמוד — (שמאל, ימין) או None."""
+    import statistics as st
+    rows = page["rows"]
+    g = [r for r in rows if r["s"] == "gemara" and r["box"][2] - r["box"][0] > 400]
+    if not g:
+        return None
+    gx0 = st.median(r["box"][0] for r in g)
+    gx1 = st.median(r["box"][2] for r in g)
+    near = lambda r: any(abs(r["box"][1] - q["box"][1]) < 20 for q in g)
+    side = [r for r in rows if r["s"] != "gemara" and near(r)]
+    R = [r["box"][0] - gx1 for r in side if r["box"][0] > gx1 - 5]
+    L = [gx0 - r["box"][2] for r in side if r["box"][2] < gx0 + 5]
+    return (round(st.median(L) / Z, 1) if L else None, round(st.median(R) / Z, 1) if R else None)
+
+
 def status_of(page):
     """מוכן / לבדיקה — כלל קבוע, כדי שההחלטה איזה עמוד לבדוק לא תהיה תחושה."""
     words = sum(i["n"] for i in page.get("audit", []) if i["n"] >= 2 or i["type"] != "missing")
-    if (page.get("match") or 0) >= READY and words == 0:
+    if (page.get("match") or 0) >= READY and words == 0 and not page.get("flags"):
         return "ready"
     return "review"
 
@@ -204,8 +223,16 @@ def main():
     # 5. בדיקת שלמות (audit.py) וסטטוס לכל עמוד: "מוכן" = התאמה ≥ READY ובלי מילים חסרות/כפולות
     import audit as AU
     au = AU.audit(tractate)
+    # בדיקת חריגות (רק מסמנת, לא משנה את הדף): רווח בין עמודות שרחוק מהרווח הטיפוסי של המסכת
+    import statistics as st
+    gut = {k: gutters_of(pg_) for k, pg_ in data["pages"].items()}
+    vals = [v for g_ in gut.values() if g_ for v in g_ if v is not None]
+    typical = st.median(vals) if len(vals) >= 10 else 14.3
     for k, pg_ in data["pages"].items():
         pg_["audit"] = au["pages"].get(k, [])
+        pg_["gutters"] = gut[k]
+        pg_["flags"] = [f"רווח {'שמאלי' if i == 0 else 'ימני'} בין העמודות {v} נק' (בדרך כלל {typical:.1f})"
+                        for i, v in enumerate(gut[k] or ()) if v is not None and abs(v - typical) > GUTTER_TOL]
         pg_["status"] = status_of(pg_)
     st_ = {}
     for pg_ in data["pages"].values():
