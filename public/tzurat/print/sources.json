@@ -1,6 +1,6 @@
 {
  "avodah_zarah": {
-  "built": "2026-10-04",
+  "built": "2026-10-05",
   "file": "עבודה זרה.pdf",
   "pages": 150,
   "sha256": "fe5d81e6fb1edb92c1f88008d76967cbe645468ba7d6cde15fa44f30e1c33ac2"
@@ -42,7 +42,7 @@
   "sha256": "092ac0a9a72d354405c9f7f8995a5e8681b24f86483ce153c60150cc7a248b5e"
  },
  "makkot": {
-  "built": "2026-10-04",
+  "built": "2026-10-05",
   "file": "מכות.pdf",
   "pages": 46,
   "sha256": "e6d24d1befab390498a9119c55177a9b1179d6996d36ad18a0e55a14b8d37f1b"
@@ -66,7 +66,7 @@
   "sha256": "9ff2405d787a40a0a13bdb8d88647b04103aa439b78677cccd672ae098346eb1"
  },
  "shevuot": {
-  "built": "2026-10-04",
+  "built": "2026-10-05",
   "file": "שבועות.pdf",
   "pages": 96,
   "sha256": "6b22c12f959790efa8dd33e399a9368d1af9cb66a5627d9fbc003abd09e240a8"
