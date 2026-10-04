@@ -13,6 +13,8 @@ interface Props {
   title: string;
   /** גיאומטריית הדפוס של העמוד — מאפשרת מצב "דפוס מדויק" */
   printLayout?: PrintLayout;
+  /** חיפוש התחלתי (כשנכנסים מתוצאת חיפוש) */
+  initialQuery?: string;
 }
 
 type Renderer = ReturnType<typeof dafRenderer>;
@@ -22,13 +24,13 @@ type Renderer = ReturnType<typeof dafRenderer>;
  * בלי OCR. חיפוש מדגיש בכל הזרמים; פאנל עיצוב קובע גופן, גודל וצבעים
  * והפריסה מחושבת מחדש כך שהכל נשאר באותו דף.
  */
-export default function DafPage({ gemara, rashi, tosafot, amud, title, printLayout }: Props) {
+export default function DafPage({ gemara, rashi, tosafot, amud, title, printLayout, initialQuery }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<Renderer | null>(null);
   const [style, setStyle] = useState<DafStyle>(DEFAULT_DAF_STYLE);
   const [styleLoaded, setStyleLoaded] = useState(false);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialQuery ?? "");
   const [showStyle, setShowStyle] = useState(false);
   const [width, setWidth] = useState(640);
 

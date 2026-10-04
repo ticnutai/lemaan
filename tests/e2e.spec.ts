@@ -233,3 +233,24 @@ test("T18 — דפוס מדויק (ברכות): שורות הדפוס, בלי ת
   await page.getByPlaceholder(/חיפוש בדף/).fill("אשרי");
   await expect(daf.locator("mark.daf-hit").first()).toBeAttached({ timeout: 10_000 });
 });
+
+test("T19 — חיפוש בכל הדפוס המדויק: סינון לפי זרם, ביטוי חוצה שורה, מעבר לעמוד עם הדגשה", async () => {
+  await page.goto("/#/shas");
+  const box = page.getByLabel("חיפוש בדפוס המדויק");
+  await expect(box).toBeVisible({ timeout: 15_000 });
+  await timed("T19_print_search_ms", 3000, async () => {
+    await box.fill("אמר רבא");
+    await expect(page.getByTestId("print-search-count")).toContainText("תוצאות", { timeout: 10_000 });
+  });
+  const all = parseInt((await page.getByTestId("print-search-count").textContent()) ?? "0", 10);
+  expect(all).toBeGreaterThan(10);
+  // סינון לתוספות בלבד: פחות תוצאות, וכולן מתוספות
+  await page.getByRole("group", { name: "סינון לפי זרם" }).getByRole("button", { name: "תוספות" }).click();
+  await expect(page.getByTestId("print-search-count")).not.toContainText(`${all} תוצאות`);
+  const labels = await page.locator("ul.divide-y li .text-xs").allTextContents();
+  expect(labels.length).toBeGreaterThan(0);
+  expect(labels.every((l) => l.includes("תוספות"))).toBe(true);
+  // לחיצה על תוצאה פותחת את העמוד בדפוס המדויק עם המילים מודגשות
+  await page.locator("ul.divide-y li button").first().click();
+  await expect(page.locator(".lemaan-print mark.daf-hit").first()).toBeAttached({ timeout: 15_000 });
+});

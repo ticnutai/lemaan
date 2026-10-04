@@ -712,6 +712,53 @@ def frame_of(p, W):
     return fL, fR, (best_[0] if best_ else 0), G, side, gem, head
 
 
+OVERRIDES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "overrides")
+_ovr_cache = {}
+
+
+def overrides_for(tractate, key):
+    """תיקונים ידניים קבועים (overrides/<Tractate>.json) — נשמרים בכל בנייה מחדש.
+    מבנה: {"2a": [{"s": "gemara", "k": 12, "end": "שמע"}, {"s": "rashi", "k": 3, "start": "פירוש"}]}
+    k = מספר השורה בזרם (מ-0, בסדר הקריאה, כמו בכלי הסקירה); end/start = המילה שבה השורה
+    צריכה להסתיים/להתחיל בדפוס. הגבול זז רק עד 8 מילים, ורק אם המילה נמצאת שם."""
+    if tractate not in _ovr_cache:
+        p = os.path.join(OVERRIDES_DIR, f"{tractate}.json")
+        _ovr_cache[tractate] = json.load(open(p, encoding="utf-8")) if os.path.exists(p) else {}
+    return _ovr_cache[tractate].get(key, [])
+
+
+def apply_overrides(lines, stream, ovr, applied):
+    """lines = [[tokens]] של זרם אחד; מזיז גבולות שורות לפי התיקונים. מחזיר רשימה חדשה."""
+    mine = [o for o in ovr if o.get("s") == stream]
+    if not mine:
+        return lines
+    toks = [t for ln in lines for t in ln]
+    cum = [0]
+    for ln in lines:
+        cum.append(cum[-1] + len(ln))
+    plain = lambda t: fold(norm_token(re.sub(r"<[^>]+>", "", t.lstrip(DH))))
+    for o in mine:
+        k = o.get("k")
+        if not isinstance(k, int) or not 0 <= k < len(lines):
+            continue
+        word = o.get("end") or o.get("start")
+        if not word:
+            continue
+        b = k + 1 if o.get("end") else k  # הגבול שזז: אחרי השורה (end) או לפניה (start)
+        if b <= 0 or b >= len(lines):
+            continue
+        target = plain(word)
+        cands = [i for i in range(max(0, cum[b] - 8), min(len(toks), cum[b] + 8)) if plain(toks[i]) == target]
+        if not cands:
+            continue
+        i = min(cands, key=lambda i: abs((i + 1 if o.get("end") else i) - cum[b]))
+        nb = i + 1 if o.get("end") else i
+        if cum[b - 1] < nb <= cum[b + 1]:  # השורה שלפני הגבול לא מתרוקנת; השורה שאחריו מותר (פיסה בלי מילים בדפוס)
+            cum[b] = nb
+            applied.append(dict(o, stream=stream))
+    return [toks[cum[i]:cum[i + 1]] for i in range(len(lines))]
+
+
 FRAME_W = 411.0  # רוחב מסגרת וילנא הטיפוסי בסריקות (נק'); הספים בקוד מכוילים אליו
 _scaled_docs = []
 
@@ -725,7 +772,7 @@ def scaled_page(p, k):
     return sp
 
 
-def build_page(p, key, refs, _scaled=False):
+def build_page(p, key, refs, _scaled=False, tractate=None):
     W = [w for w in page_words(p) if HEB.search(w["t"])]
     # גדלי הגופן משתנים מעמוד לעמוד ובין מקורות ה-OCR (HebrewBooks: גמרא 9.5/11, מפרשים 6.5–7.5,
     # שוליים 5–6.5; ABBYY של אוצריא: גמרא 8.5–10, מפרשים 6.5–8, שוליים 4.5–5.5), ולפעמים רש"י ותוספות
@@ -748,7 +795,7 @@ def build_page(p, key, refs, _scaled=False):
         k_ = FRAME_W / (fR - fL)
         if os.environ.get("FRAME_DEBUG"):
             print(key, f"rescaled page x{k_:.3f}")
-        lay_, rep_ = build_page(scaled_page(p, k_), key, refs, _scaled=True)
+        lay_, rep_ = build_page(scaled_page(p, k_), key, refs, _scaled=True, tractate=tractate)
         rep_["k"] = k_
         return lay_, rep_
     if os.environ.get("FRAME_DEBUG"):
@@ -969,13 +1016,16 @@ def build_page(p, key, refs, _scaled=False):
         gtext, moved = FW.refit(gtext, FW.ink_widths(fink, IL.Z, g_rows, fclip.x0, fclip.y0), lambda t: "vilna",
                                 free=free_bounds(gtext))
         report["fit"] = {"gemara": moved}
+    ovr = overrides_for(tractate, key) if tractate else []
+    if ovr:
+        gtext = apply_overrides(gtext, "gemara", ovr, report.setdefault("overrides", []))
     report["gemara"] = {"lines": len(glines), "cover": round(gcov, 3)}
     # מצב סקירה (review.py): כל שורה — מיקומה בסריקה, מה ה-OCR קרא בדפוס, ומה הצבנו אצלנו
     review = report.setdefault("_lines", []) if os.environ.get("REVIEW") else None
     edge = lambda r: (r.get("top", r["cy"] - 7), r.get("base", r["cy"] + 2))
     if review is not None:
-        for r, t in zip((r for b in blocks for r in b["rows"]), gtext):
-            review.append({"s": "gemara", "x0": r["x0"], "x1": r["x1"], "top": edge(r)[0], "base": edge(r)[1],
+        for k_, (r, t) in enumerate(zip((r for b in blocks for r in b["rows"]), gtext)):
+            review.append({"s": "gemara", "k": k_, "x0": r["x0"], "x1": r["x1"], "top": edge(r)[0], "base": edge(r)[1],
                            "print": " ".join(w["t"] for w in r["w"]), "ours": " ".join(t)})
     lh = pitch * s
     li = 0
@@ -1045,10 +1095,12 @@ def build_page(p, key, refs, _scaled=False):
             stext, moved = FW.refit(stext, FW.ink_widths(fink, IL.Z, ps, fclip.x0, fclip.y0),
                                     lambda t: "vilna" if t.startswith(DH) else "rashi", locked, free=free_bounds(stext))
             report["fit"][st_] = moved
+        if ovr:
+            stext = apply_overrides(stext, st_, ovr, report.setdefault("overrides", []))
         report[st_] = {"lines": len(ps), "cover": round(scov, 3)}
         if review is not None:
-            for pc, t in zip(ps, stext):
-                review.append({"s": st_, "x0": pc["x0"], "x1": pc["x1"], "top": edge(pc)[0], "base": edge(pc)[1],
+            for k_, (pc, t) in enumerate(zip(ps, stext)):
+                review.append({"s": st_, "k": k_, "x0": pc["x0"], "x1": pc["x1"], "top": edge(pc)[0], "base": edge(pc)[1],
                                "print": " ".join(w["t"] for w in pc["w"]), "ours": " ".join(x.lstrip(DH) for x in t)})
         groups = []
         for i, (pc, t) in enumerate(zip(ps, stext)):
@@ -1175,6 +1227,52 @@ def compact(o, key=None):
     return o
 
 
+def _drop_last_words(html, n):
+    """מוריד n מילים מסוף שורת HTML (עם התגיות שלהן) וסוגר תגיות שנשארו פתוחות."""
+    parts = html.split(" ")
+    while n > 0 and parts:
+        last = parts.pop()
+        if HEB.search(re.sub(r"<[^>]+>", "", last)):
+            n -= 1
+    out = " ".join(parts)
+    for tag in ("i", "big", "b"):
+        opened = len(re.findall(f"<{tag}>", out)) - len(re.findall(f"</{tag}>", out))
+        out += f"</{tag}>" * max(0, opened)
+    return re.sub(r"<(b|i|big)></>", "", out).strip()
+
+
+def dedupe_boundaries(lays, keys, report=None):
+    """גבול בין עמודים: אם סוף זרם בעמוד א חוזר בדיוק על תחילת אותו זרם בעמוד ב (המילים
+    "נדחסו" לשורה האחרונה של א), מורידים אותן מ-א. תחילת ב מעוגנת בשורה הראשונה שלו, ולכן אמינה.
+    מחזיר כמה מילים הורדו."""
+    def words(lay, s):
+        return [(i, j, t) for i, sl in enumerate(lay["slabs"]) if sl.get("s") == s
+                for j, ln in enumerate(sl.get("lines", [])) for t in re.sub(r"<[^>]+>", " ", ln.get("t", "")).split() if HEB.search(t)]
+    nrm = lambda t: fold(norm_token(re.sub(r"[\"'״׳.,:;()\[\]]", "", t)))
+    total = 0
+    ks = [k for k in keys if k in lays and lays[k].get("slabs")]
+    for a, b in zip(ks, ks[1:]):
+        if keys.index(b) != keys.index(a) + 1:
+            continue
+        for s in ("gemara", "rashi", "tosafot"):
+            A, B = words(lays[a], s), words(lays[b], s)
+            An, Bn = [nrm(t) for _, _, t in A], [nrm(t) for _, _, t in B]
+            n = next((n for n in range(min(len(An), len(Bn), 80), 1, -1) if An[-n:] == Bn[:n]), 0)
+            if not n:
+                continue
+            # מורידים מהשורות האחרונות של א, שורה אחר שורה
+            per_line = {}
+            for i, j, _ in A[-n:]:
+                per_line[(i, j)] = per_line.get((i, j), 0) + 1
+            for (i, j), c in per_line.items():
+                ln = lays[a]["slabs"][i]["lines"][j]
+                ln["t"] = _drop_last_words(ln["t"], c)
+            total += n
+            if report is not None:
+                report.append({"amud": a, "stream": s, "removed": n})
+    return total
+
+
 def write_layouts(path, layouts):
     data = json.dumps(compact(layouts), ensure_ascii=False, separators=(",", ":")).encode()
     open(path, "wb").write(gzip.compress(data, 9))
@@ -1195,7 +1293,7 @@ def main(pdf, tractate, first_page, only=None):
             break
         refs = make_refs(shas, ws, keys, key, tractate)
         try:
-            lay, rep = build_page(doc[pg], key, refs)
+            lay, rep = build_page(doc[pg], key, refs, tractate=tractate)
         except Exception as e:  # עמוד חריג לא עוצר את המסכת — מדווחים וממשיכים
             print(key, "pdf p", pg + 1, "FAILED", repr(e), flush=True)
             continue
@@ -1203,7 +1301,9 @@ def main(pdf, tractate, first_page, only=None):
         rep.pop("_lines", None)
         print(key, "pdf p", pg + 1, json.dumps(rep, ensure_ascii=False), flush=True)
     out = {k: out[k] for k in keys if k in out}  # סדר העמודים במסכת
+    print("boundary duplicates removed:", dedupe_boundaries(out, keys), "words")
     write_layouts(out_path, out)
+    record_source(tractate, pdf, len(doc))
     print("→", out_path, len(out), "amudim")
 
 
@@ -1227,6 +1327,20 @@ def first_page_of(doc, slug):
     sc = lambda r, t: (fuzz.partial_ratio(r[:150], t) + fuzz.partial_ratio(r[-150:], t)) / 2 if t else 0
     best = max(range(n - 1), key=lambda i: (sc(r0, txt[i]) + sc(r1, txt[i + 1]), -i))
     return best + 1
+
+
+def record_source(tractate, pdf, pages):
+    """מאיזו סריקה נבנתה כל מסכת: שם הקובץ, SHA-256 ומספר עמודים (tzurat/print/sources.json)."""
+    import hashlib, datetime
+    h = hashlib.sha256()
+    with open(pdf, "rb") as f_:
+        for chunk in iter(lambda: f_.read(1 << 20), b""):
+            h.update(chunk)
+    path = f"{ROOT}/tzurat/print/sources.json"
+    src = json.load(open(path, encoding="utf-8")) if os.path.exists(path) else {}
+    src[tractate.lower()] = {"file": os.path.basename(pdf), "sha256": h.hexdigest(), "pages": pages,
+                             "built": datetime.date.today().isoformat()}
+    json.dump(src, open(path, "w", encoding="utf-8"), ensure_ascii=False, indent=1, sort_keys=True)
 
 
 def update_index():

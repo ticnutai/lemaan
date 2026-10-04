@@ -6,6 +6,7 @@ import PageBanner from "../components/PageBanner";
 import DafPage from "../features/daf/DafPage";
 import { sanitizeSegment } from "../features/daf/buildHtml";
 import type { PrintLayout } from "../features/daf/PrintDaf";
+import PrintSearch from "../features/daf/PrintSearch";
 
 /** מאגר הש"ס המקומי (מהדורת וילנא, ספריא) — 37 מסכתות, עובד אופליין מלא. */
 
@@ -142,6 +143,9 @@ export default function ShasPage() {
       <div className="max-w-4xl mx-auto space-y-5 animate-fade-in">
         <PageBanner icon={Landmark} title='הש"ס' subtitle="גמרא מהדורת וילנא עם מפרשים — 37 מסכתות, זמין גם בלי אינטרנט." />
         {error && <p className="text-destructive text-sm">{error}</p>}
+        {index && (
+          <PrintSearch masechtot={index.masechtot} onOpen={(m, a, q) => setParams({ m, a, v: "daf", q })} />
+        )}
         {sedarim.map(([seder, list]) => (
           <div key={seder} className="card-panel">
             <h3 className="font-bold mb-3">{seder}</h3>
@@ -212,6 +216,7 @@ export default function ShasPage() {
           amud={amudKey.endsWith("b") ? "b" : "a"}
           title={`${meta.he} דף ${amud.daf} ${amud.amud}`}
           printLayout={printLayouts?.[amudKey]}
+          initialQuery={params.get("q") ?? undefined}
         />
       )}
 

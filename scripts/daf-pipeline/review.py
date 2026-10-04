@@ -60,6 +60,17 @@ def ink_bbox(a):
     return (int(cols[0]), int(rows[0]), int(cols[-1]) + 1, int(rows[-1]) + 1) if len(rows) else (0, 0, 0, 0)
 
 
+READY = 0.97  # סף "מוכן": אחוז ההתאמה לסריקה
+
+
+def status_of(page):
+    """מוכן / לבדיקה — כלל קבוע, כדי שההחלטה איזה עמוד לבדוק לא תהיה תחושה."""
+    words = sum(i["n"] for i in page.get("audit", []) if i["n"] >= 2 or i["type"] != "missing")
+    if (page.get("match") or 0) >= READY and words == 0:
+        return "ready"
+    return "review"
+
+
 def main():
     pdf, tractate, amudim = sys.argv[1], sys.argv[2], sys.argv[3].split(",")
     out = sys.argv[4] if len(sys.argv) > 4 else os.path.join(DEFAULT_OUT, tractate.lower())
@@ -76,13 +87,15 @@ def main():
     reports = {}
     for a in amudim:
         try:
-            lay, rep = H.build_page(doc[first - 1 + keys.index(a)], a, H.make_refs(shas, ws, keys, a, tractate))
+            lay, rep = H.build_page(doc[first - 1 + keys.index(a)], a, H.make_refs(shas, ws, keys, a, tractate), tractate=tractate)
         except Exception as e:  # עמוד חריג (סריקה חלופית וכד') — נשאר הקיים, ולא עוצר את השאר
             print(f"{a} FAILED: {e!r} — kept previous layout")
             continue
         lays[a] = lay
         reports[a] = rep
+    print("boundary duplicates removed:", H.dedupe_boundaries(lays, keys), "words")
     H.write_layouts(path, {k: lays[k] for k in keys if k in lays})
+    H.record_source(tractate, pdf, len(doc))
     H.update_index()
     amudim = [a for a in amudim if a in reports]
 
@@ -138,7 +151,7 @@ def main():
         rows = []
         for i, ln in enumerate(lines):
             c = line_check(ln)
-            rows.append({"i": i, "s": ln["s"], "print": ln["print"], "ours": ln["ours"], **c,
+            rows.append({"i": i, "s": ln["s"], "k": ln.get("k"), "print": ln["print"], "ours": ln["ours"], **c,
                          "box": [round((ln["x0"] - crop.x0) * Z), round((ln["top"] - crop.y0) * Z) - 4,
                                  round((ln["x1"] - crop.x0) * Z), round((ln["base"] - crop.y0) * Z) + 4]})
         # מרווחים: כמה המילים שלנו ממלאות כל שורה מלאה (ביישור לשני הצדדים) במרווח רגיל.
@@ -186,6 +199,18 @@ def main():
         print(a, "match", q and q["match"], "| lines", len(rows), "| flagged", len(flagged), "| size", size, flush=True)
         os.remove(os.path.join(out, f"o-{a}.png"))
     data["pages"] = {k: data["pages"][k] for k in keys if k in data["pages"]}
+    data["pdf"] = os.path.abspath(pdf)  # לבנייה מחדש מתוך כלי הסקירה
+    # 5. בדיקת שלמות (audit.py) וסטטוס לכל עמוד: "מוכן" = התאמה ≥ READY ובלי מילים חסרות/כפולות
+    import audit as AU
+    au = AU.audit(tractate)
+    for k, pg_ in data["pages"].items():
+        pg_["audit"] = au["pages"].get(k, [])
+        pg_["status"] = status_of(pg_)
+    st_ = {}
+    for pg_ in data["pages"].values():
+        st_[pg_["status"]] = st_.get(pg_["status"], 0) + 1
+    data["status"] = {"ready_threshold": READY, "counts": st_, "audit": au["streams"]}
+    print("status:", st_, "| audit:", {k: (v["missing_words"], v["extra_words"]) for k, v in au["streams"].items()})
     json.dump(data, open(data_path, "w", encoding="utf-8"), ensure_ascii=False)
     print("→", out)
 

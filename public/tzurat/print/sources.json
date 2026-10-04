@@ -1,0 +1,14 @@
+{
+ "kiddushin": {
+  "built": "2026-10-04",
+  "file": "קידושין.pdf",
+  "pages": 162,
+  "sha256": "092ac0a9a72d354405c9f7f8995a5e8681b24f86483ce153c60150cc7a248b5e"
+ },
+ "shabbat": {
+  "built": "2026-10-04",
+  "file": "שבת.pdf",
+  "pages": 312,
+  "sha256": "9ff2405d787a40a0a13bdb8d88647b04103aa439b78677cccd672ae098346eb1"
+ }
+}

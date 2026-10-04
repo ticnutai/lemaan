@@ -61,6 +61,8 @@ th { color: var(--muted); font-weight: 600; }
 .legend span { display: inline-block; margin-inline-end: 10px; font-size: 12px; }
 .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-inline-end: 4px; vertical-align: middle; }
 .hint { font-size: 12px; color: var(--muted); }
+.fix label { display: block; font-size: 13px; margin-top: 4px; }
+.fix input { width: 9em; margin-inline-start: 6px; padding: 2px 6px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: inherit; font: inherit; }
 @media (max-width: 1000px) {
   main { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) 42vh; }
   aside { border-inline-start: 0; border-top: 1px solid var(--line); }
@@ -115,7 +117,7 @@ const AMUD = (k) => k.replace(/^(\d+)([ab])$/, (_, n, a) => heb(+n) + (a === "a"
 function heb(n) { const o = " אבגדהוזחט", t = " יכלמנסעפצ", h = { 1: "ק", 2: "ר", 3: "ש", 4: "ת" }; let s = ""; if (n >= 100) { s += h[Math.floor(n / 100)] || ""; n %= 100; } if (n === 15) return s + "טו"; if (n === 16) return s + "טז"; return s + (t[Math.floor(n / 10)] || "").trim() + (o[n % 10] || "").trim(); }
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
-let T = null, DATA = null, AM = null, NOTES = {}, mode = "side", marking = false, focus = null, blinkT = null, draft = null;
+let LOADTS = Date.now(), OVR = {}, T = null, DATA = null, AM = null, NOTES = {}, mode = "side", marking = false, focus = null, blinkT = null, draft = null;
 const ls = { get: (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
 
 async function init() {
@@ -127,14 +129,16 @@ async function init() {
   if (ts.length) loadTractate($("#tractate").value, last.a);
 }
 async function loadTractate(t, amud) {
-  T = t;
+  T = t; LOADTS = Date.now();
   DATA = await (await fetch(`/${t}/data.json?ts=${Date.now()}`)).json();
   try { NOTES = await (await fetch(`/api/notes?tractate=${t}`)).json(); } catch { NOTES = ls.get("review.notes." + t) || {}; }
+  try { OVR = await (await fetch(`/api/overrides?tractate=${t}`)).json(); } catch { OVR = {}; }
   const keys = Object.keys(DATA.pages);
   $("#pages").innerHTML = keys.map((k) => {
     const p = DATA.pages[k], m = p.match ?? 0;
-    const c = m >= 0.97 ? "#3ccf7a" : m >= 0.9 ? "#f0b43c" : "#ff6b5e";
-    return `<button data-k="${k}">${AMUD(k)}<span class="dot" style="background:${c}"></span></button>`;
+    const c = p.status === "review" ? (m >= 0.9 ? "#f0b43c" : "#ff6b5e") : p.status === "ready" ? "#3ccf7a" : m >= 0.97 ? "#3ccf7a" : m >= 0.9 ? "#f0b43c" : "#ff6b5e";
+    const tip = p.status ? (p.status === "ready" ? "מוכן" : "לבדיקה") : "";
+    return `<button data-k="${k}" title="${tip}">${AMUD(k)}<span class="dot" style="background:${c}"></span></button>`;
   }).join("");
   $("#pages").querySelectorAll("button").forEach((b) => (b.onclick = () => show(b.dataset.k)));
   show(amud && DATA.pages[amud] ? amud : keys[0]);
@@ -150,7 +154,7 @@ function show(k) {
 function figure(kind, label) {
   const p = DATA.pages[AM];
   return `<figure><figcaption>${label}</figcaption><div class="wrap" data-kind="${kind}">
-    <img src="/${T}/${AM}-${kind}.png?ts=${p.match}" draggable="false">
+    <img src="/${T}/${AM}-${kind}.png?ts=${LOADTS}" draggable="false">
     <svg viewBox="0 0 ${p.img[0]} ${p.img[1]}" preserveAspectRatio="none"></svg></div></figure>`;
 }
 function renderStage() {
@@ -261,11 +265,21 @@ function renderPanel() {
     h += `<div class="card" style="border-color:var(--focus)"><h2>שורה ${r.i + 1} · ${NAME[r.s]} <a href="#" onclick="focus=null;drawOverlays();renderPanel();return false">סגור</a></h2>
       <div class="cmp"><b>דפוס:</b> ${esc(r.print) || '<span class="muted">(ה-OCR לא קרא)</span>'}</div>
       <div class="cmp"><b>אצלנו:</b> ${esc(r.ours) || '<span class="bad">(ריקה)</span>'}</div>
-      <div class="hint">התחלה ${yes(r.start_ok)} · סוף ${yes(r.end_ok)}${r.readable ? "" : " · ה-OCR של השורה לא קריא, אין השוואה אמינה"}</div></div>`;
+      <div class="hint">התחלה ${yes(r.start_ok)} · סוף ${yes(r.end_ok)}${r.readable ? "" : " · ה-OCR של השורה לא קריא, אין השוואה אמינה"}</div>
+      ${r.k == null ? "" : `<div class="fix"><div class="hint" style="margin-top:8px"><b>תיקון קבוע</b> — נשמר בקובץ ונשאר בכל בנייה מחדש:</div>
+        <label>השורה מסתיימת במילה <input id="fixEnd" value="${esc(ovrOf(r, "end"))}" placeholder="${esc((r.print || "").split(" ").filter(Boolean).slice(-1)[0] || "")}"></label>
+        <label>השורה מתחילה במילה <input id="fixStart" value="${esc(ovrOf(r, "start"))}" placeholder="${esc((r.print || "").split(" ").filter(Boolean)[0] || "")}"></label>
+        <div style="display:flex;gap:6px;margin-top:6px"><button class="btn" onclick="saveFix(${r.i})">שמור תיקון</button>
+        <button class="btn" onclick="rebuild()">בנה מחדש את העמוד</button></div></div>`}</div>`;
   }
   h += `<div class="card"><h2>עמוד ${AMUD(AM)} <span class="muted">עמוד ${p.pdf_page} בקובץ</span></h2>
     <div class="big">${pct(p.match)}</div><div class="hint">משטח הטקסט שבו השורות שלנו יושבות על שורות הדפוס</div>
     <div style="margin-top:6px">${p.flagged} שורות שונות מתוך ${p.readable} שורות קריאות</div></div>`;
+  if (p.status) h += `<div class="card"><h2>סטטוס: ${p.status === "ready" ? '<span class="ok">מוכן</span>' : '<span class="bad">לבדיקה</span>'}</h2>
+    <div class="hint">מוכן = התאמה ≥ ${Math.round((DATA.status?.ready_threshold ?? 0.97) * 100)}% ובלי מילים חסרות או כפולות</div>
+    ${(p.audit || []).length ? p.audit.map((a) => `<div class="row"><span class="lbl">${NAME[a.stream]} · ${{ missing: "חסר", extra: "מיותר", duplicate: "כפול" }[a.type]} ${a.n} מילים</span><div class="cmp">${esc(a.words)}</div></div>`).join("") : '<div class="muted">בדיקת שלמות: כל מילות המקור מופיעות פעם אחת ובסדר</div>'}</div>`;
+  const fixes = OVR[AM] || [];
+  if (fixes.length) h += `<div class="card"><h2>תיקונים קבועים בעמוד (${fixes.length})</h2>${fixes.map((o) => `<div class="row"><span class="lbl">${NAME[o.s]} · שורה ${o.k + 1} בזרם</span> ${o.end ? "מסתיימת ב" + esc(o.end) : ""}${o.start ? " מתחילה ב" + esc(o.start) : ""}</div>`).join("")}</div>`;
   h += `<div class="card"><h2>מידות (נקודות)</h2><table>
     <tr><th></th><th>דפוס</th><th>אצלנו</th><th>הפרש</th></tr>
     <tr><td>רוחב</td><td>${s.print.w}</td><td>${s.ours.w}</td><td>${d(s.print.w, s.ours.w)}</td></tr>
@@ -297,6 +311,25 @@ function renderPanel() {
     <a href="#" style="float:left;color:var(--bad)" onclick="delMark(${i});return false">מחק</a></div>`));
   h += `</div>`;
   $("#panel").innerHTML = h;
+}
+function ovrOf(r, kind) { const o = (OVR[AM] || []).find((x) => x.s === r.s && x.k === r.k && x[kind]); return o ? o[kind] : ""; }
+async function saveFix(i) {
+  const r = DATA.pages[AM].rows[i];
+  for (const kind of ["end", "start"]) {
+    const word = $(kind === "end" ? "#fixEnd" : "#fixStart").value.trim();
+    if (word === ovrOf(r, kind)) continue;
+    const res = await fetch("/api/override", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tractate: T, amud: AM, s: r.s, k: r.k, kind, word }) });
+    const j = await res.json(); if (j.overrides) OVR[AM] = j.overrides; else { $("#status").textContent = "שגיאה בשמירה"; return; }
+  }
+  $("#status").textContent = "התיקון נשמר. לחצו 'בנה מחדש' כדי לראות אותו."; renderPanel();
+}
+async function rebuild() {
+  $("#status").textContent = "בונה מחדש את העמוד… (כ-15 שניות)";
+  const res = await fetch("/api/rebuild", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tractate: T, amud: AM }) });
+  const j = await res.json();
+  if (!j.ok) { $("#status").textContent = "הבנייה נכשלה: " + (j.error || (j.log || []).join(" | ")); return; }
+  $("#status").textContent = "נבנה מחדש ✓"; await loadTractate(T, AM);
 }
 async function delMark(i) { NOTES[AM].splice(i, 1); await persist(); drawOverlays(); renderPanel(); }
 
