@@ -530,6 +530,16 @@ def image_rows(p, W, fL, fR, head):
                 ov = lambda o: min(o["x1"], l["x1"]) - max(o["x0"], l["x0"]) >= 0.8 * wd(l)
                 up = [o for o in W_ if 4 < l["base"] - o["base"] < 15 and ov(o)]
                 dn = [o for o in W_ if 4 < o["base"] - l["base"] < 15 and ov(o)]
+                # שורה אחרונה בעמודת מפרש (מתחתיה הגמרא מתרחבת לכל הרוחב, או כלום), שנמדדה על הסף בגלל
+                # דיבור המתחיל, באותם קצוות כמו שורת המפרש שמעליה, ולצדה פיסת גמרא שנעצרת בקצה עמודת
+                # הגמרא — מפרש (ע"ז ב.: "ולא אומה ואומה בפני עצמה:", 5.67 מול סף 5.63)
+                if up and l["c"] == "g" and abs(l["xh"] - thr) < 0.8:
+                    u = max(up, key=lambda o: o["base"])
+                    d = min(dn, key=lambda o: o["base"]) if dn else None
+                    if (u["c"] == "s" and abs(u["x0"] - l["x0"]) < 3 and abs(u["x1"] - l["x1"]) < 3
+                            and (d is None or (d["c"] == "g" and wd(d) > wd(l) + 40)) and gutter_kept(l)):
+                        flips.append((l, "s"))
+                        continue
                 if up and dn:
                     u, d = max(up, key=lambda o: o["base"]), min(dn, key=lambda o: o["base"])
                     same_col = all(abs(o["x0"] - l["x0"]) < 5 and abs(o["x1"] - l["x1"]) < 5 for o in (u, d))
@@ -605,8 +615,32 @@ def image_rows(p, W, fL, fR, head):
         if not any(o is not l and o["c"] == "g" and abs(o["base"] - l["base"]) <= 1.5
                    and min(abs(o["x0"] - l["x1"]), abs(l["x0"] - o["x1"])) < 25 for o in L):
             return False
+        # השורה האחרונה בעמודת מפרש, באותו גובה כמו שורת גמרא שלידה: הפיסה יושבת בתוך שורת המפרש
+        # שמעליה והמרווח בין העמודות עוד קיים (ע"ז ב., ראו gutter_kept)
+        if any(o["c"] == "s" and wide(o) and 4 < l["base"] - o["base"] < 15
+               and o["x0"] - 3 <= l["x0"] and l["x1"] <= o["x1"] + 3 for o in L) and gutter_kept(l):
+            return False
         return not any(o["c"] == "s" and 4 < o["base"] - l["base"] < 15
                        and min(o["x1"], l["x1"]) - max(o["x0"], l["x0"]) > 0.5 * min(wd(o), wd(l)) for o in L)
+
+    def gutter_kept(l):
+        """פיסת גמרא באותה שורה ממש כמו l, צמודה אליה, שנעצרת בדיוק בקצה עמודת הגמרא של השורה שמעליה:
+        המרווח בין העמודות נמשך, ולכן l שייכת לעמודה שלה ולא להמשך שורת הגמרא. בגמרא שמתרחבת באמת
+        לרוחב העמוד, השורה עוברת את קצה העמודה. ע"ז ב.: "ולא אומה ואומה בפני עצמה:" של רש"י (דיבור
+        המתחיל, גבוה כמעט כגמרא) צורף ל"דתני אידיהן לא משתבש" ונשמט מרש"י"""
+        for g in L:
+            if g is l or g["c"] != "g" or abs(g["base"] - l["base"]) > 1.5:
+                continue
+            if g["x1"] <= l["x0"] + 2 and l["x0"] - g["x1"] < 25:
+                facing = "x1"
+            elif l["x1"] <= g["x0"] + 2 and g["x0"] - l["x1"] < 25:
+                facing = "x0"
+            else:
+                continue
+            if any(o["c"] == "g" and wide(o) and 4 < g["base"] - o["base"] < 15
+                   and abs(o[facing] - g[facing]) < 2.5 for o in L):
+                return True
+        return False
 
     def same_row(a, b):
         # שבר דק (רק ה"גג" או רק ה"בסיס" של מילה) — שייך לשורה שהפס שלה מכיל אותו
@@ -642,6 +676,13 @@ def image_rows(p, W, fL, fR, head):
                     # מילה פותחת מוגדלת (גבוהה בבירור מהשורה שלידה) בתוך שורת מפרש
                     if other["xh"] > main["xh"] + 1.2 and wd(other) < 60 and other["top"] < main["top"] - 0.8:
                         m["big"] = (other["x0"], other["x1"])
+                    elif (main["c"] == "s" and other["xh"] >= cs - 0.9 and main["xh"] > other["xh"] + 1.2 and wd(main) < 60
+                          and main["top"] < other["top"] - 0.8):
+                        # וכשהמילה המוגדלת היא הפיסה הרחבה מהשתיים — גובה השורה הוא של האותיות הרגילות,
+                        # אחרת הצירוף יורש את גובה הדיבור המתחיל ונראה כגמרא. ב"ק צא.: "והולך אלמא" (7.0)
+                        # + "יש" + "אומר" (5.0) = 77 נק' בגובה 7.0, ונשלחו לגמרא. רק מול אותיות בגובה מפרש: שבר דיו
+                        # דק (נקודה, קו) היה נותן לשורה כולה גובה של הערת שוליים, והיא נזרקה (ברכות כא:)
+                        m.update(xh=other["xh"], top=other["top"], big=(main["x0"], main["x1"]))
                     elif a.get("big") or b.get("big"):
                         m["big"] = a.get("big") or b.get("big")
                     L.remove(a); L.remove(b); L.append(m)
