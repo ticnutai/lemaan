@@ -525,6 +525,7 @@ def image_rows(p, W, fL, fR, head):
         # שורה רחבה שגובהה נמדד על הגבול (דפוס חיוור/עבה) וששתי שכנותיה באותה עמודה מסוג אחר — כמותן
         # וכן שורה שמילה פותחת מוגדלת בתוכה הגביהה אותה — כשהיא באותם קצוות בדיוק כמו שכנותיה (אותה עמודה)
         flips = []
+        y_first = min((l["base"] for l in W_), default=0)  # קו הבסיס של השורה העליונה בעמוד
         for l in W_:
             ov = lambda o: min(o["x1"], l["x1"]) - max(o["x0"], l["x0"]) >= 0.8 * wd(l)
             up = [o for o in W_ if 4 < l["base"] - o["base"] < 15 and ov(o)]
@@ -534,10 +535,20 @@ def image_rows(p, W, fL, fR, head):
                 same_col = all(abs(o["x0"] - l["x0"]) < 5 and abs(o["x1"] - l["x1"]) < 5 for o in (u, d))
                 if u["c"] == d["c"] != l["c"] and (abs(l["xh"] - thr) < 0.8 or same_col):
                     flips.append((l, u["c"]))
-            elif dn and not up:
+            elif not up:
                 # ראש עמודה: שורת מפרש שמתחילה במילה מוגדלת (ד"ה פותח) נמדדת גבוהה כגמרא — אם שתי
-                # השורות שמתחתיה הן מפרש באותה עמודה (קצה משותף), גם היא מפרש
-                d = min(dn, key=lambda o: o["base"])
+                # השורות שמתחתיה הן מפרש באותה עמודה (קצה משותף), גם היא מפרש.
+                # בראש העמוד השכנה מתחת נבחרת בחפיפה של חצי (כמו השנייה), לא ב-80% של dn: השורה
+                # השנייה בעמודה מסתיימת לפעמים מוקדם (סוף דיבור) וחופפת פחות. בברכות ב. — 159 מתוך 199
+                # נקודות (79.9%), והשורה העליונה של רש"י ("מאימתי קורין את שמע בערבין") נשארה גמרא, כך
+                # שהמסגרת לא זוהתה. באמצע העמוד נשאר dn כמו קודם: שם ההרחבה שינתה סיווגים בעמודים שלא נבדקו (יבמות צח.–קב.)
+                near_top = l["base"] < y_first + 15
+                below = dn if not near_top else [
+                    o for o in W_ if 4 < o["base"] - l["base"] < 15
+                    and min(o["x1"], l["x1"]) - max(o["x0"], l["x0"]) > 0.5 * min(wd(o), wd(l))]
+                if not below:
+                    continue
+                d = min(below, key=lambda o: o["base"])
                 d2 = [o for o in W_ if 4 < o["base"] - d["base"] < 15
                       and min(o["x1"], l["x1"]) - max(o["x0"], l["x0"]) > 0.5 * min(wd(o), wd(l))]
                 edge = lambda o: abs(o["x0"] - l["x0"]) < 5 or abs(o["x1"] - l["x1"]) < 5
