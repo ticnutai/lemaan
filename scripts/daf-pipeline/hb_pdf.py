@@ -524,42 +524,45 @@ def image_rows(p, W, fL, fR, head):
             l["c"] = cls(l)
         # שורה רחבה שגובהה נמדד על הגבול (דפוס חיוור/עבה) וששתי שכנותיה באותה עמודה מסוג אחר — כמותן
         # וכן שורה שמילה פותחת מוגדלת בתוכה הגביהה אותה — כשהיא באותם קצוות בדיוק כמו שכנותיה (אותה עמודה)
-        flips = []
+        def find_flips():
+            flips = []
+            for l in W_:
+                ov = lambda o: min(o["x1"], l["x1"]) - max(o["x0"], l["x0"]) >= 0.8 * wd(l)
+                up = [o for o in W_ if 4 < l["base"] - o["base"] < 15 and ov(o)]
+                dn = [o for o in W_ if 4 < o["base"] - l["base"] < 15 and ov(o)]
+                if up and dn:
+                    u, d = max(up, key=lambda o: o["base"]), min(dn, key=lambda o: o["base"])
+                    same_col = all(abs(o["x0"] - l["x0"]) < 5 and abs(o["x1"] - l["x1"]) < 5 for o in (u, d))
+                    if u["c"] == d["c"] != l["c"] and (abs(l["xh"] - thr) < 0.8 or same_col):
+                        flips.append((l, u["c"]))
+                elif not up:
+                    # ראש עמודה: שורת מפרש שמתחילה במילה מוגדלת (ד"ה פותח) נמדדת גבוהה כגמרא — אם שתי
+                    # השורות שמתחתיה הן מפרש באותה עמודה (קצה משותף), גם היא מפרש.
+                    # בראש העמוד השכנה מתחת נבחרת בחפיפה של חצי (כמו השנייה), לא ב-80% של dn: השורה
+                    # השנייה בעמודה מסתיימת לפעמים מוקדם (סוף דיבור) וחופפת פחות. בברכות ב. — 159 מתוך 199
+                    # נקודות (79.9%), והשורה העליונה של רש"י ("מאימתי קורין את שמע בערבין") נשארה גמרא, כך
+                    # שהמסגרת לא זוהתה. באמצע העמוד נשאר dn כמו קודם: שם ההרחבה שינתה סיווגים בעמודים שלא נבדקו (יבמות צח.–קב.)
+                    near_top = l["base"] < y_first + 15
+                    below = dn if not near_top else [
+                        o for o in W_ if 4 < o["base"] - l["base"] < 15
+                        and min(o["x1"], l["x1"]) - max(o["x0"], l["x0"]) > 0.5 * min(wd(o), wd(l))]
+                    if not below:
+                        continue
+                    d = min(below, key=lambda o: o["base"])
+                    d2 = [o for o in W_ if 4 < o["base"] - d["base"] < 15
+                          and min(o["x1"], l["x1"]) - max(o["x0"], l["x0"]) > 0.5 * min(wd(o), wd(l))]
+                    edge = lambda o: abs(o["x0"] - l["x0"]) < 5 or abs(o["x1"] - l["x1"]) < 5
+                    # בראש העמוד: גם שורה שכולה בתוך רוחב השורה העליונה היא באותה עמודה — סוף דיבור ממורכז.
+                    # ע"ז טז.: מתחת ל"לפרסאי דמגנו עלן" בא "לעובדי כוכבים כלי זיין מהאי טעמא:" ממורכז
+                    # (136–244 בתוך 110–310), בלי קצה משותף, והשורה העליונה של התוספות נשארה גמרא ונשמטה
+                    inside = lambda o: near_top and l["x0"] - 2 <= o["x0"] and o["x1"] <= l["x1"] + 2
+                    if l["c"] == "g" and d2:
+                        d2 = min(d2, key=lambda o: o["base"])
+                        if d["c"] == d2["c"] == "s" and (edge(d) or inside(d)):
+                            flips.append((l, "s"))
+            return flips
         y_first = min((l["base"] for l in W_), default=0)  # קו הבסיס של השורה העליונה בעמוד
-        for l in W_:
-            ov = lambda o: min(o["x1"], l["x1"]) - max(o["x0"], l["x0"]) >= 0.8 * wd(l)
-            up = [o for o in W_ if 4 < l["base"] - o["base"] < 15 and ov(o)]
-            dn = [o for o in W_ if 4 < o["base"] - l["base"] < 15 and ov(o)]
-            if up and dn:
-                u, d = max(up, key=lambda o: o["base"]), min(dn, key=lambda o: o["base"])
-                same_col = all(abs(o["x0"] - l["x0"]) < 5 and abs(o["x1"] - l["x1"]) < 5 for o in (u, d))
-                if u["c"] == d["c"] != l["c"] and (abs(l["xh"] - thr) < 0.8 or same_col):
-                    flips.append((l, u["c"]))
-            elif not up:
-                # ראש עמודה: שורת מפרש שמתחילה במילה מוגדלת (ד"ה פותח) נמדדת גבוהה כגמרא — אם שתי
-                # השורות שמתחתיה הן מפרש באותה עמודה (קצה משותף), גם היא מפרש.
-                # בראש העמוד השכנה מתחת נבחרת בחפיפה של חצי (כמו השנייה), לא ב-80% של dn: השורה
-                # השנייה בעמודה מסתיימת לפעמים מוקדם (סוף דיבור) וחופפת פחות. בברכות ב. — 159 מתוך 199
-                # נקודות (79.9%), והשורה העליונה של רש"י ("מאימתי קורין את שמע בערבין") נשארה גמרא, כך
-                # שהמסגרת לא זוהתה. באמצע העמוד נשאר dn כמו קודם: שם ההרחבה שינתה סיווגים בעמודים שלא נבדקו (יבמות צח.–קב.)
-                near_top = l["base"] < y_first + 15
-                below = dn if not near_top else [
-                    o for o in W_ if 4 < o["base"] - l["base"] < 15
-                    and min(o["x1"], l["x1"]) - max(o["x0"], l["x0"]) > 0.5 * min(wd(o), wd(l))]
-                if not below:
-                    continue
-                d = min(below, key=lambda o: o["base"])
-                d2 = [o for o in W_ if 4 < o["base"] - d["base"] < 15
-                      and min(o["x1"], l["x1"]) - max(o["x0"], l["x0"]) > 0.5 * min(wd(o), wd(l))]
-                edge = lambda o: abs(o["x0"] - l["x0"]) < 5 or abs(o["x1"] - l["x1"]) < 5
-                # בראש העמוד: גם שורה שכולה בתוך רוחב השורה העליונה היא באותה עמודה — סוף דיבור ממורכז.
-                # ע"ז טז.: מתחת ל"לפרסאי דמגנו עלן" בא "לעובדי כוכבים כלי זיין מהאי טעמא:" ממורכז
-                # (136–244 בתוך 110–310), בלי קצה משותף, והשורה העליונה של התוספות נשארה גמרא ונשמטה
-                inside = lambda o: near_top and l["x0"] - 2 <= o["x0"] and o["x1"] <= l["x1"] + 2
-                if l["c"] == "g" and d2:
-                    d2 = min(d2, key=lambda o: o["base"])
-                    if d["c"] == d2["c"] == "s" and (edge(d) or inside(d)):
-                        flips.append((l, "s"))
+        flips = find_flips()
         if os.environ.get("TOP_DEBUG"):
             y0_ = min(l["base"] for l in W_)
             for l in sorted(W_, key=lambda l: l["base"]):
@@ -567,6 +570,17 @@ def image_rows(p, W, fL, fR, head):
                     print("TOP", round(l["x0"], 1), round(l["x1"], 1), round(l["top"], 1), round(l["base"], 1), round(l["xh"], 2), l["c"], round(thr, 2))
         for l, c in flips:
             l["c"] = c
+        # היפוכים שתלויים זה בזה: שורה שהתהפכה למפרש יכולה להיות "השכנה מתחת" שמכשירה היפוך של
+        # השורה שמעליה. ב"ב קסז.: השורה השלישית (5.67, ממש מעל הסף) נחשבה גמרא בזמן ההחלטה על
+        # העליונה, והתהפכה רק אחרי. סבבים נוספים — רק מגמרא למפרש, כך שהתהליך תמיד נעצר, ורק בראש
+        # העמוד: באמצע העמוד היפוך נוסף שינה את צירוף הפיסות ומשך טקסט של רש"י לתוך שורות הגמרא
+        # (יבמות צז. קטז., ב"מ מ.)
+        for _ in range(4):
+            more = [(l, c) for l, c in find_flips() if c == "s" and l["c"] == "g" and l["base"] < y_first + 15]
+            if not more:
+                break
+            for l, c in more:
+                l["c"] = c
         for l in L:
             if wide(l):
                 continue
