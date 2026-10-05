@@ -89,6 +89,12 @@
   "pages": 96,
   "sha256": "6b22c12f959790efa8dd33e399a9368d1af9cb66a5627d9fbc003abd09e240a8"
  },
+ "sotah": {
+  "built": "2026-10-05",
+  "file": "סוטה.pdf",
+  "pages": 96,
+  "sha256": "b1bd0b835da1ee26848319857bd369215deb5ef47204219c747a8649eeb33d59"
+ },
  "taanit": {
   "built": "2026-10-04",
   "file": "תענית.pdf",

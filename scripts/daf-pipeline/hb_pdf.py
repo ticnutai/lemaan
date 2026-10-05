@@ -261,6 +261,16 @@ def make_refs(shas, ws, keys, key, slug=None):
     refs = {"gemara": window(lambda k: gem_tokens(ws.get(k) or shas[k]["gemara"]), keys, key)}
     for c in ("rashi", "tosafot"):
         refs[c] = window(lambda k: side_tokens(com(k, c)), keys, key) + ([side_tokens([sg]) for sg in com(key, c)],)
+    pre = ws_commentary.BEFORE_TOSAFOT.get(he)
+    if pre:
+        # הפירוש שלפני התוספות (נדרים: הר"ן) מחולק בוויקיטקסט לפי הדף שעליו הוא מפרש, ובדפוס הוא גולש
+        # לעמודים הבאים (גם עמוד שלם). לבנייה: כל הפירוש של העמוד הקודם (בלי התוספות שלו) + של העמוד
+        # + התוספות של העמוד, והטקסט מותר מתחילתו. (הייחוס הרגיל נשאר לבדיקת השלמות.)
+        i = keys.index(key)
+        ptok = lambda k: side_tokens(ws_commentary.page(he, k, pre) or [])
+        carry = [t for k in keys[max(0, i - 2):i] for t in ptok(k)][-2500:]
+        flow = carry + ptok(key) + side_tokens(com_(key, "tosafot"))
+        refs["tosafot"] = refs["tosafot"] + ((flow, 0, len(flow)),)
     return refs
 
 
@@ -1176,7 +1186,9 @@ def build_page(p, key, refs, _scaled=False, tractate=None):
             if len(cand) > 2 and len(cand[-1]["w"]) <= 1 and cand[-1]["x1"] - cand[-1]["x0"] < 40 and cand[-1]["x1"] < cand[-2]["x1"] - 8:
                 cand = cand[:-1]
             ref_, lo_, hi_ = refs[st_][0], refs[st_][1], refs[st_][2]
-            if len(refs[st_]) > 3:
+            if len(refs[st_]) > 4:  # פירוש גולש (נדרים): ייחוס הבנייה המיוחד
+                ref_, lo_, hi_ = refs[st_][4]
+            elif len(refs[st_]) > 3:
                 ref_ = print_order([pc["w"] for pc in cand], ref_, lo_, hi_, refs[st_][3])
             res = anchor([pc["w"] for pc in cand], ref_, (lo_, hi_), [(pc["x0"], pc["x1"]) for pc in cand])
             if best is None or res[1] > best[1][1] + 0.01:

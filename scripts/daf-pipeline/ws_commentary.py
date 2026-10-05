@@ -48,6 +48,7 @@ def page(he, key, comm):
         return None
     body = sec.group(1)
     body = re.sub(r"<קטע[^>]*/>", " ", body)
+    body = re.sub(r"<[^>]+>", " ", body)  # תגיות HTML (<div class='gmara_tosfot'>)
     body = re.sub(r"\[\[\s*(?:קטגוריה|Category)\s*:[^\]]*\]\]", " ", body)  # קטגוריות — לא טקסט
     body = re.sub(r"\{\{[^{}]*\}\}", " ", body)                 # תבניות
     body = re.sub(r"\[\[(?:[^|\]]*\|)?([^\]]*)\]\]", r"\1", body)  # קישורים → הטקסט
