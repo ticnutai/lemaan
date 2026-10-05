@@ -25,30 +25,50 @@ const amudLabel = (k: string) => {
   return m ? `${hebrewDaf(+m[1])}${m[2] === "a" ? "." : ":"}` : k;
 };
 
+// קובץ החיפוש (tzurat/print/search/<מסכת>.json.gz, נוצר בצינור): לכל עמוד וזרם — [השורות, השורות
+// מנורמלות כמו normHe], כך שהדפדפן לא טוען גאומטריה ולא מנרמל מאות אלפי שורות
+type SearchFile = Record<string, Partial<Record<Stream, [string, string]>>>;
+
+function fromSearchFile(f: string, d: SearchFile, out: Seq[]) {
+  for (const [amud, per] of Object.entries(d)) {
+    for (const s of ["gemara", "rashi", "tosafot"] as Stream[]) {
+      const pair = per[s];
+      if (!pair) continue;
+      const lines = pair[0].split("\n");
+      const norm = pair[1].replace(/\n/g, " ") + " ";
+      const starts = [0];
+      for (let i = pair[1].indexOf("\n"); i >= 0; i = pair[1].indexOf("\n", i + 1)) starts.push(i + 1);
+      out.push({ file: f, amud, s, norm, starts, lines });
+    }
+  }
+}
+
+function fromLayouts(f: string, d: Record<string, PrintLayout>, out: Seq[]) {
+  for (const [amud, lay] of Object.entries(d)) {
+    for (const s of ["gemara", "rashi", "tosafot"] as Stream[]) {
+      const lines = lay.slabs.filter((sl) => sl.s === s).flatMap((sl) => (sl.lines ?? []).map((l) => strip(l.t)));
+      if (!lines.length) continue;
+      const starts: number[] = [];
+      let norm = "";
+      for (const l of lines) { starts.push(norm.length); norm += normHe(l) + " "; }
+      out.push({ file: f, amud, s, norm, starts, lines });
+    }
+  }
+}
+
 let corpus: Promise<Seq[]> | null = null;
 function loadCorpus(base: string): Promise<Seq[]> {
   corpus ??= fetch(`${base}tzurat/print/index.json`)
     .then((r) => (r.ok ? r.json() : []))
     .then((files: string[]) =>
       Promise.all(files.map((f) =>
-        fetchGzJson<Record<string, PrintLayout>>(`${base}tzurat/print/${f}.json.gz`).then((d) => ({ f, d })).catch(() => null))))
-    .then((all) => {
-      const out: Seq[] = [];
-      for (const x of all) {
-        if (!x) continue;
-        for (const [amud, lay] of Object.entries(x.d)) {
-          for (const s of ["gemara", "rashi", "tosafot"] as Stream[]) {
-            const lines = lay.slabs.filter((sl) => sl.s === s).flatMap((sl) => (sl.lines ?? []).map((l) => strip(l.t)));
-            if (!lines.length) continue;
-            const starts: number[] = [];
-            let norm = "";
-            for (const l of lines) { starts.push(norm.length); norm += normHe(l) + " "; }
-            out.push({ file: x.f, amud, s, norm, starts, lines });
-          }
-        }
-      }
-      return out;
-    })
+        fetchGzJson<SearchFile>(`${base}tzurat/print/search/${f}.json.gz`)
+          .then((d) => { const out: Seq[] = []; fromSearchFile(f, d, out); return out; })
+          // בלי קובץ חיפוש (גרסה ישנה במטמון): מקבצי הפריסה
+          .catch(() => fetchGzJson<Record<string, PrintLayout>>(`${base}tzurat/print/${f}.json.gz`)
+            .then((d) => { const out: Seq[] = []; fromLayouts(f, d, out); return out; }))
+          .catch(() => [] as Seq[]))))
+    .then((all) => all.flat())
     .catch(() => { corpus = null; return []; });
   return corpus;
 }
@@ -110,7 +130,8 @@ export default function PrintSearch({ masechtot, onOpen }: {
       <div className="flex items-center gap-2 flex-wrap">
         <div className="relative flex-1 min-w-0 basis-48">
           <input className="input h-10 w-full pe-9" placeholder="מילה או ביטוי — גם כשהוא עובר שורה" value={q}
-            onChange={(e) => setQ(e.target.value)} aria-label="חיפוש בדפוס המדויק" />
+            onChange={(e) => setQ(e.target.value)} aria-label="חיפוש בדפוס המדויק"
+            onFocus={() => void loadCorpus(import.meta.env.BASE_URL)} /* טעינה כבר בכניסה לתיבה */ />
           {q && <button className="absolute top-2 end-2 text-muted-foreground" onClick={() => setQ("")} title="נקה"><X className="h-5 w-5" /></button>}
         </div>
         <div className="flex flex-wrap gap-1" role="group" aria-label="סינון לפי זרם">

@@ -1423,6 +1423,33 @@ def ref_lookup(shas, ws, keys, tractate):
 def write_layouts(path, layouts):
     data = json.dumps(compact(layouts), ensure_ascii=False, separators=(",", ":")).encode()
     open(path, "wb").write(gzip.compress(data, 9))
+    write_search(path, layouts)
+
+
+def norm_search(t):
+    """זהה ל-normHe ב-src/features/daf/PrintSearch.tsx: בלי ניקוד/טעמים, גרשיים ופיסוק; רווחים מכווצים."""
+    t = re.sub("[֑-ׇ]", "", t)
+    t = re.sub(r"[\"'״׳.,:;!?()\[\]{}־-]", "", t)
+    return re.sub(r"\s+", " ", t).strip()
+
+
+def write_search(path, layouts):
+    """קובץ חיפוש לצד הפריסה (search/<מסכת>.json.gz): רק טקסט השורות לכל עמוד וזרם, בלי גאומטריה,
+    ואיתו הנרמול מוכן — כדי שהחיפוש בכל הש"ס בדפוס המדויק לא יטען את קבצי הפריסה ולא ינרמל בדפדפן.
+    {עמוד: {"gemara": ["שורה\\nשורה", "שורה מנורמלת\\n…"], ...}}"""
+    out = {}
+    for k, lay in layouts.items():
+        per = {}
+        for sl in lay.get("slabs", []):
+            if sl.get("s") in ("gemara", "rashi", "tosafot"):
+                per.setdefault(sl["s"], []).extend(
+                    re.sub(r"\s+", " ", TAGS.sub(" ", l.get("t", ""))).strip() for l in sl.get("lines") or [])
+        # [השורות כפי שהן, השורות מנורמלות] — הנרמול כמו normHe ב-PrintSearch.tsx (מחושב כאן ולא בדפדפן)
+        out[k] = {s_: ["\n".join(v), "\n".join(norm_search(l) for l in v)] for s_, v in per.items() if v}
+    d = os.path.join(os.path.dirname(path), "search")
+    os.makedirs(d, exist_ok=True)
+    data = json.dumps(out, ensure_ascii=False, separators=(",", ":")).encode()
+    open(os.path.join(d, os.path.basename(path)), "wb").write(gzip.compress(data, 9))
 
 
 def main(pdf, tractate, first_page, only=None):
