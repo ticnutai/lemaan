@@ -35,6 +35,12 @@
   "pages": 25,
   "sha256": "dcaa7f2e7259c0fecb6a80190ea931307a9135927c2ab13a645e1b1c31b1871c"
  },
+ "ketubot": {
+  "built": "2026-10-05",
+  "file": "כתובות.pdf",
+  "pages": 222,
+  "sha256": "8bdcd4267b75af4e001b156fcfb07b91a4f2b042c44e438c9a1adb6667fc2445"
+ },
  "kiddushin": {
   "built": "2026-10-04",
   "file": "קידושין.pdf",
