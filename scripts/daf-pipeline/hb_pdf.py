@@ -552,9 +552,13 @@ def image_rows(p, W, fL, fR, head):
                 d2 = [o for o in W_ if 4 < o["base"] - d["base"] < 15
                       and min(o["x1"], l["x1"]) - max(o["x0"], l["x0"]) > 0.5 * min(wd(o), wd(l))]
                 edge = lambda o: abs(o["x0"] - l["x0"]) < 5 or abs(o["x1"] - l["x1"]) < 5
+                # בראש העמוד: גם שורה שכולה בתוך רוחב השורה העליונה היא באותה עמודה — סוף דיבור ממורכז.
+                # ע"ז טז.: מתחת ל"לפרסאי דמגנו עלן" בא "לעובדי כוכבים כלי זיין מהאי טעמא:" ממורכז
+                # (136–244 בתוך 110–310), בלי קצה משותף, והשורה העליונה של התוספות נשארה גמרא ונשמטה
+                inside = lambda o: near_top and l["x0"] - 2 <= o["x0"] and o["x1"] <= l["x1"] + 2
                 if l["c"] == "g" and d2:
                     d2 = min(d2, key=lambda o: o["base"])
-                    if d["c"] == d2["c"] == "s" and edge(d):
+                    if d["c"] == d2["c"] == "s" and (edge(d) or inside(d)):
                         flips.append((l, "s"))
         if os.environ.get("TOP_DEBUG"):
             y0_ = min(l["base"] for l in W_)
