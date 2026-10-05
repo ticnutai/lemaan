@@ -628,8 +628,9 @@ def image_rows(p, W, fL, fR, head):
         המרווח בין העמודות נמשך, ולכן l שייכת לעמודה שלה ולא להמשך שורת הגמרא. בגמרא שמתרחבת באמת
         לרוחב העמוד, השורה עוברת את קצה העמודה. ע"ז ב.: "ולא אומה ואומה בפני עצמה:" של רש"י (דיבור
         המתחיל, גבוה כמעט כגמרא) צורף ל"דתני אידיהן לא משתבש" ונשמט מרש"י"""
+        # נקראת גם מתוך הסיווג, לפני שלפיסות הצרות יש סוג — לכן get
         for g in L:
-            if g is l or g["c"] != "g" or abs(g["base"] - l["base"]) > 1.5:
+            if g is l or g.get("c") != "g" or abs(g["base"] - l["base"]) > 1.5:
                 continue
             if g["x1"] <= l["x0"] + 2 and l["x0"] - g["x1"] < 25:
                 facing = "x1"
@@ -637,7 +638,7 @@ def image_rows(p, W, fL, fR, head):
                 facing = "x0"
             else:
                 continue
-            if any(o["c"] == "g" and wide(o) and 4 < g["base"] - o["base"] < 15
+            if any(o.get("c") == "g" and wide(o) and 4 < g["base"] - o["base"] < 15
                    and abs(o[facing] - g[facing]) < 2.5 for o in L):
                 return True
         return False
