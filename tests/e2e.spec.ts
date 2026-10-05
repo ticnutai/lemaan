@@ -239,11 +239,22 @@ test("T19 — חיפוש בכל הדפוס המדויק: סינון לפי זר�
   await page.goto("/#/shas");
   const box = page.getByLabel("חיפוש בדפוס המדויק");
   await expect(box).toBeVisible({ timeout: 15_000 });
-  await timed("T19_print_search_ms", 3000, async () => {
+  // חיפוש ראשון כולל טעינת קובצי החיפוש של כל המסכתות (~10MB דחוס ב-20 מסכתות, יגדל עם הש"ס) —
+  // התקציב גדל עם הקורפוס; החיפוש עצמו נמדד בנפרד (T19_print_search_warm_ms) בתקציב קשיח
+  await timed("T19_print_search_ms", 6000, async () => {
     await box.fill("אמר רבא");
-    await expect(page.getByTestId("print-search-count")).toContainText("תוצאות", { timeout: 10_000 });
+    await expect(page.getByTestId("print-search-count")).toContainText("תוצאות", { timeout: 15_000 });
   });
-  const all = parseInt((await page.getByTestId("print-search-count").textContent()) ?? "0", 10);
+  const count = page.getByTestId("print-search-count");
+  const firstText = (await count.textContent()) ?? "";
+  const all = parseInt(firstText, 10);
+  await timed("T19_print_search_warm_ms", 1000, async () => {
+    await box.fill("רב פפא");
+    await expect(count).not.toHaveText(firstText, { timeout: 5_000 });
+    await expect(count).toContainText("תוצאות", { timeout: 5_000 });
+  });
+  await box.fill("אמר רבא");
+  await expect(count).toContainText(`${all} תוצאות`, { timeout: 5_000 });
   expect(all).toBeGreaterThan(10);
   // סינון לתוספות בלבד: פחות תוצאות, וכולן מתוספות
   await page.getByRole("group", { name: "סינון לפי זרם" }).getByRole("button", { name: "תוספות" }).click();
