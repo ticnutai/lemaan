@@ -1293,6 +1293,9 @@ def build_page(p, key, refs, _scaled=False, tractate=None):
     box = None
     if refs["gemara"][1] == 0:
         gref = [t for t in refs["gemara"][0] if not re.match(r"^מתני[׳']?$", t)]
+        # בוויקיטקסט "מתני'" לפעמים דבוקה למילה הראשונה, והיא נכנסה למסגרת ("מתני'מגילה" במגילה ב.)
+        if gref:
+            gref[0] = re.sub(r"^מתני[׳']", "", gref[0]) or gref[0]
         gs = sorted((sl for sl in slabs if sl["s"] == "gemara"), key=lambda sl: sl["t"])
         if gref and gs:
             g0 = gs[0]
