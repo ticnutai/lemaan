@@ -59,6 +59,18 @@
   "pages": 61,
   "sha256": "a8fee881216bca228ac955f2660c2e0864b91687ea3b335106e59d8233e1aa99"
  },
+ "nazir": {
+  "built": "2026-10-05",
+  "file": "נזיר.pdf",
+  "pages": 130,
+  "sha256": "b9a0c1575ff6370a1562dd81bd72d2fb19bc1e26cf08dd97861a9cc11483905c"
+ },
+ "nedarim": {
+  "built": "2026-10-05",
+  "file": "נדרים.pdf",
+  "pages": 180,
+  "sha256": "1ec026d28a778bf4b40672e48c88947d46e12de0e059c5b234bf7b7844241820"
+ },
  "sanhedrin": {
   "built": "2026-10-05",
   "file": "סנהדרין.pdf",
