@@ -89,6 +89,9 @@ def gemara_of(w):
     body = re.sub(r"\[\[(?:[^|\]]*\|)?([^\]]*)\]\]", r"\1", body)
     body = body.replace("'''", "").replace("‏", "").replace("‎", "")
     segs = [re.sub(r"\s+", " ", p).strip() for p in re.split(r"\n\s*\n", body)]
+    # הפניה של ויקיטקסט למהדורה המבוארת ("ראה במהדורה המבוארת", "ראו דף זה במהדורה המבוארת") — קישור
+    # באתר, לא גמרא. במנחות ב. היא נכנסה למסגרת הפתיחה במקום "כל"
+    segs = [re.sub(r"^רא[הו] (?:דף זה )?במהדורה המבוארת\s*", "", p) for p in segs]
     return [s for s in segs if s] or None
 
 

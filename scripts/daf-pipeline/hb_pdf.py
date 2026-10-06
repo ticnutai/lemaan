@@ -60,7 +60,22 @@ def page_words(p):
                     else:
                         cur.append((c, sp))
             flush()
-    return out
+    # שכבת טקסט כפולה: באותה מילה באותו מקום (חופפת ברובה) — רק הראשונה. בסריקה של מעילה שכבת ה-OCR
+    # מופיעה פעמיים (לפעמים בהזזה של 2 נק'), והכותרת יצאה "קדשי קדשי קדשים קדשים". ההשוואה בלי
+    # סימני פיסוק: מספר הדף נקרא פעם "ה:" ופעם ":ה"
+    kept, seen = [], {}
+    for w in out:
+        key = re.sub(r"[^\w]", "", w["t"]) or w["t"]
+        area = lambda b: max(0.0, b["x1"] - b["x0"]) * max(0.0, b["y1"] - b["y0"])
+        dup = False
+        for o in seen.get(key, ()):
+            ix = min(o["x1"], w["x1"]) - max(o["x0"], w["x0"]); iy = min(o["y1"], w["y1"]) - max(o["y0"], w["y0"])
+            if ix > 0 and iy > 0 and ix * iy > 0.5 * min(area(o), area(w)):
+                dup = True
+                break
+        if not dup:
+            kept.append(w); seen.setdefault(key, []).append(w)
+    return kept
 
 
 def rows_of(words, tol=None, base=False):
@@ -1352,7 +1367,8 @@ def build_page(p, key, refs, _scaled=False, tractate=None):
     # המילה (אחרי "מתני׳") נלקחת מהטקסט, והמסגרת — בין ראשי המפרשים לשורת הגמרא הראשונה
     box = None
     if refs["gemara"][1] == 0:
-        gref = [t for t in refs["gemara"][0] if not re.match(r"^מתני[׳']?$", t)]
+        # "מתני'" או "מתניתין" (ביצה ב. בוויקיטקסט) — לפני המילה, לא במסגרת
+        gref = [t for t in refs["gemara"][0] if not re.match(r"^מתני(?:תין|[׳'])?$", t)]
         # בוויקיטקסט "מתני'" לפעמים דבוקה למילה הראשונה, והיא נכנסה למסגרת ("מתני'מגילה" במגילה ב.)
         if gref:
             gref[0] = re.sub(r"^מתני[׳']", "", gref[0]) or gref[0]
