@@ -29,6 +29,10 @@ BASE_G, BASE_S = float(os.environ.get("BASE_G", 0.785)), float(os.environ.get("B
 
 
 # ---------- מילים עם גודל/הדגשה ----------
+# שכבת טקסט בקידוד ישן (דפי היברובוקס): בתי חלונות-עברית שהוצגו כלטינית (גופן רש"י) או כמקינטוש (גופן וילנא)
+LEGACY = {bytes([b]).decode(enc): chr(b - 0xE0 + 0x5D0) for enc in ("latin-1", "mac_roman") for b in range(0xE0, 0xFB)}
+LEGACY[""] = "נ"  # נ בגופן וילנא (במקום תו התפוח של מקינטוש)
+MIRROR = {"(": ")", ")": "(", "[": "]", "]": "["}
 def page_words(p):
     """מילות ה-OCR עם גודל גופן, נבנות מהתווים עצמם.
     סימני ההפניה הקטנים בגמרא (מספרים/אותיות של תורה אור, עין משפט, מסורת הש"ס, הגהות) נקראים
@@ -46,7 +50,12 @@ def page_words(p):
                     cnt[round(sp["size"], 1)] = cnt.get(round(sp["size"], 1), 0) + 1
                 size = max(cnt, key=lambda z: (cnt[z], z))
                 keep = [(c, sp) for c, sp in cur if sp["size"] >= 0.8 * size]
-                t = re.sub(r"^[׳'״\"־■\-]+", "", "".join(c["c"] for c, _ in keep))
+                t = "".join(c["c"] for c, _ in keep)
+                # קידוד ישן (היברובוקס): אותיות לטיניות בסדר חזותי. רק כשכל האותיות במילה מהקידוד הישן —
+                # בסריקות של אוצריא יש מעט רעש כמו "ÆÅÈ" (מעילה), ואסור שיהפוך לאות עברית
+                if any(c in LEGACY for c in t) and all(c in LEGACY or not c.isalpha() for c in t):
+                    t = "".join(LEGACY.get(c) or MIRROR.get(c, c) for c in reversed(t))
+                t = re.sub(r"^[׳'״\"־■\-]+", "", t)
                 if t:
                     xs = [c["bbox"] for c, _ in keep]
                     font = max(keep, key=lambda cs: cs[1]["size"])[1]["font"]

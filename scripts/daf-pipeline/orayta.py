@@ -74,6 +74,7 @@ def to_segments(body):
 
 def load(he, comm):
     """→ {"2a": [פסקאות], ...} או None אם אין קובץ."""
+    he = {"נידה": "נדה"}.get(he, he)  # שם הקובץ באורייתא
     k = (he, comm)
     if k in _cache:
         return _cache[k]
