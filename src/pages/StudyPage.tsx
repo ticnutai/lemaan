@@ -12,6 +12,7 @@ import { applyReview, buildPracticeQueue, type SrsAlgorithm } from "../features/
 import { cardsForDeck } from "../features/study/deckCards";
 import { AMUD_LABELS, SEDARIM, hebrewDaf } from "../features/study/shas";
 import { useStudySession, type SessionPath } from "../features/study/activeSession";
+import { dafStatus, emptyDafEntry, sederOf, STATUS_DOT, STATUS_LABEL, useShasCounts, type DafStatus } from "../features/study/shasCounts";
 import {
   isPlacePinned, saveFontScale, saveInstant, togglePinnedCard, togglePinnedPlace,
   usePinnedCardIds, usePinnedPlaces, useStudyToolbarPrefs, type PinnedPlace,
@@ -37,31 +38,6 @@ const QUALITY_BUTTONS: { q: 0 | 3 | 4 | 5; label: string; cls: string }[] = [
 ];
 
 const OPTION_KEYS = ["א", "ב", "ג", "ד", "ה", "ו", "ז", "ח"];
-
-/** מוני שאלות לכל דף: לפי עמוד, וכמה כבר תורגלו / ממתינות לחזרה. */
-interface DafEntry { a: number; b: number; none: number; reviewed: number; due: number }
-type DafCounts = Map<number, DafEntry>;
-type DafStatus = "new" | "partial" | "done" | "due";
-
-function dafStatus(e: DafEntry): DafStatus {
-  const total = e.a + e.b + e.none;
-  if (e.due > 0) return "due";
-  if (e.reviewed === 0) return "new";
-  return e.reviewed >= total ? "done" : "partial";
-}
-
-const STATUS_DOT: Record<DafStatus, string> = {
-  new: "",
-  partial: "border-2 border-green-600 bg-transparent",
-  done: "bg-green-600",
-  due: "bg-gold",
-};
-const STATUS_LABEL: Record<DafStatus, string> = {
-  new: "עוד לא התחלת",
-  partial: "בתהליך",
-  done: "נלמד",
-  due: "ממתין לחזרה",
-};
 
 function formatClock(ms: number): string {
   const s = Math.floor(ms / 1000);
@@ -110,8 +86,6 @@ function PinPlaceButton({ place, places }: { place: PinnedPlace; places: PinnedP
   );
 }
 
-const sederOf = (masechta: string) => SEDARIM.find((s) => s.masechtot.includes(masechta))?.name ?? null;
-
 export default function StudyPage() {
   // ---- מיקום הבחירה ומצב הסשן — במאגר משותף, כדי שיישמרו במעבר לגמרא וחזרה ----
   const st = useStudySession();
@@ -137,7 +111,7 @@ export default function StudyPage() {
 
   const categories = useLiveQuery(() => db.categories.toArray(), []);
   const decks = useLiveQuery(() => db.decks.toArray(), []);
-  const allCards = useLiveQuery(() => db.cards.toArray(), []);
+  const { cards: allCards, counts } = useShasCounts();
   const algorithm = useLiveQuery(async () => ((await db.settings.get("srs-algo"))?.value ?? "sm2") as SrsAlgorithm, []);
   const session = useSession();
   const [noteOpen, setNoteOpen] = useState(false);
@@ -153,30 +127,6 @@ export default function StudyPage() {
     return () => clearInterval(t);
   }, [queue, st.clockStartedAt]);
   const elapsed = st.elapsed();
-
-  /** מוני שאלות לכל מסכת/דף/עמוד + מצב התרגול — חישוב אחד מהמאגר. */
-  const counts = useMemo(() => {
-    const byMasechta = new Map<string, DafCounts>();
-    if (!allCards) return byMasechta;
-    const now = Date.now();
-    for (const c of allCards) {
-      if (!c.masechta) continue;
-      const dafNum = parseInt(c.daf ?? "", 10);
-      if (!Number.isFinite(dafNum)) continue;
-      let dafMap = byMasechta.get(c.masechta);
-      if (!dafMap) byMasechta.set(c.masechta, (dafMap = new Map()));
-      let entry = dafMap.get(dafNum);
-      if (!entry) dafMap.set(dafNum, (entry = { a: 0, b: 0, none: 0, reviewed: 0, due: 0 }));
-      if (c.amud === "1") entry.a++;
-      else if (c.amud === "2") entry.b++;
-      else entry.none++;
-      if (c.srs.lastReviewedAt != null) {
-        entry.reviewed++;
-        if (c.srs.dueAt <= now) entry.due++;
-      }
-    }
-    return byMasechta;
-  }, [allCards]);
 
   const masechtaTotal = (name: string) => {
     let n = 0;
@@ -271,6 +221,7 @@ export default function StudyPage() {
       const deck = await db.decks.get(deckId);
       if (deck) await startDeck(deck);
       setSearchParams({}, { replace: true });
+      deckStarted.current = false; // קישור נוסף (גם בלי לצאת מהעמוד) יטופל שוב
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, categories, allCards]);
@@ -299,9 +250,16 @@ export default function StudyPage() {
       const single = from === to ? from : undefined;
       const leaf = single !== undefined ? (amud ? AMUD_LABELS[amud] : "כל הדף")
         : from <= 2 && to >= 500 ? "כל המסכת" : `דפים ${hebrewDaf(from)}–${hebrewDaf(to)}`;
+      // המקום בבחירה מתעדכן לאותו מקום — "חזרה" מהתרגול מגיעה לשם
+      set("mode", "general");
+      set("corpus", 'ש"ס');
+      set("seder", sederOf(m));
+      set("masechta", m);
+      set("daf", single ?? null);
       if (dueOnly && due.length) beginPractice(due, { kind: "shas", masechta: m, daf: single, leaf: `חזרה מהירה · ${leaf}` });
       else beginPractice(inRange, { kind: "shas", masechta: m, daf: single, leaf });
       setSearchParams({}, { replace: true });
+      linkStarted.current = false; // קישור נוסף (למשל מהחלון הצף) יטופל שוב
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
@@ -681,7 +639,7 @@ export default function StudyPage() {
             {/* רמה 4: בחירת עמוד / מיון לעמודים */}
             {masechta && daf !== null && (() => {
               if (sorting) return <AmudSorter masechta={masechta} daf={daf} onClose={() => setSorting(false)} />;
-              const e = counts.get(masechta)?.get(daf) ?? { a: 0, b: 0, none: 0, reviewed: 0, due: 0 };
+              const e = counts.get(masechta)?.get(daf) ?? emptyDafEntry();
               const total = e.a + e.b + e.none;
               // שאלות בלי תיוג עמוד נספרות בשני העמודים — כמו במקור
               const aCount = e.a + e.none, bCount = e.b + e.none;

@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "0.1.0"
+version = "0.1.1"
 description = "A Tauri App"
 authors = ["you"]
 license = ""
@@ -12,7 +12,9 @@ rust-version = "1.90"
 
 [lib]
 name = "app_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
+# רק לתוכנת המחשב. (staticlib/cdylib נועדו לאפליקציית טלפון שנבנית בכלי הזה —
+# אצלנו אפליקציית האנדרואיד נבנית בנפרד, ולכן הם רק תפסו מקום וזמן בכל בנייה.)
+crate-type = ["rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2.7.0", features = [] }

@@ -44,6 +44,13 @@
     --focus-learned-to: 42 70% 50%;
     --focus-learned-icon: 160 78% 34%;
     --focus-learned-icon-border: 160 65% 48%;
+    /* צבעי ששת הסדרים — חלון הניווט הצף */
+    --seder-1: 152 45% 38%;
+    --seder-2: 42 72% 48%;
+    --seder-3: 345 55% 50%;
+    --seder-4: 220 62% 46%;
+    --seder-5: 22 72% 50%;
+    --seder-6: 190 58% 38%;
     --gradient-gold: linear-gradient(135deg, hsl(42 75% 55%), hsl(38 65% 45%));
     --gradient-navy: linear-gradient(135deg, hsl(220 65% 14%), hsl(220 50% 22%));
     --shadow-elegant: 0 4px 20px -4px hsl(220 65% 14% / 0.15);
@@ -89,6 +96,13 @@
     --focus-learned-to: 42 75% 58%;
     --focus-learned-icon: 160 72% 52%;
     --focus-learned-icon-border: 160 56% 44%;
+    /* צבעי ששת הסדרים — חלון הניווט הצף */
+    --seder-1: 152 50% 52%;
+    --seder-2: 42 78% 58%;
+    --seder-3: 345 62% 64%;
+    --seder-4: 215 72% 64%;
+    --seder-5: 22 80% 60%;
+    --seder-6: 186 62% 52%;
     --gradient-gold: linear-gradient(135deg, hsl(42 80% 60%), hsl(38 70% 48%));
     --gradient-navy: linear-gradient(135deg, hsl(220 50% 8%), hsl(220 45% 14%));
     --shadow-elegant: 0 4px 20px -4px hsl(0 0% 0% / 0.5);
@@ -133,6 +147,13 @@
     --focus-learned-to: 148 58% 70%;
     --focus-learned-icon: 158 72% 36%;
     --focus-learned-icon-border: 158 62% 48%;
+    /* צבעי ששת הסדרים — חלון הניווט הצף */
+    --seder-1: 158 62% 40%;
+    --seder-2: 42 80% 48%;
+    --seder-3: 340 58% 52%;
+    --seder-4: 220 58% 44%;
+    --seder-5: 25 80% 52%;
+    --seder-6: 190 62% 38%;
     --gradient-gold: linear-gradient(135deg, hsl(42 84% 56%), hsl(38 72% 47%));
     --gradient-navy: linear-gradient(135deg, hsl(220 62% 17%), hsl(220 44% 27%));
     --shadow-elegant: 0 5px 22px -6px hsl(220 62% 17% / 0.16);
@@ -177,6 +198,13 @@
     --focus-learned-to: 42 65% 50%;
     --focus-learned-icon: 158 62% 34%;
     --focus-learned-icon-border: 158 50% 46%;
+    /* צבעי ששת הסדרים — חלון הניווט הצף */
+    --seder-1: 160 55% 28%;
+    --seder-2: 42 72% 46%;
+    --seder-3: 350 45% 45%;
+    --seder-4: 200 48% 34%;
+    --seder-5: 28 62% 46%;
+    --seder-6: 175 48% 32%;
     --gradient-gold: linear-gradient(135deg, hsl(42 75% 55%), hsl(38 65% 45%));
     --gradient-navy: linear-gradient(135deg, hsl(160 55% 18%), hsl(160 50% 26%));
     --shadow-elegant: 0 4px 20px -4px hsl(160 50% 12% / 0.15);
@@ -221,6 +249,13 @@
     --focus-learned-to: 25 60% 55%;
     --focus-learned-icon: 150 48% 34%;
     --focus-learned-icon-border: 148 40% 48%;
+    /* צבעי ששת הסדרים — חלון הניווט הצף */
+    --seder-1: 150 30% 38%;
+    --seder-2: 25 62% 52%;
+    --seder-3: 350 55% 34%;
+    --seder-4: 265 30% 44%;
+    --seder-5: 12 62% 48%;
+    --seder-6: 195 35% 38%;
     --gradient-gold: linear-gradient(135deg, hsl(25 65% 60%), hsl(20 55% 50%));
     --gradient-navy: linear-gradient(135deg, hsl(350 55% 25%), hsl(350 45% 33%));
     --shadow-elegant: 0 4px 20px -4px hsl(350 45% 18% / 0.15);
@@ -266,6 +301,13 @@
     --focus-learned-to: 43 72% 72%;
     --focus-learned-icon: 158 72% 36%;
     --focus-learned-icon-border: 158 62% 48%;
+    /* צבעי ששת הסדרים — חלון הניווט הצף */
+    --seder-1: 158 50% 40%;
+    --seder-2: 42 72% 50%;
+    --seder-3: 350 52% 56%;
+    --seder-4: 220 52% 40%;
+    --seder-5: 30 76% 52%;
+    --seder-6: 185 52% 40%;
     --gradient-gold: linear-gradient(135deg, hsl(42 84% 56%), hsl(38 72% 47%));
     --gradient-navy: linear-gradient(135deg, hsl(220 62% 17%), hsl(220 44% 27%));
     --shadow-elegant: 0 5px 22px -6px hsl(220 62% 17% / 0.16);

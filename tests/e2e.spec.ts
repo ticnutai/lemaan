@@ -306,3 +306,20 @@ test("T20 — בית: תוכנית ש\"ס (הבאה לסימון, סיימתי, 
   await expect(crumbs).toContainText("דף ב");
   await expect(crumbs).toContainText("עמוד ב'");
 });
+
+test("T21 — חלון ניווט הש\"ס הצף: סדר ← מסכת ← דף ← תרגול עמוד", async () => {
+  await page.goto("/#/");
+  await page.getByRole("button", { name: 'פתיחת ניווט הש"ס' }).click();
+  const nav = page.getByRole("dialog", { name: 'ניווט בש"ס' });
+  await expect(nav).toBeVisible();
+  await expect(nav.getByRole("button", { name: /סדר מועד/ })).toBeVisible();
+  await nav.getByRole("button", { name: /סדר מועד/ }).click();
+  await nav.getByRole("button", { name: /^חגיגה/ }).click();
+  await nav.locator(".grid > button").first().click();
+  // פירורי הלחם בחלון מראים את המסלול
+  await expect(nav.getByRole("navigation", { name: "מיקום בניווט" })).toContainText("חגיגה");
+  // תרגול עמוד א' — מעבר למסך התרגול, והחלון מתמזער
+  await nav.getByRole("button", { name: /תרגול/ }).first().click();
+  await expect(page.getByText(/1 \/ \d+ · תרגול חופשי/)).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("navigation", { name: "מיקום" }).first()).toContainText("עמוד א'");
+});

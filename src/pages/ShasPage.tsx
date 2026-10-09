@@ -79,12 +79,13 @@ export default function ShasPage() {
   const slug = params.get("m");
   const amudKey = params.get("a") ?? "2a";
 
-  // קישור עמוק ממסך התרגול: ?he=<שם מסכת בעברית>&daf=<מספר דף>
+  // קישור עמוק ממסך התרגול ומחלון הניווט: ?he=<שם מסכת בעברית>&daf=<מספר דף>[&amud=2]
   useEffect(() => {
     const he = params.get("he");
     if (!he || !index) return;
     const m = index.masechtot.find((x) => x.he === he || x.he === he.replace("מסכת ", ""));
-    if (m) setParams({ m: m.slug, a: `${params.get("daf") ?? "2"}a` }, { replace: true });
+    const side = params.get("amud") === "2" ? "b" : "a";
+    if (m) setParams({ m: m.slug, a: `${params.get("daf") ?? "2"}${side}` }, { replace: true });
     else setParams({}, { replace: true });
   }, [params, index, setParams]);
 

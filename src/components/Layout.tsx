@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { flushAmudSorts, pullAmudSorts } from "../db/amudSort";
 import { useStudySession } from "../features/study/activeSession";
+import ShasNavigator from "./ShasNavigator";
 import { useTheme } from "../theme/ThemeProvider";
 import { useAutoImport } from "../db/useAutoImport";
 import { useSession } from "../db/useSession";
@@ -183,15 +184,18 @@ export default function Layout() {
           </div>
         </aside>
 
-        <main className="flex-1 min-w-0 p-3 md:p-6 overflow-auto">
+        <main className="flex-1 min-w-0 p-3 pb-24 md:p-6 md:pb-24 overflow-auto">
           <Outlet />
         </main>
       </div>
 
+      {/* ניווט מהיר בש"ס — אייקון צף בכל האתר */}
+      <ShasNavigator />
+
       {showResume && (
         <Link
           to="/study"
-          className="fixed bottom-4 left-4 z-40 btn-gold rounded-full shadow-gold h-11 px-4"
+          className="fixed bottom-5 left-20 z-40 btn-gold rounded-full shadow-gold h-11 px-4"
         >
           <GraduationCap className="h-4 w-4" /> חזרה לתרגול · {activeIndex + 1}/{activeQueue!.length}
         </Link>

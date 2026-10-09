@@ -77,6 +77,17 @@ export const COLOR_TOKEN_GROUPS: { title: string; tokens: { key: string; label: 
       { key: "focus-learned-to", label: "נלמדו — סוף" },
     ],
   },
+  {
+    title: "ניווט הש\"ס — צבעי הסדרים",
+    tokens: [
+      { key: "seder-1", label: "סדר זרעים" },
+      { key: "seder-2", label: "סדר מועד" },
+      { key: "seder-3", label: "סדר נשים" },
+      { key: "seder-4", label: "סדר נזיקין" },
+      { key: "seder-5", label: "סדר קדשים" },
+      { key: "seder-6", label: "סדר טהרות" },
+    ],
+  },
 ];
 
 /** טוקנים מתקדמים (טקסט חופשי): גרדיאנטים וצללים */
