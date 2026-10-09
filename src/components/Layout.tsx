@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { NavLink, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
+import { flushAmudSorts, pullAmudSorts } from "../db/amudSort";
+import { useStudySession } from "../features/study/activeSession";
 import { useTheme } from "../theme/ThemeProvider";
 import { useAutoImport } from "../db/useAutoImport";
 import { useSession } from "../db/useSession";
 import { fetchTabsConfig, logAppOpen, pullApprovedQuestions, tabsForUser } from "../db/admin";
 import { useIsAdmin } from "../db/useIsAdmin";
-import { CalendarDays, FolderTree, GraduationCap, HelpCircle, Home, Landmark, LineChart, Moon, Settings, LayoutGrid, ShieldCheck, Sparkles, Sun, Target, Timer, UserRound } from "lucide-react";
+import { CalendarDays, FolderTree, GraduationCap, HelpCircle, Home, Landmark, LineChart, Menu, Moon, Settings, LayoutGrid, ShieldCheck, Sparkles, Sun, Target, Timer, UserRound, X } from "lucide-react";
 import { cn } from "../lib/utils";
 
 const nav = [
@@ -41,7 +43,22 @@ export default function Layout() {
     if (!session) return;
     void logAppOpen(session);
     void pullApprovedQuestions();
+    void flushAmudSorts(); // מיון לעמודים שנעשה בלי חיבור — נשלח עכשיו
   }, [session]);
+  // מיון לעמודים שנעשה במכשירים אחרים — לכל המשתמשים, אחרי שהמאגר נטען
+  useEffect(() => {
+    if (!importing) void pullAmudSorts();
+  }, [importing]);
+
+  // תפריט צדדי בטלפון: נפתח מכפתור בכותרת, נסגר במעבר עמוד
+  const location = useLocation();
+  const [menuOpen, setMenuOpen] = useState(false);
+  useEffect(() => setMenuOpen(false), [location.pathname]);
+
+  // תרגול פעיל ופתחת מסך אחר (למשל הגמרא) — כפתור חזרה לאותה שאלה
+  const activeQueue = useStudySession((s) => s.queue);
+  const activeIndex = useStudySession((s) => s.index);
+  const showResume = !!activeQueue && activeIndex < activeQueue.length && location.pathname !== "/study";
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -62,6 +79,14 @@ export default function Layout() {
       {/* Top header bar */}
       <header className="h-14 shrink-0 border-b bg-card flex items-center justify-between px-4">
         <div className="flex items-center gap-2.5">
+          <button
+            className="md:hidden h-9 w-9 rounded-full border border-gold/60 bg-card flex items-center justify-center hover:bg-secondary"
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-label={menuOpen ? "סגירת התפריט" : "פתיחת התפריט"}
+            aria-expanded={menuOpen}
+          >
+            {menuOpen ? <X className="h-4 w-4 text-gold" /> : <Menu className="h-4 w-4 text-gold" />}
+          </button>
           <div className="h-9 w-9 rounded-full bg-gradient-gold shadow-gold flex items-center justify-center">
             <Sparkles className="h-4.5 w-4 text-navy" />
           </div>
@@ -81,7 +106,14 @@ export default function Layout() {
 
       <div className="flex-1 flex min-h-0">
         {/* Right sidebar: label on the right, icon circle on the left, like the original */}
-        <aside className="w-52 shrink-0 border-l bg-card flex flex-col">
+        {menuOpen && <div className="md:hidden fixed inset-0 top-14 z-30 bg-black/40" onClick={() => setMenuOpen(false)} aria-hidden />}
+        <aside
+          className={cn(
+            "w-52 shrink-0 border-l bg-card flex-col",
+            menuOpen ? "flex fixed top-14 bottom-0 right-0 z-40 shadow-elegant" : "hidden",
+            "md:flex md:static md:shadow-none"
+          )}
+        >
           <nav className="flex-1 p-3 space-y-1.5 overflow-auto">
             {[...nav.filter((n) => admin || n.to === "/" || !visibleTabs || visibleTabs.includes(n.to)),
                ...(admin ? [{ to: "/admin", label: "ניהול", icon: ShieldCheck }] : [])].map(({ to, label, icon: Icon }) => (
@@ -123,13 +155,22 @@ export default function Layout() {
                   isActive ? "border-gold shadow-gold bg-secondary/60" : "border-gold/40 hover:border-gold hover:bg-secondary"
                 )
               }
-              title={session ? "החשבון שלי" : "כניסה לחשבון"}
+              title={session ? (admin ? "החשבון שלי · מנהל" : "החשבון שלי · משתמש רגיל") : "כניסה לחשבון"}
             >
               <span className="min-w-0 text-right">
                 {session ? (
                   <>
                     <span className="block text-xs font-medium truncate" dir="ltr">{session.user.email}</span>
-                    <span className="block text-[10px] text-gold font-bold">מחובר</span>
+                    {/* סוג החשבון: מנהל / משתמש רגיל */}
+                    {admin ? (
+                      <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-gold/20 text-gold px-1.5 py-px text-[10px] font-bold">
+                        <ShieldCheck className="h-3 w-3" /> מנהל
+                      </span>
+                    ) : (
+                      <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-secondary text-muted-foreground px-1.5 py-px text-[10px] font-medium">
+                        <UserRound className="h-3 w-3" /> משתמש רגיל
+                      </span>
+                    )}
                   </>
                 ) : (
                   <span className="block text-sm font-medium">כניסה לחשבון</span>
@@ -142,10 +183,19 @@ export default function Layout() {
           </div>
         </aside>
 
-        <main className="flex-1 p-6 overflow-auto">
+        <main className="flex-1 min-w-0 p-3 md:p-6 overflow-auto">
           <Outlet />
         </main>
       </div>
+
+      {showResume && (
+        <Link
+          to="/study"
+          className="fixed bottom-4 left-4 z-40 btn-gold rounded-full shadow-gold h-11 px-4"
+        >
+          <GraduationCap className="h-4 w-4" /> חזרה לתרגול · {activeIndex + 1}/{activeQueue!.length}
+        </Link>
+      )}
     </div>
   );
 }

@@ -159,6 +159,16 @@ export function priorityScore(card: Card, now: number = Date.now()): number {
   return overdueScore + difficultyScore + accuracyScore + leechScore + newBonus - recencyPenalty;
 }
 
+/**
+ * תרגול חופשי: כל השאלות שנבחרו, בלי להשמיט אף אחת — קודם אלה שהגיע זמנן
+ * (לפי עדיפות), ואחריהן השאר לפי מועד החזרה הקרוב.
+ */
+export function buildPracticeQueue(cards: Card[], now: number = Date.now()): Card[] {
+  const due = cards.filter((c) => c.srs.dueAt <= now).sort((a, b) => priorityScore(b, now) - priorityScore(a, now));
+  const later = cards.filter((c) => c.srs.dueAt > now).sort((a, b) => a.srs.dueAt - b.srs.dueAt);
+  return [...due, ...later];
+}
+
 /** Due cards first by priority; tops up with soon-due cards when small. */
 export function buildStudyQueue(cards: Card[], now: number = Date.now(), minSize = 5): Card[] {
   const due = cards.filter((c) => c.srs.dueAt <= now);

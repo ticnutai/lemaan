@@ -23,6 +23,22 @@ async function timed(key: string, budgetMs: number, action: () => Promise<void>)
   expect(ms, `${key} חרג מהתקציב — רגרסיית מהירות`).toBeLessThan(budgetMs);
 }
 
+/**
+ * כניסה למרכז התרגול, בראש הבחירה (רשימת הסדרים). הסשן והמקום בבחירה נשמרים
+ * במעבר בין מסכים (כדי שאפשר יהיה לפתוח את הגמרא ולחזור), ולכן אם נשאר סשן
+ * פעיל או מקום בבחירה מבדיקה קודמת — יוצאים מהם קודם.
+ */
+async function openStudyCenter() {
+  await page.goto("/#/study");
+  await page.getByRole("button", { name: /תרגול כללי|^חזרה$|^חזרה לתרגול$/ }).first().waitFor();
+  const exit = page.getByRole("button", { name: /^חזרה$|^חזרה לתרגול$/ });
+  if (await exit.count()) await exit.first().click();
+  await page.getByRole("button", { name: /תרגול כללי/ }).click();
+  const top = page.getByRole("navigation", { name: "מיקום" }).getByRole("button", { name: 'ש"ס', exact: true });
+  if (await top.count()) await top.click();
+  await expect(page.getByRole("button", { name: /^מועד/ })).toBeVisible();
+}
+
 test.beforeAll(async ({ browser }) => {
   page = await browser.newPage();
 });
@@ -69,7 +85,7 @@ test("T04 — עמוד בניית שאלות: טעינה וחיפוש (מהיר�
 });
 
 test("T05 — תרגול כללי: סדר ← מסכת ← דף ← עמוד ← סשן (כמו במקור)", async () => {
-  await page.goto("/#/study");
+  await openStudyCenter();
   // דרילדאון: מועד ← חגיגה ← דף ראשון ← כל הדף
   await page.getByRole("button", { name: /^מועד/ }).click();
   await page.getByRole("button", { name: /^חגיגה/ }).click();
@@ -115,7 +131,11 @@ test("T08 — יעדים: הוספה ומד התקדמות", async () => {
 });
 
 test("T09 — תרגול מבחנים בעמוד התרגול: המבחן מ-T07 מופיע ומתחיל", async () => {
+  // הסשן שהתחיל ב-T07 נשמר גם אחרי מעבר למסך אחר (T08) — חוזרים בדיוק אליו
+  await expect(page.getByRole("link", { name: /חזרה לתרגול/ })).toBeVisible();
   await page.goto("/#/study");
+  await expect(page.getByText(/1 \/ \d+ · תרגול חופשי/)).toBeVisible({ timeout: 15_000 });
+  await page.getByRole("button", { name: "חזרה", exact: true }).click();
   await page.getByRole("button", { name: /תרגול מבחנים/ }).click();
   await expect(page.getByText("בדיקה אוטומטית")).toBeVisible();
   await page.getByRole("button", { name: /התחל תרגול/ }).first().click();
@@ -175,7 +195,7 @@ test("T15 — ניהול: מוסתר בלי חשבון, כפתור הערה בת
   // ואין "ניהול" בסיידבר כשלא מחוברים
   await expect(page.locator("aside").getByText("ניהול", { exact: true })).toHaveCount(0);
   // כפתור הערה בסשן תרגול מציג דרישת כניסה
-  await page.goto("/#/study");
+  await openStudyCenter();
   await page.getByRole("button", { name: /^מועד/ }).click();
   await page.getByRole("button", { name: /^חגיגה/ }).click();
   await page.locator(".grid button.card-panel").first().click();
@@ -280,5 +300,9 @@ test("T20 — בית: תוכנית ש\"ס (הבאה לסימון, סיימתי, 
   await expect(page.getByTestId("today-card")).toContainText('ברכות ב\' ע"ב');
   // תרגול העמוד הבא — סשן של השאלות של אותו עמוד
   await card.getByRole("link", { name: /תרגול/ }).click();
-  await expect(page.getByRole("heading", { name: /ברכות דף ב · עמוד ב'/ })).toBeVisible({ timeout: 10_000 });
+  // פירורי הלחם של הסשן: ש"ס › סדר זרעים › ברכות › דף ב › עמוד ב'
+  const crumbs = page.getByRole("navigation", { name: "מיקום" });
+  await expect(crumbs).toContainText("ברכות", { timeout: 10_000 });
+  await expect(crumbs).toContainText("דף ב");
+  await expect(crumbs).toContainText("עמוד ב'");
 });

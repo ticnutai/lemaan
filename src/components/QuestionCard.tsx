@@ -34,8 +34,15 @@ interface Props {
  * כרטיס שאלה בסגנון המקור: פירור דרך + תגית סוג בראש, אפשרויות עם
  * אותיות א-ב-ג-ד. אחרי חשיפה — הנכונה מוזהבת, בחירה שגויה באדום.
  */
+/** השוואה בלי רווחים וסימני פיסוק — כדי לזהות "הסבר" שהוא רק העתק של התשובה הנכונה. */
+const normalize = (s: string) => s.replace(/[\s.,:;!?״"'׳()\-–]/g, "");
+
 export default function QuestionCard({ card, revealed, selected, onSelect, breadcrumb, fontScale = 1 }: Props) {
   const withOptions = hasOptions(card);
+  // הסבר שזהה לנוסח התשובה הנכונה לא מוסיף מידע — לא מציגים אותו
+  const answerIsJustOption =
+    withOptions && card.correctIndices.some((i) => card.options[i] && normalize(card.options[i]) === normalize(card.answer));
+  const showAnswer = revealed && !!card.answer && !answerIsJustOption;
 
   return (
     <div className="space-y-3">
@@ -49,7 +56,7 @@ export default function QuestionCard({ card, revealed, selected, onSelect, bread
         <p className="font-medium leading-relaxed" style={{ fontSize: `${1.125 * fontScale}rem` }}>
           {card.question}
         </p>
-        {revealed && card.answer && (
+        {showAnswer && (
           <div className="pt-3 border-t animate-slide-in-down mt-auto">
             <p className="text-sm text-muted-foreground mb-1">{withOptions ? "הסבר:" : "תשובה:"}</p>
             <p className="leading-relaxed">{card.answer}</p>
