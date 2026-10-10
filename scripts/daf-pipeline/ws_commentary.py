@@ -7,7 +7,9 @@
 import os, re, json, urllib.request, urllib.parse
 
 CACHE = os.path.join(os.path.expanduser("~"), "lemaan-data", "ws-com")
-SECTION = {"rashi": 'רש"י', "tosafot": "תוספות", "ran": 'ר"ן'}
+SECTION = {"rashi": 'רש"י', "tosafot": "תוספות", "ran": 'ר"ן', "rashbam": 'רשב"ם'}
+# מסכתות שבהן עמודת רש"י ממשיכה בפירוש אחר (פסחים צט:–קכא:: רש"י ואחריו רשב"ם, וגם בתחתית הדף)
+AFTER_RASHI = {"פסחים": "rashbam"}
 # מסכתות שבהן עמודת התוספות מתחילה בפירוש אחר והתוספות אחריו (נדרים: הר"ן, והתוספות בתחתית הדף)
 BEFORE_TOSAFOT = {"נדרים": "ran"}
 BOLD = "'" * 3

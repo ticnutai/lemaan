@@ -280,6 +280,9 @@ def make_refs(shas, ws, keys, key, slug=None):
 
     def com(k, c):
         segs = com_(k, c)
+        post = ws_commentary.AFTER_RASHI.get(he) if c == "rashi" else None
+        if post:  # פסחים צט:–קכא:: הרשב"ם מודפס אחרי רש"י באותה עמודה (ובתחתית הדף)
+            segs = list(segs) + (ws_commentary.page(he, k, post) or [])
         pre = ws_commentary.BEFORE_TOSAFOT.get(he) if c == "tosafot" else None
         return ((ws_commentary.page(he, k, pre) or []) + list(segs)) if pre else segs
     refs = {"gemara": window(lambda k: gem_tokens(ws.get(k) or shas[k]["gemara"]), keys, key)}
@@ -469,6 +472,41 @@ def anchor(lines, ref, bounds=None, ext=None):
     return out, cover, (min(line_of), max(line_of))
 
 
+LOW_GAIN = 0.15   # הגוש התחתון נכנס רק אם הוא מגדיל את החלק המוצג מטקסט הזרם לפחות בכך
+LOW_COVER = 0.25  # ורק אם לפחות כך ממילות ה-OCR שבו הותאמו לטקסט (ולא רעש שהותאם במקרה)
+
+
+def low_fill(best, lows, ref_st, st_):
+    """גוש מפרש באות קטנה בתחתית העמוד: מוסיפים אותו לזרם רק כשהוא משלים טקסט שחסר.
+    best = (פיסות, תוצאת anchor, ANCHOR_INFO) של הזרם בלי הגוש. מחזיר best חדש או None."""
+    ref_, lo_, hi_ = ref_st[0], ref_st[1], ref_st[2]
+    if len(ref_st) > 4 or hi_ - lo_ < 20:  # פירוש גולש (נדרים) — ייחוס מיוחד, לא נוגעים
+        return None
+    span = lambda rng: (min(rng[1], hi_ - 1) - max(rng[0], lo_) + 1) / (hi_ - lo_) if rng else 0.0
+    cand0, res0, _ = best
+    base = span(res0[2])
+    if base > 0.8:
+        if os.environ.get("LOW_DEBUG"):
+            print("LOWFILL", st_, "span", round(base, 2), "-> skip (stream already shown)", flush=True)
+        return None
+    cand = list(cand0) + sorted(lows, key=lambda pc: pc["cy"])
+    if len(ref_st) > 3:  # סדר הדיבורים כבדפוס, כמו בזרם עצמו
+        ref_ = print_order([pc["w"] for pc in cand], ref_, lo_, hi_, ref_st[3])
+    res = anchor([pc["w"] for pc in cand], ref_, (lo_, hi_), [(pc["x0"], pc["x1"]) for pc in cand])
+    info = dict(ANCHOR_INFO)
+    nlow = sum(len(pc["w"]) for pc in lows)
+    # כמה ממילות הגוש עצמו הותאמו: הפרש ההתאמות, יחסית למילים שבגוש
+    m0 = res0[1] * sum(len(pc["w"]) for pc in cand0)
+    m1 = res[1] * sum(len(pc["w"]) for pc in cand)
+    low_cov = (m1 - m0) / max(1, nlow)
+    gain = span(res[2]) - base
+    if os.environ.get("LOW_DEBUG"):
+        print("LOWFILL", st_, "span", round(base, 2), "->", round(span(res[2]), 2), "low words", nlow, "low cover", round(low_cov, 2), flush=True)
+    if gain >= LOW_GAIN and low_cov >= LOW_COVER:
+        return (cand, res, info)
+    return None
+
+
 def fit_rows(cys, default_pitch):
     """קו הבסיס של השורה הראשונה + פסיעת השורה של גוש, בהתאמה חסינה (Theil–Sen) לכל שורות הגוש —
     שורה בודדת שנמדדה לא מדויק (סוגריים, ק/ך/ן, שורה קצרה) לא מזיזה את כל הגוש ולא צוברת סחף."""
@@ -539,6 +577,9 @@ def image_rows(p, W, fL, fR, head):
     # שורה נמוכה באמצע הטקסט היא שורה רגילה שנמדדה חלקית (דפוס חיוור) — נשארת
     last_text = max((l["base"] for l in pieces if wide(l)), default=0)
     L = [l for l in pieces if not (wd(l) >= 60 and cls(l) == "n" and l["base"] > last_text)]
+    # השורות שהוצאו (רחבות ונמוכות מתחת לטקסט) נשמרות בצד: לפעמים זה גוש מפרש באות קטנה לרוחב העמוד
+    # (כריתות ב.–טו.: התוספות). build_page מכניס אותן רק אם הן משלימות טקסט שחסר בזרם — ראו low_fill
+    low_lines = [l for l in pieces if wd(l) >= 60 and cls(l) == "n" and l["base"] > last_text]
 
     def classify():
         """שורה רחבה — לפי גובה גוף האות. פיסה צרה (מילה-שתיים, שגובהה אינו אמין) — לפי העמודה
@@ -804,9 +845,20 @@ def image_rows(p, W, fL, fR, head):
             pc["side"] = "F" if full_ else ("R" if (pc["x0"] + pc["x1"]) / 2 > mid else "L")
             pcs.append(pc)
     fTop = min(l["top"] for l in L) - c_t
+    # הגוש התחתון: מילות ה-OCR שלו (רק מילים שלא שויכו לשום שורה), כפיסות רוחב-מלא — בצד, לא בזרמים
+    lows = []
+    if len(low_lines) >= 3:
+        taken = {id(w) for l in L for w in l["w"]}
+        for l in sorted(low_lines, key=lambda l: l["base"]):
+            ws_ = [w for w in W if id(w) not in taken and id(w) not in hd_ids and w["size"] < title_sz
+                   and l["x0"] - 2 <= (w["x0"] + w["x1"]) / 2 <= l["x1"] + 2 and l["top"] - 3 <= (w["y0"] + w["y1"]) / 2 <= l["base"] + 2.5]
+            if not ws_:
+                continue
+            taken |= {id(w) for w in ws_}
+            lows.append(dict(l, cy=l["base"], w=sorted(ws_, key=lambda w: -w["x1"]), side="F", low=True, c="s"))
     if os.environ.get("FRAME_DEBUG"):
         print(f"image rows: gemara {len(grows)}, commentary {len(pcs)}, xh g/s {cg:.2f}/{cs:.2f}, calib {c_g:.2f} {c_s:.2f} {c_t:.2f}")
-    return grows, pcs, fTop, heads_, catch_
+    return grows, pcs, fTop, heads_, catch_, lows
 
 
 # ---------- עמוד ----------
@@ -1018,10 +1070,10 @@ def build_page(p, key, refs, _scaled=False, tractate=None):
     gem = [w for w in gem if inside(w)]
     # מקור הגיאומטריה: התמונה עצמה (ברירת מחדל) או שורות ה-OCR (GEOM=ocr, וגם כגיבוי אם התמונה נכשלת)
     use_img = os.environ.get("GEOM", "image") == "image"
-    side_heads, catches = [], []
+    side_heads, catches, lows = [], [], []
     if use_img:
         try:
-            grows, pcs, fTop, side_heads, catches = image_rows(p, W, fL, fR, head)
+            grows, pcs, fTop, side_heads, catches, lows = image_rows(p, W, fL, fR, head)
             # מילת הקישור לעמוד הבא: פיסה קצרה (מילה-שתיים) בחלק התחתון של העמוד, שהטקסט שלה הוא
             # המילה הראשונה של העמוד הבא באחד הזרמים. מוצאים אותה מהזרמים ומציגים בנפרד
             nxt_word = {}
@@ -1253,9 +1305,10 @@ def build_page(p, key, refs, _scaled=False, tractate=None):
         diffs += [b - a for a, b in zip(ys, ys[1:]) if 7 < b - a < 14]
     spitch = st.median(diffs)
     slh = spitch * s
+    lows_used = False
     for st_ in ("rashi", "tosafot"):
         ps = [pc for pc in pcs if pc["s"] == st_]
-        if not ps:
+        if not ps and not lows:
             continue
         ps.sort(key=lambda pc: pc["cy"])
         # אות/מילה פותחת מוגדלת (על פני שתי שורות): מצטרפת לראש השורה הסמוכה מתחתיה בעמודה
@@ -1288,7 +1341,17 @@ def build_page(p, key, refs, _scaled=False, tractate=None):
             res = anchor([pc["w"] for pc in cand], ref_, (lo_, hi_), [(pc["x0"], pc["x1"]) for pc in cand])
             if best is None or res[1] > best[1][1] + 0.01:
                 best = (cand, res, dict(ANCHOR_INFO))
+        if best is None:  # הזרם אין לו שורות רגילות — רק הגוש התחתון יכול להשלים אותו
+            best = ([], ([], 0.0, None), {})
+        if lows and not lows_used:
+            alt = low_fill(best, lows, refs[st_], st_)
+            if alt:
+                best = alt
+                lows_used = True
+                report.setdefault("low_fill", st_)
         ps, (stext, scov, _), info_ = best
+        if not ps:
+            continue
         ANCHOR_INFO.clear(); ANCHOR_INFO.update(info_)
         if fit_on:
             locked = [i for i, pc in enumerate(ps) if pc.get("drop") or pc.get("big")]
@@ -1323,8 +1386,12 @@ def build_page(p, key, refs, _scaled=False, tractate=None):
             L_, Rr = X(x0), X(x1)
             if abs(L_ - V_L) < 4: L_ = V_L
             if abs(Rr - (V_L + V_W)) < 4: Rr = V_L + V_W
-            cy0, pitch_b = fit_rows([pc["cy"] for pc in ps_], spitch)
-            top = Y(cy0) - (BASE_S if use_img else 0.78) * slh
+            low_ = all(pc.get("low") for pc in ps_)
+            if low_ and len(ps_) > 1:  # גוש תחתון באות קטנה: פסיעה וגופן משלו
+                cy0, pitch_b = fit_rows([pc["cy"] for pc in ps_], st.median(b["cy"] - a["cy"] for a, b in zip(ps_, ps_[1:])))
+            else:
+                cy0, pitch_b = fit_rows([pc["cy"] for pc in ps_], spitch)
+            top = Y(cy0) - (BASE_S if use_img else 0.78) * (pitch_b * s if low_ else slh)
             lines = []
             prev_t = None
             for pc, t in zip(ps_, g["t"]):
@@ -1338,7 +1405,7 @@ def build_page(p, key, refs, _scaled=False, tractate=None):
                     prev_t = t[-1]
             slh_b = pitch_b * s
             slabs.append({"s": st_, "l": round(L_, 2), "t": round(top, 2), "w": round(Rr - L_, 2), "h": round(len(ps_) * slh_b, 2),
-                          "fs": round(S_FS * slh / S_LH, 2), "lh": round(slh_b, 3), "lines": lines})
+                          "fs": round(S_FS * (slh_b if low_ else slh) / S_LH, 2), "lh": round(slh_b, 3), "lines": lines})
     # כותרת
     header = []
     head = running_header(head, fL, fR, p)
