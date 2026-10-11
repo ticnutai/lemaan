@@ -480,7 +480,10 @@ def low_fill(best, lows, ref_st, st_):
     """גוש מפרש באות קטנה בתחתית העמוד: מוסיפים אותו לזרם רק כשהוא משלים טקסט שחסר.
     best = (פיסות, תוצאת anchor, ANCHOR_INFO) של הזרם בלי הגוש. מחזיר best חדש או None."""
     ref_, lo_, hi_ = ref_st[0], ref_st[1], ref_st[2]
-    if len(ref_st) > 4 or hi_ - lo_ < 20:  # פירוש גולש (נדרים) — ייחוס מיוחד, לא נוגעים
+    flow = len(ref_st) > 4
+    if flow:  # נדרים: הר"ן גולש בעמודה, והתוספות של העמוד מודפסות בגוש קטן בתחתית — סוף ייחוס הבנייה
+        ref_, lo_, hi_ = ref_st[4]
+    if hi_ - lo_ < 20:
         return None
     span = lambda rng: (min(rng[1], hi_ - 1) - max(rng[0], lo_) + 1) / (hi_ - lo_) if rng else 0.0
     cand0, res0, _ = best
@@ -490,7 +493,7 @@ def low_fill(best, lows, ref_st, st_):
             print("LOWFILL", st_, "span", round(base, 2), "-> skip (stream already shown)", flush=True)
         return None
     cand = list(cand0) + sorted(lows, key=lambda pc: pc["cy"])
-    if len(ref_st) > 3:  # סדר הדיבורים כבדפוס, כמו בזרם עצמו
+    if len(ref_st) > 3 and not flow:  # סדר הדיבורים כבדפוס, כמו בזרם עצמו
         ref_ = print_order([pc["w"] for pc in cand], ref_, lo_, hi_, ref_st[3])
     res = anchor([pc["w"] for pc in cand], ref_, (lo_, hi_), [(pc["x0"], pc["x1"]) for pc in cand])
     info = dict(ANCHOR_INFO)
@@ -923,11 +926,14 @@ def frame_of(p, W):
     # ציון = כמה שורות מתיישרות לשני הקצוות × קרבה לרוחב הטיפוסי (סריקות שונות בקנה מידה ב~±7%)
     import math
     best_ = None
+    # FRAME_ABS=1: הסריקה כבר הובאה לקנה המידה של וילנא (נידה מהיברובוקס — כל עמוד נחתך בשוליים אחרים,
+    # ולכן היחס לרוחב העמוד לא אומר כלום): מחפשים מסגרת ברוחב הקבוע FRAME_W
+    abs_ = os.environ.get("FRAME_ABS") == "1"
     for l in lefts_h:
         for r in rights_h:
-            if 0.55 * PW <= r - l <= 0.75 * PW:
+            if (0.85 * FRAME_W <= r - l <= 1.15 * FRAME_W) if abs_ else (0.55 * PW <= r - l <= 0.75 * PW):
                 n_ = min(near_(lefts_h, l), near_(rights_h, r))
-                sc_ = n_ * math.exp(-(((r - l) / PW - 0.655) / 0.03) ** 2)
+                sc_ = n_ * math.exp(-(((r - l) / FRAME_W - 1) / 0.045) ** 2) if abs_ else n_ * math.exp(-(((r - l) / PW - 0.655) / 0.03) ** 2)
                 if n_ >= 8 and (best_ is None or sc_ > best_[0]):
                     best_ = (sc_, l, r)
     if best_:
