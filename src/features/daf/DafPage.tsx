@@ -15,6 +15,8 @@ interface Props {
   printLayout?: PrintLayout;
   /** חיפוש התחלתי (כשנכנסים מתוצאת חיפוש) */
   initialQuery?: string;
+  /** שורת ציון מקור מתחת לדף — מוצגת רק בדפוס המדויק (למשל נידה: מהדורה שהזכויות עליה שמורות) */
+  printCredit?: string;
 }
 
 type Renderer = ReturnType<typeof dafRenderer>;
@@ -24,7 +26,7 @@ type Renderer = ReturnType<typeof dafRenderer>;
  * בלי OCR. חיפוש מדגיש בכל הזרמים; פאנל עיצוב קובע גופן, גודל וצבעים
  * והפריסה מחושבת מחדש כך שהכל נשאר באותו דף.
  */
-export default function DafPage({ gemara, rashi, tosafot, amud, title, printLayout, initialQuery }: Props) {
+export default function DafPage({ gemara, rashi, tosafot, amud, title, printLayout, initialQuery, printCredit }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<Renderer | null>(null);
@@ -208,6 +210,9 @@ export default function DafPage({ gemara, rashi, tosafot, amud, title, printLayo
           <PrintDaf layout={printLayout} width={Math.round(width * style.scale)} style={style} query={query} />
         ) : (
           <div ref={hostRef} className="lemaan-daf mx-auto" style={{ width: Math.round(width * style.scale) }} dir="rtl" />
+        )}
+        {isPrint && printCredit && (
+          <p className="mt-3 text-center text-xs text-muted-foreground" data-testid="print-credit">{printCredit}</p>
         )}
       </div>
     </div>

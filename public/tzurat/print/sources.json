@@ -1,116 +1,224 @@
 {
+ "arakhin": {
+  "built": "2026-10-06",
+  "file": "ערכין.pdf",
+  "pages": 65,
+  "sha256": "fc553f635d44cfc4d39418f2d674a803e60e53b36b21fb7cf797d08842f5f025"
+ },
  "avodah_zarah": {
-  "built": "2026-10-05",
+  "built": "2026-10-06",
   "file": "עבודה זרה.pdf",
   "pages": 150,
   "sha256": "fe5d81e6fb1edb92c1f88008d76967cbe645468ba7d6cde15fa44f30e1c33ac2"
  },
  "bava_batra": {
-  "built": "2026-10-04",
+  "built": "2026-10-06",
   "file": "בבא בתרא.pdf",
   "pages": 350,
   "sha256": "4670723a9605b93f03bd31598db99c48a8a42f8abeb1f70679c4e53b39142077"
  },
  "bava_kamma": {
-  "built": "2026-10-04",
+  "built": "2026-10-06",
   "file": "בבא קמא.pdf",
   "pages": 236,
   "sha256": "a5dd73812ef4705c8e755a23ec119ee8f79b5cb5163ea1a92f5db1345fa14d94"
  },
  "bava_metzia": {
-  "built": "2026-10-05",
+  "built": "2026-10-06",
   "file": "בבא מציעא.pdf",
   "pages": 235,
   "sha256": "c5e36d9495c4fc7fd03729671f26d4ba39137774b94cc7fa4b7423c565b2a28f"
  },
+ "beitzah": {
+  "built": "2026-10-06",
+  "file": "ביצה.pdf",
+  "pages": 78,
+  "sha256": "d5a63d7be21d04ed8d7981959659d86097c5a70cc012bda9bcb864992a5bfd84"
+ },
+ "bekhorot": {
+  "built": "2026-10-06",
+  "file": "בכורות.pdf",
+  "pages": 119,
+  "sha256": "1dea3dde308e8533404df998c82e25b14d6624dc58f0b2e2c3f78f1569367311"
+ },
  "berakhot": {
-  "built": "2026-10-04",
+  "built": "2026-10-06",
   "file": "ברכות.pdf",
   "pages": 125,
   "sha256": "bcf8e3349ad99a4ad62a682bfb3197ed763c546ba0502638eeaa2711f1ac8874"
  },
+ "chagigah": {
+  "built": "2026-10-06",
+  "file": "חגיגה.pdf",
+  "pages": 51,
+  "sha256": "eec17d0f0dbd52be83529e9d5a064eac2ae1d951acc7359ef4fb20e035098a2b"
+ },
+ "chullin": {
+  "built": "2026-10-06",
+  "file": "חולין.pdf",
+  "pages": 281,
+  "sha256": "4085874646171dde63b8fbb62a460ae59e94cd03d9da9260a27439a951272ff9"
+ },
+ "eruvin": {
+  "built": "2026-10-06",
+  "file": "עירובין.pdf",
+  "pages": 207,
+  "sha256": "b2ec46734b511b9e7c5d6f4986a7cdad5ee3fb99df4d1e4655cc4c53eacce3cc"
+ },
  "gittin": {
-  "built": "2026-10-05",
+  "built": "2026-10-06",
   "file": "גיטין.pdf",
   "pages": 178,
   "sha256": "eebc8aa5b2b39581f9d7c7344b5554ae0896851e297f4237d8289535fb3d99e4"
  },
  "horayot": {
-  "built": "2026-10-04",
+  "built": "2026-10-05",
   "file": "הוריות.pdf",
   "pages": 25,
   "sha256": "dcaa7f2e7259c0fecb6a80190ea931307a9135927c2ab13a645e1b1c31b1871c"
  },
+ "keritot": {
+  "built": "2026-10-06",
+  "file": "כריתות.pdf",
+  "pages": 54,
+  "sha256": "40b518ff66f5ba2c8c593b5fda34f9ed88d178fb1ffae8210e3a866dbed1ffe9"
+ },
  "ketubot": {
-  "built": "2026-10-05",
+  "built": "2026-10-06",
   "file": "כתובות.pdf",
   "pages": 222,
   "sha256": "8bdcd4267b75af4e001b156fcfb07b91a4f2b042c44e438c9a1adb6667fc2445"
  },
  "kiddushin": {
-  "built": "2026-10-04",
+  "built": "2026-10-06",
   "file": "קידושין.pdf",
   "pages": 162,
   "sha256": "092ac0a9a72d354405c9f7f8995a5e8681b24f86483ce153c60150cc7a248b5e"
  },
  "makkot": {
-  "built": "2026-10-05",
+  "built": "2026-10-06",
   "file": "מכות.pdf",
   "pages": 46,
   "sha256": "e6d24d1befab390498a9119c55177a9b1179d6996d36ad18a0e55a14b8d37f1b"
  },
  "megillah": {
-  "built": "2026-10-04",
+  "built": "2026-10-06",
   "file": "מגילה.pdf",
   "pages": 61,
   "sha256": "a8fee881216bca228ac955f2660c2e0864b91687ea3b335106e59d8233e1aa99"
  },
+ "meilah": {
+  "built": "2026-10-06",
+  "file": "מעילה.pdf",
+  "pages": 41,
+  "sha256": "6ff8e383efd63d16af1170e0002cf9db3e2de3dadc44af9ba25e03f51ef937e7"
+ },
+ "menachot": {
+  "built": "2026-10-06",
+  "file": "מנחות.pdf",
+  "pages": 217,
+  "sha256": "f0ff01c9c0537d201f9fd0a65fca8abcc8f2c2473adb5cd135857adef7bf4b72"
+ },
+ "moed_katan": {
+  "built": "2026-10-06",
+  "file": "מועד קטן.pdf",
+  "pages": 55,
+  "sha256": "09fde13369bbc6c614b07fd62cf06a4106f4a385a51a6c54cdaeac55e8592479"
+ },
  "nazir": {
-  "built": "2026-10-05",
+  "built": "2026-10-06",
   "file": "נזיר.pdf",
   "pages": 130,
   "sha256": "b9a0c1575ff6370a1562dd81bd72d2fb19bc1e26cf08dd97861a9cc11483905c"
  },
  "nedarim": {
-  "built": "2026-10-05",
+  "built": "2026-10-06",
   "file": "נדרים.pdf",
   "pages": 180,
   "sha256": "1ec026d28a778bf4b40672e48c88947d46e12de0e059c5b234bf7b7844241820"
  },
+ "niddah": {
+  "built": "2026-10-09",
+  "file": "niddah_hb.pdf",
+  "pages": 143,
+  "sha256": "d04dfaa9f12d4f5953db8e4fab94dbfc4f328e0efd3fa2775a79ca84065cbc3b"
+ },
+ "pesachim": {
+  "built": "2026-10-06",
+  "file": "פסחים.pdf",
+  "pages": 240,
+  "sha256": "bd491eaa5197fd65d798597a0f91f75f44106ff97789aad5f39bcac20103ab97"
+ },
+ "rosh_hashanah": {
+  "built": "2026-10-06",
+  "file": "ראש השנה.pdf",
+  "pages": 67,
+  "sha256": "8403cc4d4eac7b18d2ae66a7ad594f5daa6d073bf66fbcd4a5dd761174b3b5ef"
+ },
  "sanhedrin": {
-  "built": "2026-10-05",
+  "built": "2026-10-06",
   "file": "סנהדרין.pdf",
   "pages": 224,
   "sha256": "71750f8982c04395f3dedb1c02bd7e0af9063a70e96479d09f0414f5f7049bdc"
  },
  "shabbat": {
-  "built": "2026-10-04",
+  "built": "2026-10-06",
   "file": "שבת.pdf",
   "pages": 312,
   "sha256": "9ff2405d787a40a0a13bdb8d88647b04103aa439b78677cccd672ae098346eb1"
  },
+ "shekalim": {
+  "built": "2026-10-06",
+  "file": "שקלים.pdf",
+  "pages": 42,
+  "sha256": "fe91042aa49ebf0b6dd8d2bf7d6e72eb0c6d89862a3b6201ca3dcf5a8ea6bbf6"
+ },
  "shevuot": {
-  "built": "2026-10-05",
+  "built": "2026-10-06",
   "file": "שבועות.pdf",
   "pages": 96,
   "sha256": "6b22c12f959790efa8dd33e399a9368d1af9cb66a5627d9fbc003abd09e240a8"
  },
  "sotah": {
-  "built": "2026-10-05",
+  "built": "2026-10-06",
   "file": "סוטה.pdf",
   "pages": 96,
   "sha256": "b1bd0b835da1ee26848319857bd369215deb5ef47204219c747a8649eeb33d59"
  },
+ "sukkah": {
+  "built": "2026-10-06",
+  "file": "סוכה.pdf",
+  "pages": 110,
+  "sha256": "5f4d55a8b6518ba731cf93a46586fb48ca440c884e0025426686674f7db2bfd2"
+ },
  "taanit": {
-  "built": "2026-10-04",
+  "built": "2026-10-06",
   "file": "תענית.pdf",
   "pages": 59,
   "sha256": "3b09cd4c305094ccd6e1d2ec69541741bd2f2db957232cbcb1942670a5efe384"
  },
+ "temurah": {
+  "built": "2026-10-06",
+  "file": "תמורה.pdf",
+  "pages": 65,
+  "sha256": "8f4bc62c24be9f4a6ceab402eaffd4cc5f01f4d85bc67770a4fe01d74e8eb1cc"
+ },
  "yevamot": {
-  "built": "2026-10-05",
+  "built": "2026-10-06",
   "file": "יבמות.pdf",
   "pages": 242,
   "sha256": "97fe3a7efdbf2f7b51b39c012b67f976e5ac6799b0444d025e19fb639153b5be"
+ },
+ "yoma": {
+  "built": "2026-10-06",
+  "file": "יומא.pdf",
+  "pages": 173,
+  "sha256": "672f68b36224782cecd9b7e6fafec930a141c0a9107db8c9c8219660f1ec8a4d"
+ },
+ "zevachim": {
+  "built": "2026-10-06",
+  "file": "זבחים.pdf",
+  "pages": 238,
+  "sha256": "c124649196578ced3a9d27856de7189c16333ab32341694eb841c2ec7763798c"
  }
 }

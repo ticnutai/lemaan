@@ -323,3 +323,13 @@ test("T21 — חלון ניווט הש\"ס הצף: סדר ← מסכת ← דף 
   await expect(page.getByText(/1 \/ \d+ · תרגול חופשי/)).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole("navigation", { name: "מיקום" }).first()).toContainText("עמוד א'");
 });
+
+test("T22 — נידה בדפוס מדויק: שורת ציון לזכויות ההוצאה, ורק בנידה", async () => {
+  await page.goto("/#/shas?m=Niddah&a=2a&v=daf");
+  await expect(page.locator(".lemaan-print .daf-pline").first()).toBeAttached({ timeout: 20_000 });
+  await expect(page.getByTestId("print-credit")).toContainText("הוצאת ח. וגשל");
+  // במסכת אחרת — אין שורת ציון
+  await page.goto("/#/shas?m=Berakhot&a=2a&v=daf");
+  await expect(page.locator(".lemaan-print .daf-pline").first()).toBeAttached({ timeout: 20_000 });
+  await expect(page.getByTestId("print-credit")).toHaveCount(0);
+});

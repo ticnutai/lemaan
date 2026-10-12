@@ -50,6 +50,14 @@ async function loadMasechet(slug: string): Promise<Record<string, Amud>> {
   return data.amudim;
 }
 
+/**
+ * ציון מקור לדפוס המדויק — נוסח זהה לאתר הגמרא. בנידה מיקום השורות נמדד ממהדורה שהזכויות
+ * עליה שמורות; השורה מוצגת מתחת לעמוד עד שתיבנה מסריקת וילנא חופשית.
+ */
+const PRINT_CREDIT: Record<string, string> = {
+  Niddah: "מיקום השורות בצורת הדף של מסכת נידה נמדד ממהדורת נהרדעא החדשה של הוצאת ח. וגשל. כל הזכויות על המהדורה שמורות להוצאה.",
+};
+
 /** מסכתות שקיימת להן צורת הדף המלאה (HTML וילנא, ללא פרסומות) בקבצים מקומיים. */
 // מסכתות עם דפוס מדויק — הרשימה נכתבת ע"י scripts/daf-pipeline/hb_pdf.py
 let printIndex: Promise<Set<string>> | null = null;
@@ -218,6 +226,7 @@ export default function ShasPage() {
           title={`${meta.he} דף ${amud.daf} ${amud.amud}`}
           printLayout={printLayouts?.[amudKey]}
           initialQuery={params.get("q") ?? undefined}
+          printCredit={PRINT_CREDIT[slug]}
         />
       )}
 
