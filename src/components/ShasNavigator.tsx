@@ -10,6 +10,7 @@ import {
   STATUS_DOT, STATUS_LABEL, dafStatus, dafTotal, emptyDafEntry, masechtaSummary, sederOf, useShasCounts,
 } from "../features/study/shasCounts";
 import { isPlacePinned, togglePinnedPlace, usePinnedPlaces } from "../features/study/studyPrefs";
+import { dafYomiFor } from "../features/study/dafYomi";
 import { cn } from "../lib/utils";
 
 /**
@@ -283,6 +284,23 @@ function NavigatorWindow() {
               <p className="text-center text-sm text-muted-foreground py-10">טוען את מאגר השאלות…</p>
             ) : !seder && !masechta ? (
               /* ---- סדרים ---- */
+              <>
+              {(() => {
+                // הדף היומי של היום — קפיצה ישירה לבחירת העמוד שלו
+                // גם בלי שאלות לדף — בשלב העמודים יש "פתיחה בגמרא"
+                const dy = dafYomiFor();
+                return (
+                  <button
+                    className="w-full mb-3 rounded-2xl border-2 border-gold/60 px-4 py-3 flex items-center justify-between gap-2 text-right hover:shadow-gold transition-shadow"
+                    style={{ background: "linear-gradient(90deg, hsl(var(--gold) / 0.18), hsl(var(--card)))" }}
+                    onClick={() => go(sederOf(dy.he), dy.he, dy.daf)}
+                    title="מעבר לדף היומי"
+                  >
+                    <span className="font-bold">הדף היומי של היום</span>
+                    <span className="font-display text-lg">{dy.he} {hebrewDaf(dy.daf)}</span>
+                  </button>
+                );
+              })()}
               <div className={cn("grid gap-3", compact ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2")}>
                 {SEDARIM.map((s) => {
                   const L = lookOf(s.name);
@@ -308,6 +326,7 @@ function NavigatorWindow() {
                   );
                 })}
               </div>
+              </>
             ) : masechta === null ? (
               /* ---- מסכתות הסדר ---- */
               <div className={cn("grid gap-3", compact ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2")}>

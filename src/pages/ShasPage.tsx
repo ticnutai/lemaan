@@ -7,6 +7,9 @@ import DafPage from "../features/daf/DafPage";
 import { sanitizeSegment } from "../features/daf/buildHtml";
 import type { PrintLayout } from "../features/daf/PrintDaf";
 import PrintSearch from "../features/daf/PrintSearch";
+import EinMishpatPanel from "../components/EinMishpatPanel";
+import { dafYomiFor } from "../features/study/dafYomi";
+import { hebrewDaf } from "../features/study/shas";
 
 /** מאגר הש"ס המקומי (מהדורת וילנא, ספריא) — 37 מסכתות, עובד אופליין מלא. */
 
@@ -152,6 +155,25 @@ export default function ShasPage() {
       <div className="max-w-4xl mx-auto space-y-5 animate-fade-in">
         <PageBanner icon={Landmark} title='הש"ס' subtitle="גמרא מהדורת וילנא עם מפרשים — 37 מסכתות, זמין גם בלי אינטרנט." />
         {error && <p className="text-destructive text-sm">{error}</p>}
+        {(() => {
+          // הדף היומי של היום — קיצור דרך ישר לדף
+          const dy = dafYomiFor();
+          const has = !!dy.slug && !!index?.masechtot.some((m) => m.slug === dy.slug);
+          return (
+            <div className="card-panel flex items-center justify-between gap-3 flex-wrap">
+              <span className="flex items-center gap-2">
+                <BookOpen className="h-4 w-4 text-gold" />
+                <span className="font-bold">הדף היומי של היום:</span>
+                <span>{dy.he} דף {hebrewDaf(dy.daf)}</span>
+              </span>
+              {has && (
+                <button className="btn-gold h-9 rounded-full text-sm" onClick={() => go(dy.slug!, `${dy.daf}a`)}>
+                  פתיחת הדף
+                </button>
+              )}
+            </div>
+          );
+        })()}
         {index && (
           <PrintSearch masechtot={index.masechtot} onOpen={(m, a, q) => setParams({ m, a, v: "daf", q })} />
         )}
@@ -263,6 +285,9 @@ export default function ShasPage() {
           ))}
         </>
       )}
+
+      {/* עין משפט — מה נפסק להלכה מהעמוד (בשני מצבי התצוגה) */}
+      {amud && <EinMishpatPanel masechet={slug} amudKey={amudKey} />}
     </div>
   );
 }

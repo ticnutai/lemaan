@@ -333,3 +333,27 @@ test("T22 — נידה בדפוס מדויק: שורת ציון לזכויות �
   await expect(page.locator(".lemaan-print .daf-pline").first()).toBeAttached({ timeout: 20_000 });
   await expect(page.getByTestId("print-credit")).toHaveCount(0);
 });
+
+test("T23 — עין משפט: ההפניות להלכה מוצגות בעברית מתחת לדף", async () => {
+  await page.goto("/#/shas?m=Kiddushin&a=2a");
+  const panel = page.getByTestId("ein-mishpat");
+  await expect(panel).toBeVisible({ timeout: 15_000 });
+  const toggle = panel.getByRole("button").first();
+  if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
+  await expect(panel).toContainText('רמב"ם');
+  await expect(panel).toContainText("הלכות יבום וחליצה");
+  await expect(panel).toContainText("אבן העזר סימן");
+  // אין אנגלית בהפניות
+  expect(/[A-Za-z]/.test(await panel.innerText())).toBe(false);
+});
+
+test("T24 — הדף היומי של היום: כרטיס במסך הש\"ס שפותח את הדף", async () => {
+  await page.goto("/#/shas");
+  const card = page.locator(".card-panel").filter({ hasText: "הדף היומי של היום" });
+  await expect(card).toBeVisible({ timeout: 15_000 });
+  const btn = card.getByRole("button", { name: "פתיחת הדף" });
+  if (await btn.count()) {
+    await btn.click();
+    await expect(page).toHaveURL(/#\/shas\?m=[A-Za-z_]+&a=\d+a/);
+  }
+});
