@@ -1,9 +1,9 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import dafRenderer from "./vendor/renderer";
-import { Palette, Search, X } from "lucide-react";
+import { Minus, Palette, Plus, Search, X } from "lucide-react";
 import { buildMainHtml, buildSideHtml, countHits, stripNikud } from "./buildHtml";
 import PrintDaf, { type PrintLayout } from "./PrintDaf";
-import { DEFAULT_DAF_STYLE, FONT_FAMILY, loadDafStyle, saveDafStyle, type DafStyle } from "./dafStyle";
+import { DEFAULT_DAF_STYLE, FONT_FAMILY, MIN_SCALE, effectiveScale, loadDafStyle, maxScaleFor, saveDafStyle, type DafStyle } from "./dafStyle";
 
 interface Props {
   gemara: string[];
@@ -35,6 +35,9 @@ export default function DafPage({ gemara, rashi, tosafot, amud, title, printLayo
   const [query, setQuery] = useState(initialQuery ?? "");
   const [showStyle, setShowStyle] = useState(false);
   const [width, setWidth] = useState(640);
+  // ההגדלה בפועל — בטלפון מותר יותר מ-1.6 (dafStyle.maxScaleFor); במחשב בדיוק כמו קודם
+  const scale = effectiveScale(style.scale, width);
+  const maxScale = maxScaleFor(width);
 
   useEffect(() => {
     loadDafStyle().then((s) => { setStyle(s); setStyleLoaded(true); });
@@ -62,7 +65,7 @@ export default function DafPage({ gemara, rashi, tosafot, amud, title, printLayo
     // "דקדוק" דף וילנא, נמדד על 125 עמודים: מסגרת 435; גמרא 170/300/430;
     // מפרשים 210 (ראש) / 120 (עמודה); מרווחים 12.5; גמרא מתחילה 5.3 שורות מפרש מהראש;
     // גופנים 12.6 / 7.7; פסיעות 12.03 / 11.16 — הכל ביחס לרוחב הדף.
-    const pageW = Math.round(width * style.scale);
+    const pageW = Math.round(width * scale);
     const k = pageW / 435;
     const renderer = dafRenderer(host, {
       contentWidth: `${pageW}px`,
@@ -91,7 +94,7 @@ export default function DafPage({ gemara, rashi, tosafot, amud, title, printLayo
       }
     });
     return () => { cancelled = true; };
-  }, [gemara, rashi, tosafot, amud, style, query, width, styleLoaded, printLayout]);
+  }, [gemara, rashi, tosafot, amud, style, query, width, scale, styleLoaded, printLayout]);
 
   const isPrint = style.mode === "print" && !!printLayout;
   const printStreams = useMemo(() => {
@@ -114,6 +117,8 @@ export default function DafPage({ gemara, rashi, tosafot, amud, title, printLayo
     setStyle(next);
     void saveDafStyle(next);
   };
+  const zoom = (dir: 1 | -1) =>
+    update({ scale: Math.round(Math.min(maxScale, Math.max(MIN_SCALE, scale + dir * 0.15)) * 100) / 100 });
 
   return (
     <div className="space-y-2">
@@ -121,8 +126,9 @@ export default function DafPage({ gemara, rashi, tosafot, amud, title, printLayo
       <div className="card-panel py-2 px-3 flex items-center gap-2 flex-wrap">
         <div className="relative flex-1 min-w-48">
           <Search className="absolute right-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          {/* w-full: בלי זה השדה רחב מהתיבה שלו וגולש מעל הכפתורים שלידו (בטלפון — מעל כפתור ההקטנה) */}
           <input
-            className="input h-9 pr-8"
+            className="input h-9 pr-8 w-full"
             placeholder="חיפוש בדף — גמרא, רש״י, תוספות"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -134,6 +140,16 @@ export default function DafPage({ gemara, rashi, tosafot, amud, title, printLayo
           )}
         </div>
         {query && <span className="text-sm text-gold font-medium">{hits} מופעים</span>}
+        <div className="flex items-center gap-1" role="group" aria-label="גודל הדף">
+          <button className="btn-outline h-9 w-9 p-0" onClick={() => zoom(-1)} disabled={scale <= MIN_SCALE}
+            aria-label="הקטנת הדף" title="הקטנה">
+            <Minus className="h-4 w-4" />
+          </button>
+          <button className="btn-outline h-9 w-9 p-0" onClick={() => zoom(1)} disabled={scale >= maxScale}
+            aria-label="הגדלת הדף" title="הגדלה">
+            <Plus className="h-4 w-4" />
+          </button>
+        </div>
         <button
           className={`btn-outline h-9 ${showStyle ? "border-gold text-gold bg-gold/10" : ""}`}
           onClick={() => setShowStyle((v) => !v)}
@@ -180,7 +196,7 @@ export default function DafPage({ gemara, rashi, tosafot, amud, title, printLayo
           </label>
           <label className="flex items-center justify-between gap-2">
             גודל טקסט
-            <input type="range" min={0.85} max={1.6} step={0.05} value={style.scale} className="w-44"
+            <input type="range" min={MIN_SCALE} max={maxScale} step={0.05} value={scale} className="w-44"
               onChange={(e) => update({ scale: Number(e.target.value) })} />
           </label>
           <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -207,9 +223,9 @@ export default function DafPage({ gemara, rashi, tosafot, amud, title, printLayo
           {title}
         </p>
         {isPrint && printLayout ? (
-          <PrintDaf layout={printLayout} width={Math.round(width * style.scale)} style={style} query={query} />
+          <PrintDaf layout={printLayout} width={Math.round(width * scale)} style={style} query={query} />
         ) : (
-          <div ref={hostRef} className="lemaan-daf mx-auto" style={{ width: Math.round(width * style.scale) }} dir="rtl" />
+          <div ref={hostRef} className="lemaan-daf mx-auto" style={{ width: Math.round(width * scale) }} dir="rtl" />
         )}
         {isPrint && printCredit && (
           <p className="mt-3 text-center text-xs text-muted-foreground" data-testid="print-credit">{printCredit}</p>

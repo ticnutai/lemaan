@@ -8,6 +8,7 @@ import { sanitizeSegment } from "../features/daf/buildHtml";
 import type { PrintLayout } from "../features/daf/PrintDaf";
 import PrintSearch from "../features/daf/PrintSearch";
 import EinMishpatPanel from "../components/EinMishpatPanel";
+import { innerSegments, outerSegments } from "../features/daf/streams";
 import { dafYomiFor } from "../features/study/dafYomi";
 import { hebrewDaf } from "../features/study/shas";
 
@@ -242,8 +243,8 @@ export default function ShasPage() {
         <DafPage
           key={`${slug}-${amudKey}`}
           gemara={amud.gemara}
-          rashi={amud.commentaries.find((c) => c.key === "rashi")?.segments ?? []}
-          tosafot={amud.commentaries.find((c) => c.key === "tosafot")?.segments ?? []}
+          rashi={innerSegments(amud.commentaries)}
+          tosafot={outerSegments(amud.commentaries)}
           amud={amudKey.endsWith("b") ? "b" : "a"}
           title={`${meta.he} דף ${amud.daf} ${amud.amud}`}
           printLayout={printLayouts?.[amudKey]}

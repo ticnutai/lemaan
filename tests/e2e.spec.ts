@@ -357,3 +357,20 @@ test("T24 — הדף היומי של היום: כרטיס במסך הש\"ס שפ
     await expect(page).toHaveURL(/#\/shas\?m=[A-Za-z_]+&a=\d+a/);
   }
 });
+
+test("T25 — חיפוש בכל הש\"ס: מחיקת החיפוש בזמן טעינה לא משאירה תוצאות ישנות, ו'מחפש…' לא נתקע", async () => {
+  // טעינה ראשונה של הדף — כדי שהמאגר עוד לא נטען כשמקלידים
+  await page.goto("/#/");
+  await page.reload();
+  await page.goto("/#/shas");
+  const box = page.getByLabel("חיפוש בדפוס המדויק");
+  await box.fill("אמר רבא");
+  await page.waitForTimeout(300); // החיפוש מתחיל (אחרי השהיית ההקלדה) ומתחיל לטעון את המאגר
+  await box.fill("");
+  await page.waitForTimeout(5_000); // זמן מספיק לסיום הטעינה
+  await expect(page.locator("ul.divide-y li button")).toHaveCount(0);
+  await expect(page.getByText("מחפש…")).toHaveCount(0);
+  // וחיפוש חדש אחרי זה עובד כרגיל
+  await box.fill("בשוליא דנגרי");
+  await expect(page.locator("ul.divide-y li button").first()).toBeVisible({ timeout: 15_000 });
+});

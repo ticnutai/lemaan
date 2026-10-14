@@ -25,6 +25,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx tsc --noEmit
+      # בדיקות מהירות בלי דפדפן: תמונת מצב של כל עמודי צורת הדף, קובצי החיפוש, ערכי זהב, עין משפט
+      - run: npx vitest run
       - run: npx playwright install --with-deps chrome
       - run: npx playwright test
       - uses: actions/upload-artifact@v4

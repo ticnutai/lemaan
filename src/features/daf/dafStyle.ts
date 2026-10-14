@@ -25,6 +25,22 @@ export const DEFAULT_DAF_STYLE: DafStyle = {
 
 const KEY = "daf-style";
 
+export const MIN_SCALE = 0.85;
+
+/**
+ * גבול ההגדלה לפי רוחב הדף (px). בכל רוחב מעל 625 — 1.6, כמו תמיד (מחשב וטבלט בלי שינוי).
+ * בטלפון הדף צר (320), ורש"י ותוספות יוצאים בגודל 3.6px — אז מותר להגדיל עד פי 3 (כ-11px), והמסגרת נגללת לרוחב.
+ */
+export function maxScaleFor(width: number): number {
+  return Math.max(1.6, Math.min(3, 1000 / width));
+}
+
+/** ההגדלה בפועל: הערך השמור, בתוך הגבולות לרוחב הנוכחי (ערך פגום — 1) */
+export function effectiveScale(stored: number, width: number): number {
+  if (!Number.isFinite(stored)) return 1;
+  return Math.min(maxScaleFor(width), Math.max(MIN_SCALE, stored));
+}
+
 export async function loadDafStyle(): Promise<DafStyle> {
   const raw = (await db.settings.get(KEY))?.value;
   if (!raw) return DEFAULT_DAF_STYLE;
