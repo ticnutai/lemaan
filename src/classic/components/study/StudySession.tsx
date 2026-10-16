@@ -1906,26 +1906,7 @@ export function StudySession({
                 {String(elapsed % 60).padStart(2, "0")}
               </span>
             )}
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-10 w-10 min-w-10 p-0 rounded-xl border-gold/50 hover:bg-gold/10"
-              title="הוספה מהירה לערכה אחרונה"
-              onClick={quickAddToLastDeck}
-              disabled={!card}
-            >
-              <BookmarkPlus className="h-5 w-5 text-gold" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-10 w-10 min-w-10 p-0 rounded-xl border-gold/50 hover:bg-gold/10"
-              title="הוסף את השאלה לערכות"
-              onClick={() => setDeckDialogOpen(true)}
-              disabled={!card}
-            >
-              <Layers className="h-5 w-5 text-gold" />
-            </Button>
+            {/* (אצלנו) הוסרו הכפתורים "הוספה מהירה" ו"ערכות" — לבקשת המשתמש */}
             <Button
               variant="outline"
               size="sm"
@@ -2143,28 +2124,7 @@ export function StudySession({
           isMobile && "hidden",
         )}
       >
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-7 px-2 border-gold/50 hover:bg-gold/10 gap-1"
-          title="הוספה מהירה לערכה אחרונה"
-          onClick={quickAddToLastDeck}
-          disabled={!card}
-        >
-          <BookmarkPlus className="h-3.5 w-3.5 text-gold" />
-          <span className="text-xs">מהיר</span>
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-7 px-2 border-gold/50 hover:bg-gold/10 gap-1"
-          title="הוסף את השאלה לערכות"
-          onClick={() => setDeckDialogOpen(true)}
-          disabled={!card}
-        >
-          <Layers className="h-3.5 w-3.5 text-gold" />
-          <span className="text-xs">ערכות</span>
-        </Button>
+        {/* (אצלנו) הוסרו הכפתורים "מהיר" ו"ערכות" — לבקשת המשתמש */}
         <Button
           variant="outline"
           size="sm"
