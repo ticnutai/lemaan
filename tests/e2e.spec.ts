@@ -33,6 +33,8 @@ async function openStudyCenter() {
   await page.getByRole("button", { name: /תרגול כללי|^חזרה$|^חזרה לתרגול$/ }).first().waitFor();
   const exit = page.getByRole("button", { name: /^חזרה$|^חזרה לתרגול$/ });
   if (await exit.count()) await exit.first().click();
+  // המסך זוכר את לשונית התחום האחרונה (למשל שולחן ערוך) — חוזרים לש"ס
+  await page.locator(".card-panel").getByRole("button", { name: 'ש"ס', exact: true }).first().click();
   await page.getByRole("button", { name: /תרגול כללי/ }).click();
   const top = page.getByRole("navigation", { name: "מיקום" }).getByRole("button", { name: 'ש"ס', exact: true });
   if (await top.count()) await top.click();
