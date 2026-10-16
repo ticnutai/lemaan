@@ -451,3 +451,48 @@ test("T27 — חלון עיצוב טיפוגרפיה בתרגול: שאלות ו
   await expect(page.locator(".gold-frame p.font-medium").first()).toHaveCSS("font-size", "18px");
   await page.waitForTimeout(500);
 });
+
+test("T28 — פריסה מקורית: כפתור בהגדרות מחליף את עמוד הבית ואת לשונית התרגול, והתשובות נשמרות באותו מסד", async () => {
+  await page.goto("/#/settings");
+  await page.getByRole("radio", { name: /הפריסה המקורית/ }).click();
+  await expect(page.getByRole("radio", { name: /הפריסה המקורית/ })).toHaveAttribute("aria-checked", "true");
+
+  // עמוד הבית המקורי: הכותרת ורשת הרכיבים
+  await page.goto("/#/");
+  await expect(page.getByText("עקוב אחר ההתקדמות שלך וקבל תובנות מתקדמות")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText("תוכניות לימוד").first()).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText("ערוך פריסה")).toBeVisible();
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: "test-results/classic-home.png", fullPage: true });
+
+  // לשונית התרגול המקורית: סדר ← מסכת ← דף ← עמוד ← תרגול
+  await page.goto("/#/study");
+  await page.locator(".classic-layout").getByRole("button", { name: /^תרגול כללי/ }).click();
+  await page.locator(".classic-layout").getByRole("button", { name: /^מועד/ }).first().click();
+  await page.locator(".classic-layout").getByRole("button", { name: /^חגיגה/ }).first().click();
+  await page.locator(".classic-layout").getByRole("button", { name: /^ב\s*\d/ }).first().click();
+  await page.locator(".classic-layout").getByRole("button", { name: /^עמוד א/ }).first().click();
+  await expect(page.getByText("שאלות זמינות לעמוד זה")).toBeVisible({ timeout: 15_000 });
+  await page.screenshot({ path: "test-results/classic-amud.png", fullPage: true });
+
+  const logsBefore = await page.evaluate(() => new Promise<number>((res) => {
+    const r = indexedDB.open("lemaan");
+    r.onsuccess = () => { const q = r.result.transaction("reviewLogs").objectStore("reviewLogs").count(); q.onsuccess = () => { res(q.result); r.result.close(); }; };
+  }));
+  await page.locator(".classic-layout").getByRole("button", { name: "תרגול", exact: true }).click();
+  await expect(page.getByText(/1 \/ \d+ · תרגול חופשי/)).toBeVisible({ timeout: 15_000 });
+  await page.screenshot({ path: "test-results/classic-session.png", fullPage: true });
+  await page.locator(".classic-layout").getByRole("button", { name: /^א\s/ }).first().click();
+  await expect(page.getByText(/2 \/ \d+ · תרגול חופשי/)).toBeVisible({ timeout: 10_000 });
+  await expect.poll(() => page.evaluate(() => new Promise<number>((res) => {
+    const r = indexedDB.open("lemaan");
+    r.onsuccess = () => { const q = r.result.transaction("reviewLogs").objectStore("reviewLogs").count(); q.onsuccess = () => { res(q.result); r.result.close(); }; };
+  }))).toBe(logsBefore + 1);
+
+  // חזרה לפריסה הנוכחית
+  await page.goto("/#/settings");
+  await page.getByRole("radio", { name: /הפריסה הנוכחית/ }).click();
+  await page.goto("/#/");
+  await expect(page.getByText("שאלות במאגר").first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("ערוך פריסה")).toHaveCount(0);
+});

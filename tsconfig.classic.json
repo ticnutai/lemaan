@@ -1,0 +1,21 @@
+{
+  // הפריסה המקורית (src/classic) — הועתקה אחד לאחד מהאתר הבסיסי, ולכן נבדקת בהגדרות שלו (פחות מחמירות)
+  "compilerOptions": {
+    "target": "es2022",
+    "module": "esnext",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["vite/client"],
+    "jsx": "react-jsx",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "strict": false,
+    "noImplicitAny": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "paths": { "@/*": ["./src/classic/*"] }
+  },
+  "include": ["src/classic"]
+}

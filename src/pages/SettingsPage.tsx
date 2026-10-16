@@ -1,12 +1,44 @@
 import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { AlertTriangle, Brain, Cloud, CloudDownload, CloudUpload, Copy, Download, Heart, Settings, Upload } from "lucide-react";
+import { AlertTriangle, Brain, Check, Cloud, CloudDownload, CloudUpload, Copy, Download, Heart, LayoutTemplate, Settings, Upload } from "lucide-react";
 import { db, setSetting } from "../db";
 import { getSyncCode, pullSnapshot, pushSnapshot } from "../db/sync";
 import PageBanner from "../components/PageBanner";
 import ThemeStudio from "../components/ThemeStudio";
 import AccountSection from "../components/AccountSection";
 import type { SrsAlgorithm } from "../features/study/srs";
+import { saveLayoutMode, useLayoutMode, type LayoutMode } from "../features/layoutMode";
+
+/** בחירת הפריסה של עמוד הבית ושל לשונית התרגול: הנוכחית, או המקורית (אחד לאחד כמו באתר הבסיסי). */
+function LayoutModeCard() {
+  const mode = useLayoutMode();
+  const options: { id: LayoutMode; title: string; text: string }[] = [
+    { id: "modern", title: "הפריסה הנוכחית", text: "העיצוב והפריסה של האתר הזה" },
+    { id: "classic", title: "הפריסה המקורית", text: "אחד לאחד כמו באתר הבסיסי, עם כל הפונקציות שלו" },
+  ];
+  return (
+    <div className="card-panel space-y-3">
+      <h3 className="font-semibold flex items-center gap-2"><LayoutTemplate className="h-4 w-4 text-gold" /> פריסה ועיצוב</h3>
+      <p className="text-xs text-muted-foreground">משנה את עמוד הבית ואת לשונית התרגול. הנתונים (שאלות, תשובות, התקדמות) משותפים לשתי הפריסות.</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2" role="radiogroup" aria-label="פריסה ועיצוב">
+        {options.map((o) => (
+          <button
+            key={o.id}
+            role="radio"
+            aria-checked={mode === o.id}
+            className={`rounded-xl border-2 p-3 text-right transition-colors ${mode === o.id ? "border-gold bg-gold/10" : "border-border hover:border-gold/60"}`}
+            onClick={() => void saveLayoutMode(o.id)}
+          >
+            <div className="font-semibold flex items-center gap-1.5">
+              {mode === o.id && <Check className="h-4 w-4 text-gold" />} {o.title}
+            </div>
+            <div className="text-xs text-muted-foreground mt-0.5">{o.text}</div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function SettingsPage() {
   const [busy, setBusy] = useState(false);
@@ -108,6 +140,8 @@ export default function SettingsPage() {
       <AccountSection />
 
       <ThemeStudio />
+
+      <LayoutModeCard />
 
       <div className="card-panel space-y-3">
         <h3 className="font-semibold flex items-center gap-2"><Heart className="h-4 w-4 text-gold" /> הקדשה</h3>

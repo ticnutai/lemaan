@@ -1,0 +1,270 @@
+{
+  "asOf": "2026-09-07",
+  "roles": {
+    "registered": {
+      "id": "2ecadfb4-84bf-44fc-a077-b83a7bf2b517",
+      "name": "משתמש רשום"
+    },
+    "anonymous_online": {
+      "id": "730b85cd-1fe2-45ce-8b64-e7648a129759",
+      "name": "משתמש אנונימי אונליין"
+    },
+    "anonymous_offline": {
+      "id": "463ba43e-adbc-4d3f-9703-35918f63261c",
+      "name": "משתמש אנונימי אופליין"
+    },
+    "registered_offline": {
+      "id": "49bb2bbb-82b7-456c-ae42-0e048ac9758f",
+      "name": "משתמש רשום אופליין"
+    }
+  },
+  "matrix": {
+    "shas:edit": true,
+    "shas:view": true,
+    "cards:edit": true,
+    "cards:view": true,
+    "decks:edit": true,
+    "decks:view": true,
+    "goals:edit": false,
+    "goals:view": false,
+    "roles:edit": false,
+    "roles:view": false,
+    "users:edit": false,
+    "users:view": false,
+    "shas:create": true,
+    "shas:delete": true,
+    "shas:manage": false,
+    "cards:create": true,
+    "cards:delete": true,
+    "cards:manage": false,
+    "decks:create": true,
+    "decks:delete": true,
+    "decks:manage": false,
+    "goals:create": false,
+    "goals:delete": false,
+    "goals:manage": false,
+    "roles:create": false,
+    "roles:delete": false,
+    "roles:manage": false,
+    "users:create": false,
+    "users:delete": false,
+    "users:manage": false,
+    "settings:edit": false,
+    "settings:view": false,
+    "analytics:edit": true,
+    "analytics:view": true,
+    "settings:create": false,
+    "settings:delete": false,
+    "settings:manage": false,
+    "analytics:create": true,
+    "analytics:delete": true,
+    "analytics:manage": false
+  },
+  "blocklists": {
+    "desktop": {
+      "widgets": {
+        "pdf": [
+          "pdf-viewer",
+          "pdf-notes"
+        ],
+        "goals": [
+          "goals-manager",
+          "reminder-settings"
+        ],
+        "study": [
+          "study-settings"
+        ],
+        "tasks": [
+          "tasks-board",
+          "tasks-priority",
+          "tasks-inbox"
+        ],
+        "timer": [
+          "timer-main",
+          "timer-summary"
+        ],
+        "today": [
+          "today-focus",
+          "today-notes",
+          "today-schedule"
+        ],
+        "habits": [
+          "habits-tracker",
+          "habits-streak"
+        ],
+        "studio": [
+          "studio-files",
+          "studio-recent"
+        ],
+        "ai_page": [
+          "ai-coach-main",
+          "ai-tools"
+        ],
+        "archive": [
+          "archive-search",
+          "archive-recent"
+        ],
+        "blocker": [
+          "blocker-insights",
+          "blocker-actions",
+          "blocker-overview"
+        ],
+        "journal": [
+          "journal-entry",
+          "journal-history"
+        ],
+        "monitor": [
+          "monitor-analytics",
+          "monitor-alerts",
+          "monitor-summary"
+        ],
+        "morning": [
+          "morning-routine",
+          "morning-energy"
+        ],
+        "overview": [
+          "goals-manager",
+          "quote-card",
+          "ai-coach",
+          "next-alarm",
+          "pomodoro",
+          "task-card",
+          "heatmap",
+          "daily-trackers"
+        ],
+        "goals_page": [
+          "goals-main",
+          "goals-reminders",
+          "goals-progress"
+        ],
+        "achievements_page": [
+          "achievements-badges",
+          "achievements-streak"
+        ]
+      },
+      "sections": [
+        "morning",
+        "today",
+        "tasks",
+        "habits",
+        "journal",
+        "timer",
+        "goals",
+        "studio",
+        "ai",
+        "ai-generator",
+        "question-lab",
+        "archive",
+        "backup",
+        "backup-restore",
+        "db-inspector",
+        "perf",
+        "admin",
+        "settings",
+        "blocker",
+        "monitor",
+        "pdf",
+        "achievements",
+        "book",
+        "search",
+        "system-rubric"
+      ]
+    },
+    "mobile": {
+      "widgets": {
+        "pdf": [
+          "pdf-viewer",
+          "pdf-notes"
+        ],
+        "goals": [
+          "goals-manager"
+        ],
+        "study": [
+          "study-settings"
+        ],
+        "tasks": [
+          "tasks-board",
+          "tasks-priority",
+          "tasks-inbox"
+        ],
+        "timer": [
+          "timer-main",
+          "timer-summary"
+        ],
+        "today": [
+          "today-focus",
+          "today-notes"
+        ],
+        "habits": [
+          "habits-tracker",
+          "habits-streak"
+        ],
+        "studio": [
+          "studio-files",
+          "studio-recent"
+        ],
+        "ai_page": [
+          "ai-coach-main",
+          "ai-tools"
+        ],
+        "archive": [
+          "archive-search",
+          "archive-recent"
+        ],
+        "blocker": [
+          "blocker-insights",
+          "blocker-actions"
+        ],
+        "journal": [
+          "journal-entry",
+          "journal-history"
+        ],
+        "monitor": [
+          "monitor-analytics",
+          "monitor-alerts"
+        ],
+        "morning": [
+          "morning-routine",
+          "morning-energy"
+        ],
+        "overview": [
+          "goals-manager",
+          "quote-card",
+          "ai-coach",
+          "next-alarm",
+          "pomodoro",
+          "task-card",
+          "heatmap"
+        ],
+        "goals_page": [
+          "goals-main",
+          "goals-progress"
+        ],
+        "achievements_page": [
+          "achievements-badges"
+        ]
+      },
+      "sections": [
+        "morning",
+        "today",
+        "tasks",
+        "habits",
+        "journal",
+        "timer",
+        "goals",
+        "book",
+        "studio",
+        "ai",
+        "ai-generator",
+        "question-lab",
+        "archive",
+        "backup",
+        "backup-restore",
+        "db-inspector",
+        "perf",
+        "admin",
+        "settings"
+      ]
+    }
+  }
+}
