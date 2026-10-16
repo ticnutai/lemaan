@@ -58,6 +58,26 @@ export function normalizeStream(lines: string[]): { norm: string; line: Int32Arr
   return { norm, line: Int32Array.from(line), pos: Int32Array.from(pos) };
 }
 
+/**
+ * מספר המופעים שמודגשים בדף דפוס שלם, בדיוק כמו ההדגשה ב-PrintDaf: כל זרם (גמרא, רש"י, תוספות) לאורכו,
+ * ומילת הפתיחה שבמסגרת המעוטרת ומילות הקישור בתחתית העמוד — כל אחת לבדה. גושים בלי שורות (text) לא כאן:
+ * הם מודגשים ונספרים בדרך הישנה (countHits ב-DafPage).
+ * (קודם מילת הפתיחה ומילות הקישור הודגשו ולא נספרו — ברכות ב. "מאימתי": 5 הדגשות, המונה 4; נמצא באתר למען)
+ */
+export function printHitCount(
+  layout: { slabs: { s: string; lines?: { t: string }[] }[]; box?: { text: string } | null; catch?: { text: string }[] },
+  query: string,
+): number {
+  let n = 0;
+  for (const s of ["gemara", "rashi", "tosafot"]) {
+    n += streamHighlights(layout.slabs.filter((sl) => sl.s === s && sl.lines?.length).flatMap((sl) => sl.lines!.map((l) => l.t)), query).count;
+  }
+  for (const t of [...(layout.box?.text ? [layout.box.text] : []), ...(layout.catch ?? []).map((c) => c.text)]) {
+    n += streamHighlights([t], query).count;
+  }
+  return n;
+}
+
 /** טווחי ההדגשה לכל שורה בזרם, ומספר המופעים. שאילתה קצרה מתו אחד (אחרי נרמול) — בלי הדגשה, כמו בחיפוש */
 export function streamHighlights(lines: string[], query: string): { ranges: Ranges[]; count: number } {
   const ranges: Ranges[] = lines.map(() => []);

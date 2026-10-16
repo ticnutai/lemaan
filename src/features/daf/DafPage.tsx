@@ -3,7 +3,7 @@ import dafRenderer from "./vendor/renderer";
 import { Minus, Palette, Plus, Search, X } from "lucide-react";
 import { buildMainHtml, buildSideHtml, countHits, stripNikud } from "./buildHtml";
 import PrintDaf, { type PrintLayout } from "./PrintDaf";
-import { streamHighlights } from "./printHighlight";
+import { printHitCount } from "./printHighlight";
 import { DEFAULT_DAF_STYLE, FONT_FAMILY, MIN_SCALE, effectiveScale, loadDafStyle, maxScaleFor, saveDafStyle, type DafStyle } from "./dafStyle";
 
 interface Props {
@@ -100,21 +100,15 @@ export default function DafPage({ gemara, rashi, tosafot, amud, title, printLayo
   const isPrint = style.mode === "print" && !!printLayout;
   const printStreams = useMemo(() => {
     if (!printLayout) return null;
-    // שורות לכל זרם (כמו בהדגשה ב-PrintDaf), וגושי טקסט בלי שורות בנפרד
-    const lines = { gemara: [] as string[], rashi: [] as string[], tosafot: [] as string[] }, texts: string[] = [];
-    for (const sl of printLayout.slabs) {
-      if (sl.lines?.length) lines[sl.s].push(...sl.lines.map((l) => l.t));
-      else if (sl.s !== "gemara" && sl.text) texts.push(sl.text);
-    }
-    // המילה הפותחת בתיבה המעוטרת (למשל "מאימתי" בברכות ב.) מודגשת בציור — נספרת גם במונה
-    if (printLayout.box?.text) texts.push(printLayout.box.text);
-    return { lines, texts };
+    // גושי טקסט בלי שורות — מודגשים בדרך הישנה (sideHtml), ולכן נספרים בה
+    const texts: string[] = [];
+    for (const sl of printLayout.slabs) if (!sl.lines?.length && sl.s !== "gemara" && sl.text) texts.push(sl.text);
+    return { texts };
   }, [printLayout]);
-  // במצב דפוס: אותה ספירה כמו ההדגשה (מנורמלת, על פני הזרם) — המונה תמיד שווה למספר ההדגשות
-  const hits = isPrint && printStreams
-    ? (["gemara", "rashi", "tosafot"] as const).reduce((n, s) => n + streamHighlights(printStreams.lines[s], query).count, 0) +
-      // גושי טקסט והתיבה הפותחת מסומנים ב-PrintDaf כל אחד לחוד, באותה התאמה מנורמלת — כך גם נספרים
-      printStreams.texts.reduce((n, t) => n + streamHighlights([t], query).count, 0)
+  // במצב דפוס: אותה ספירה כמו ההדגשה (מנורמלת, על פני הזרם, כולל מילת הפתיחה ומילות הקישור) — המונה תמיד
+  // שווה למספר ההדגשות (printHitCount; נבדק ב-printCounter.test.ts)
+  const hits = isPrint && printStreams && printLayout
+    ? printHitCount(printLayout, query) + countHits(query, printStreams.texts)
     : style.nikud
       ? countHits(query, gemara, rashi, tosafot)
       : countHits(stripNikud(query), gemara.map(stripNikud), rashi.map(stripNikud), tosafot.map(stripNikud));
