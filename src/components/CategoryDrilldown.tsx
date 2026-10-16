@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { BookOpen, ChevronLeft, ListChecks, Play } from "lucide-react";
+import { BookOpen, ChevronLeft, Play } from "lucide-react";
 import { db } from "../db";
 import type { Card, Category } from "../features/study/types";
+import OpenQuestionList from "./OpenQuestionList";
 
 /**
  * ניווט בתיבות מתחלפות בעץ קטגוריות (למשל שולחן ערוך: חלק ← הלכות ← סימן ← סעיף ← השאלות).
@@ -135,23 +136,9 @@ export default function CategoryDrilldown({ rootName, rootLabel, onPractice }: P
   );
 }
 
-/** רשימת השאלות של קטגוריה אחרונה בעץ (סעיף). */
+/** רשימת השאלות של קטגוריה אחרונה בעץ (סעיף) — עם בחירת תצוגה: רשימה נפתחת או כרטיסים מתהפכים. */
 function QuestionList({ categoryId }: { categoryId: string }) {
   const cards = useLiveQuery(() => db.cards.where("categoryId").equals(categoryId).toArray(), [categoryId]);
   if (!cards) return null;
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-1.5 text-sm font-semibold">
-        <ListChecks className="h-4 w-4 text-gold" /> השאלות ({cards.length})
-      </div>
-      {cards.map((c, i) => (
-        <details key={c.id} className="rounded-lg border border-gold/30 bg-card p-3 open:border-gold/60">
-          <summary className="cursor-pointer font-medium">
-            <span className="text-gold font-bold ml-1">{i + 1}.</span> {c.question}
-          </summary>
-          <p className="mt-2 whitespace-pre-line text-sm text-muted-foreground">{c.answer}</p>
-        </details>
-      ))}
-    </div>
-  );
+  return <OpenQuestionList cards={cards} />;
 }

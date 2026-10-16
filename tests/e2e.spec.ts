@@ -604,3 +604,50 @@ test("T30 — שולחן ערוך: 652 שאלות נוספו לכולם, ותי�
   await page.goto("/#/settings");
   await page.getByRole("radio", { name: /הפריסה הנוכחית/ }).click();
 });
+
+test("T31 — שאלות פתוחות: בחירה בין רשימה נפתחת לכרטיסים מתהפכים, נשמרת ומשותפת לשתי הפריסות", async () => {
+  const toSeif = async (root: import("@playwright/test").Locator) => {
+    const box = root.getByTestId("category-drilldown");
+    await expect(box).toBeVisible({ timeout: 15_000 });
+    const rootCrumb = box.getByRole("navigation", { name: "מיקום" }).getByRole("button", { name: "שולחן ערוך" });
+    if (await rootCrumb.count()) await rootCrumb.click();
+    for (const name of ["אורח חיים", "הלכות שבת", "סימן רמ״ג", "סעיף א׳"]) {
+      await box.getByTestId("drilldown-tile").filter({ hasText: name }).first().click();
+    }
+    return box.getByTestId("open-question-list");
+  };
+
+  await openStudyCenter();
+  await page.getByRole("button", { name: "שולחן ערוך" }).click();
+  const list = await toSeif(page.locator("body"));
+  await expect(list).toHaveAttribute("data-view", "list");
+
+  // כרטיסים מתהפכים
+  await list.getByRole("radio", { name: "כרטיסים מתהפכים" }).click();
+  await expect(list).toHaveAttribute("data-view", "flip");
+  const card = list.getByTestId("flip-card").first();
+  await expect(card).toHaveAttribute("aria-pressed", "false");
+  await card.screenshot({ path: "test-results/flip-front.png" });
+  await card.click();
+  await expect(card).toHaveAttribute("aria-pressed", "true");
+  await page.waitForTimeout(700);
+  await card.screenshot({ path: "test-results/flip-back.png" });
+  await card.click();
+  await expect(card).toHaveAttribute("aria-pressed", "false");
+
+  // הבחירה נשמרת ומשותפת: גם בפריסה המקורית מופיעים כרטיסים
+  await page.goto("/#/settings");
+  await page.getByRole("radio", { name: /הפריסה המקורית/ }).click();
+  await page.goto("/#/study");
+  const classic = page.locator(".classic-layout");
+  await classic.getByRole("radio", { name: /שולחן ערוך/ }).click();
+  await classic.getByRole("button", { name: /^תרגול כללי/ }).click();
+  const clist = await toSeif(classic);
+  await expect(clist).toHaveAttribute("data-view", "flip");
+
+  // חזרה לרשימה נפתחת
+  await clist.getByRole("radio", { name: "רשימה נפתחת" }).click();
+  await expect(clist).toHaveAttribute("data-view", "list");
+  await page.goto("/#/settings");
+  await page.getByRole("radio", { name: /הפריסה הנוכחית/ }).click();
+});

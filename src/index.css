@@ -659,3 +659,14 @@
   }
 }
 
+
+/* כרטיס מתהפך: השאלה מקדימה, התשובה מאחור. הגובה לפי הצד שרואים (שאלה קצרה — כרטיס קצר) */
+.flip-card { perspective: 1200px; display: block; width: 100%; cursor: pointer; }
+.flip-card-inner { position: relative; display: block; transition: transform 0.55s cubic-bezier(0.2, 0.7, 0.2, 1); transform-style: preserve-3d; }
+.flip-card.is-flipped .flip-card-inner { transform: rotateY(180deg); }
+.flip-card-face { display: block; backface-visibility: hidden; -webkit-backface-visibility: hidden; min-height: 8rem; }
+.flip-card-back { transform: rotateY(180deg); }
+.flip-card:not(.is-flipped) .flip-card-back,
+.flip-card.is-flipped .flip-card-front { position: absolute; inset: 0; overflow: hidden; }
+.flip-card:focus-visible { outline: 2px solid hsl(var(--gold)); outline-offset: 3px; border-radius: 0.75rem; }
+@media (prefers-reduced-motion: reduce) { .flip-card-inner { transition: none; } }
