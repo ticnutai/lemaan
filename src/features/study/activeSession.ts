@@ -7,7 +7,9 @@ import type { Card, SrsState, CardStats } from "./types";
 export type SessionPath =
   | { kind: "shas"; masechta: string; daf?: number; leaf: string }
   | { kind: "deck"; name: string }
-  | { kind: "pinned" };
+  | { kind: "pinned" }
+  /** תרגול מעץ קטגוריות (למשל שולחן ערוך): שמות המסלול מהשורש */
+  | { kind: "category"; trail: string[] };
 
 /** תשובה שניתנה — לביטול התשובה האחרונה. */
 export interface AnsweredStep {

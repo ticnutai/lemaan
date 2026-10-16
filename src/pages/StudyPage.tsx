@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
-  BookOpen, Check, ChevronLeft, Eye, Layers, Pause, Pin, PinOff, Play, RotateCcw, Scroll, Timer, Type, Undo2, X, Zap,
+  BookOpen, Check, ChevronLeft, Library, Eye, Layers, Pause, Pin, PinOff, Play, RotateCcw, Scroll, Timer, Type, Undo2, X, Zap,
 } from "lucide-react";
 import { db } from "../db";
 import { sendQuestionNote } from "../db/admin";
@@ -21,6 +21,7 @@ import QuestionCard, { hasOptions, isSelectionCorrect } from "../components/Ques
 import TypographyDialog from "../components/TypographyDialog";
 import { isCustom, useTypography } from "../features/study/typography";
 import AmudSorter from "../components/AmudSorter";
+import CategoryDrilldown from "../components/CategoryDrilldown";
 import { cn } from "../lib/utils";
 import type { Card, Deck } from "../features/study/types";
 
@@ -30,6 +31,7 @@ const CORPUS_TABS = [
   { name: "משנה", icon: Scroll },
   { name: "חומש", icon: Scroll },
   { name: 'תנ"ך', icon: BookOpen },
+  { name: "שולחן ערוך", icon: Library },
 ];
 
 const QUALITY_BUTTONS: { q: 0 | 3 | 4 | 5; label: string; cls: string }[] = [
@@ -499,7 +501,12 @@ export default function StudyPage() {
         {notice && <p className="text-sm text-center text-destructive">{notice}</p>}
 
         {/* תחום שאינו ש"ס — הודעה + קישור להוספת שאלות */}
-        {corpus !== 'ש"ס' && (
+        {corpus === "שולחן ערוך" && (
+          <CategoryDrilldown rootName="טור" rootLabel="שולחן ערוך" onPractice={(cards, trail) => beginPractice(cards, { kind: "category", trail })} />
+        )}
+
+        {/* תחום אחר שאין בו עדיין שאלות — הודעה + קישור להוספת שאלות */}
+        {corpus !== 'ש"ס' && corpus !== "שולחן ערוך" && (
           <div className="card-panel border-dashed text-center text-muted-foreground py-10">
             לא נמצאו עדיין שאלות בתחום {corpus}. אפשר להוסיף בעמוד{" "}
             <Link to="/questions" className="text-gold hover:underline font-medium">בניית שאלות</Link>.
@@ -736,6 +743,8 @@ export default function StudyPage() {
       ? [{ label: "מבחנים", onClick: () => { st.end(); set("mode", "tests"); } }, { label: path.name }]
       : path?.kind === "pinned"
         ? [{ label: "תרגול", onClick: () => st.end() }, { label: "השאלות הנעוצות" }]
+        : path?.kind === "category"
+        ? [{ label: "תרגול", onClick: () => st.end() }, ...path.trail.map((label) => ({ label }))]
         : path
           ? [...shasCrumbs(sederOf(path.masechta), path.masechta, path.daf ?? null), { label: path.leaf }]
           : [{ label: "תרגול" }];

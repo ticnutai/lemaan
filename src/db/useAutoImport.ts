@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from ".";
 import { ensureAmudBackfill, importLibrary, type ImportProgress } from "./importLibrary";
+import { installPacks } from "./packs";
 
 /**
  * ייבוא המאגר בכניסה הראשונה — ברמת האפליקציה, כך שזה קורה גם כשנכנסים
@@ -24,7 +25,10 @@ export function useAutoImport() {
           setProgress(null);
         });
     }
-    if (imported === true) void ensureAmudBackfill();
+    if (imported === true) {
+      void ensureAmudBackfill();
+      void installPacks(); // חבילות שאלות נוספות (למשל שולחן ערוך) — גם למי שכבר ייבא את המאגר
+    }
   }, [imported]);
 
   return { importing, progress };

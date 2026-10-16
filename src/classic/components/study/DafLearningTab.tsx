@@ -2,8 +2,10 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback, mem
 import { useScrollToSelectedQuestions } from "@/hooks/useScrollToSelectedQuestions";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useTouchHold } from "@/hooks/useTouchHold";
-import { ChevronRight, ChevronLeft, BookOpen, ListChecks, Play, PanelRightOpen, Maximize2, Minimize2, X, ZoomIn, BookText, Scroll, Layers, ArrowLeftRight, ChevronDown, Plus, ListTree, Check, GripVertical, Pin, PinOff, LineChart, Pencil } from "lucide-react";
+import { ChevronRight, ChevronLeft, BookOpen, ListChecks, Play, PanelRightOpen, Maximize2, Minimize2, X, ZoomIn, BookText, Scroll, Layers, ArrowLeftRight, ChevronDown, Plus, ListTree, Check, GripVertical, Pin, PinOff, LineChart, Pencil, Library } from "lucide-react";
 import { MishnaLearningTab } from "./MishnaLearningTab";
+import CategoryDrilldown from "../../../components/CategoryDrilldown";
+import { refreshStudyStore } from "@/lib/study/store";
 import { ChumashLearningTab } from "./ChumashLearningTab";
 import { NeviimKetuvimLearningTab } from "./NeviimKetuvimLearningTab";
 import { Button } from "@/components/ui/button";
@@ -1491,9 +1493,35 @@ export function DafLearningTabInner({ isVisible }: { isVisible: boolean }) {
   );
 }
 
-type LearnMode = "shas" | "mishna" | "chumash" | "neviim-ketuvim";
+type LearnMode = "shas" | "mishna" | "chumash" | "neviim-ketuvim" | "shulchan-aruch";
 type PracticeSection = "general" | "decks";
 const MODE_STORAGE_KEY = "daf-learning-mode";
+
+/** (אצלנו) שולחן ערוך בפריסה המקורית: התיבות המשותפות, והתרגול במסך התרגול של המקור. */
+function ShulchanAruchPanel() {
+  const [session, setSession] = useState<{ ids: string[]; trail: string[] } | null>(null);
+  if (session) {
+    return (
+      <Card className="gold-frame p-4">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h3 className="font-bold">{session.trail.join(" › ")}</h3>
+          <Button variant="outline" size="sm" onClick={() => setSession(null)}><X className="ml-1 h-4 w-4" />חזרה לבחירה</Button>
+        </div>
+        <StudySession key={session.ids.join(",")} deckId={null} mode="practice" cardIds={session.ids} includeAllQuestionTypes onExit={() => setSession(null)} />
+      </Card>
+    );
+  }
+  return (
+    <CategoryDrilldown
+      rootName="טור"
+      rootLabel="שולחן ערוך"
+      onPractice={(cards, trail) => {
+        // אם נוספו שאלות אחרי שהפריסה נפתחה — לטעון קודם, כדי שהתרגול יכיר אותן
+        void refreshStudyStore().then(() => setSession({ ids: cards.map((c) => c.id), trail }));
+      }}
+    />
+  );
+}
 
 function DeckPracticePanel({ requestedDeckId, onRequestHandled }: { requestedDeckId?: string | null; onRequestHandled?: () => void }) {
   const { state } = useStudy();
@@ -1594,6 +1622,8 @@ function DafLearningTab({ isVisible = true, requestedCardId, onCardExit }: { isV
     { id: "mishna",         label: "משנה",            icon: BookText },
     { id: "chumash",        label: "חומש",            icon: Scroll },
     { id: "neviim-ketuvim", label: "תנ״ך", icon: BookOpen },
+    // (אצלנו) שולחן ערוך — תיבות מתחלפות, אותו רכיב כמו בפריסה הנוכחית
+    { id: "shulchan-aruch", label: "שולחן ערוך", icon: Library },
   ];
 
   return (
@@ -1633,6 +1663,7 @@ function DafLearningTab({ isVisible = true, requestedCardId, onCardExit }: { isV
         {mode === "mishna"  && <MishnaLearningTab />}
         {mode === "chumash" && <ChumashLearningTab />}
         {mode === "neviim-ketuvim" && <NeviimKetuvimLearningTab />}
+        {mode === "shulchan-aruch" && <ShulchanAruchPanel />}
       </> : null}
       </div>
     </div>

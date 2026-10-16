@@ -918,6 +918,11 @@ export function useStudy() {
   } & Record<string, (...args: never[]) => unknown>;
 }
 
+/** טעינה מחדש מהמסד — למשל אחרי שנוספו שאלות חדשות (חבילת שולחן ערוך) בזמן שהפריסה פתוחה. */
+export function refreshStudyStore(): Promise<void> {
+  return ensureHydrated(true);
+}
+
 export function getCurrentStudyCardsCount(): number {
   return memState.cards.length;
 }

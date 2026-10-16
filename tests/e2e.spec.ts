@@ -556,3 +556,51 @@ test("T29 — פריסה מקורית: גרירה עם טקסט צף — סיו�
   await page.getByRole("radio", { name: /הפריסה הנוכחית/ }).click();
   if (size) await page.setViewportSize(size);
 });
+
+test("T30 — שולחן ערוך: 652 שאלות נוספו לכולם, ותיבות מתחלפות עד הסעיף בשתי הפריסות", async () => {
+  // החבילה נטענת לבד אחרי המאגר הראשי
+  await expect.poll(() => page.evaluate(() => new Promise<string | undefined>((res) => {
+    const r = indexedDB.open("lemaan");
+    r.onsuccess = () => { const q = r.result.transaction("settings").objectStore("settings").get("pack:sa-oc-shabbat"); q.onsuccess = () => { res(q.result?.value); r.result.close(); }; };
+  })), { timeout: 30_000 }).toBe("1");
+
+  const drill = async (root: import("@playwright/test").Locator) => {
+    const box = root.getByTestId("category-drilldown");
+    await expect(box).toBeVisible({ timeout: 15_000 });
+    // הרכיב זוכר את המקום האחרון — מתחילים מהשורש
+    const rootCrumb = box.getByRole("navigation", { name: "מיקום" }).getByRole("button", { name: "שולחן ערוך" });
+    if (await rootCrumb.count()) await rootCrumb.click();
+    for (const name of ["אורח חיים", "הלכות שבת", "סימן רמ״ב", "סעיף א׳"]) {
+      if (name === "סימן רמ״ב") await box.screenshot({ path: "test-results/sa-simanim.png" });
+      await box.getByTestId("drilldown-tile").filter({ hasText: name }).first().click();
+    }
+    await expect(box.getByText("האם מצוות עונג שבת מדאורייתא או מדרבנן")).toBeVisible();
+    await expect(box.getByRole("navigation", { name: "מיקום" })).toContainText("סעיף א׳");
+    return box;
+  };
+
+  // הפריסה הנוכחית
+  await openStudyCenter();
+  await page.getByRole("button", { name: "שולחן ערוך" }).click();
+  await expect(page.getByTestId("category-drilldown").getByRole("button", { name: /תרגול כל השאלות כאן \(652\)/ })).toBeVisible({ timeout: 15_000 });
+  const box = await drill(page.locator("body"));
+  await box.getByRole("button", { name: /תרגול כל השאלות כאן/ }).click();
+  await expect(page.getByText(/1 \/ 1 · תרגול חופשי/)).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText("האם מצוות עונג שבת מדאורייתא או מדרבנן")).toBeVisible();
+  await page.getByRole("button", { name: /^חזרה$/ }).click();
+
+  // הפריסה המקורית — אותו מידע, אותו רכיב
+  await page.goto("/#/settings");
+  await page.getByRole("radio", { name: /הפריסה המקורית/ }).click();
+  await page.goto("/#/study");
+  const classic = page.locator(".classic-layout");
+  await classic.getByRole("radio", { name: /שולחן ערוך/ }).click();
+  await classic.getByRole("button", { name: /^תרגול כללי/ }).click();
+  const cbox = await drill(classic);
+  await cbox.getByRole("button", { name: /תרגול כל השאלות כאן/ }).click();
+  await expect(classic.getByText("האם מצוות עונג שבת מדאורייתא או מדרבנן").first()).toBeVisible({ timeout: 10_000 });
+  await page.screenshot({ path: "test-results/sa-classic-session.png", fullPage: true });
+
+  await page.goto("/#/settings");
+  await page.getByRole("radio", { name: /הפריסה הנוכחית/ }).click();
+});
