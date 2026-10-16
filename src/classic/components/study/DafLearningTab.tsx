@@ -34,6 +34,8 @@ import type { Card as StudyCardType } from "@/lib/study/types";
 import { usePermissions } from "@/hooks/usePermissions";
 import { STUDY_UI_DEFAULTS } from "@/config/studyUiDefaults";
 import { useStableMobileNavigation } from "@/hooks/useStableMobileNavigation";
+import { useQuestionDrag, type DropAmud, type RowTarget } from "@/hooks/useQuestionDrag";
+import { applyOrder, saveQuestionOrder, useQuestionOrder } from "@/lib/study/questionOrder";
 import { isCompleteShasLocation, formatShasLocation } from "@/lib/study/shasClassification";
 
 type Layout = "stacked" | "split" | "text-only" | "cards-only";
@@ -86,6 +88,7 @@ export function DafLearningTabInner({ isVisible }: { isVisible: boolean }) {
   const [masechta, setMasechta] = useState<string>(saved.masechta ?? "שבת");
   const [daf, setDaf] = useState<number>(saved.daf ?? 2);
   const [amud, setAmud] = useState<1 | 2>(saved.amud ?? 1);
+  const [wholeDaf, setWholeDaf] = useState(false);
   const [savedLayout, setLayoutState] = useState<Layout>(() => {
     return normalizeLayout(state.uiPrefs?.dafLearningLayout ?? saved.layout ?? STUDY_UI_DEFAULTS.dafLearningLayout);
   });
@@ -249,28 +252,33 @@ export function DafLearningTabInner({ isVisible }: { isVisible: boolean }) {
   // Match the number displayed on each amud button to the questions actually
   // visible there, including legacy questions attached to the whole daf.
   const expandedAmudCounts = useMemo(() => {
-    if (!expandedMasechta || expandedDaf === null) return { a: 0, b: 0 };
+    if (!expandedMasechta || expandedDaf === null) return { a: 0, b: 0, all: 0 };
     return {
       a: filterCardsByDafAmud(state.cards, state.categories, expandedMasechta, expandedDaf, 1).length,
       b: filterCardsByDafAmud(state.cards, state.categories, expandedMasechta, expandedDaf, 2).length,
+      all: filterCardsByDafAmud(state.cards, state.categories, expandedMasechta, expandedDaf, null).length,
     };
   }, [state.cards, state.categories, expandedMasechta, expandedDaf]);
 
   // כרטיסים לעמוד הנוכחי
-  const amudCards = useMemo(
-    () => filterCardsByDafAmud(state.cards, state.categories, masechta, daf, amud, { includeDafOnly: false }),
-    [state.cards, state.categories, masechta, daf, amud],
-  );
-  const cardsWithDafOnly = useMemo(
-    () => filterCardsByDafAmud(state.cards, state.categories, masechta, daf, amud),
-    [state.cards, state.categories, masechta, daf, amud],
-  );
-  const amudCardIds = useMemo(() => new Set(amudCards.map((card) => card.id)), [amudCards]);
-  const dafOnlyCards = useMemo(
-    () => cardsWithDafOnly.filter((card) => !amudCardIds.has(card.id)),
-    [cardsWithDafOnly, amudCardIds],
-  );
-  const cards = cardsWithDafOnly;
+  // (אצלנו) "כל הדף": לשונית שלישית ליד עמוד א' ועמוד ב' — השאלות של שני העמודים יחד.
+  // הסדר בכל דף נקבע בגרירה ונשמר (questionOrder).
+  const questionOrder = useQuestionOrder(masechta, daf);
+  const groups = useMemo(() => {
+    const only = (a: 1 | 2) => filterCardsByDafAmud(state.cards, state.categories, masechta, daf, a, { includeDafOnly: false });
+    const all = filterCardsByDafAmud(state.cards, state.categories, masechta, daf, wholeDaf ? null : amud);
+    const amudGroups: { amud: 1 | 2; cards: StudyCardType[] }[] = wholeDaf
+      ? [{ amud: 1, cards: only(1) }, { amud: 2, cards: only(2) }]
+      : [{ amud, cards: only(amud) }];
+    const classified = new Set(amudGroups.flatMap((g) => g.cards.map((c) => c.id)));
+    return {
+      amudGroups: amudGroups.map((g) => ({ ...g, cards: applyOrder(g.cards, questionOrder) })),
+      dafOnly: applyOrder(all.filter((c) => !classified.has(c.id)), questionOrder),
+    };
+  }, [state.cards, state.categories, masechta, daf, amud, wholeDaf, questionOrder]);
+  const amudCards = useMemo(() => groups.amudGroups.flatMap((g) => g.cards), [groups]);
+  const dafOnlyCards = groups.dafOnly;
+  const cards = useMemo(() => [...amudCards, ...dafOnlyCards], [amudCards, dafOnlyCards]);
   const cardIds = useMemo(() => cards.map((c) => c.id), [cards]);
 
   // ניווט דף קודם/הבא
@@ -423,6 +431,30 @@ export function DafLearningTabInner({ isVisible }: { isVisible: boolean }) {
       description: `${masechta}, דף ${dafLabel(daf).replace(".", "")}`,
     });
   };
+
+  // (אצלנו) גרירה משוכללת: סיווג לעמוד א' / ב' / כל הדף, וסידור בין השאלות — עם הטקסט צף בזמן הגרירה.
+  // אחרי הסיווג הבחירה נשארת במקומה, והשאלה עוברת לעמוד שנבחר (ויוצאת מהעמוד השני).
+  const classifyToAmud = (cardId: string, target: DropAmud) => {
+    const card = state.cards.find((c) => c.id === cardId);
+    if (!card || (card.masechta === masechta && card.daf === daf && (card.amud ?? null) === target)) return;
+    updateCard(cardId, { masechta, daf, amud: target });
+    toast({
+      title: target ? `השאלה סווגה לעמוד ${target === 1 ? "א׳" : "ב׳"}` : "השאלה שויכה לכל הדף",
+      description: `${masechta}, דף ${dafLabel(daf).replace(".", "")}`,
+    });
+  };
+  const reorderQuestion = (cardId: string, target: RowTarget) => {
+    const ids = cards.map((c) => c.id).filter((id) => id !== cardId);
+    const at = ids.indexOf(target.id);
+    if (at < 0) return;
+    ids.splice(target.after ? at + 1 : at, 0, cardId);
+    void saveQuestionOrder(masechta, daf, ids);
+    const card = state.cards.find((c) => c.id === cardId);
+    if (card && (card.amud ?? null) !== target.amud) classifyToAmud(cardId, target.amud);
+  };
+  const questionDrag = useQuestionDrag({ onDropAmud: classifyToAmud, onDropRow: reorderQuestion });
+  const amudDropStyle = (key: "1" | "2" | "0") =>
+    questionDrag.draggingId ? (questionDrag.overAmud === key ? "scale-[1.03] border-gold bg-gold/20 ring-4 ring-gold/30" : "ring-2 ring-gold/30") : "";
 
   const adminPracticeAmudTargets = isAdmin ? (
     <div data-testid="admin-practice-amud-targets" className="flex flex-wrap items-center justify-center gap-2 rounded-xl border border-gold/40 bg-gold/5 px-3 py-2" dir="rtl">
@@ -681,49 +713,38 @@ export function DafLearningTabInner({ isVisible }: { isVisible: boolean }) {
             <span>{expandedMasechta}, דף {dafLabel(expandedDaf).replace(".", "")} — בחר עמוד</span>
             {navigationView === "drilldown" && <Button size="sm" variant="ghost" onClick={() => setInlineStep("daf")}><ChevronRight className="ml-1 h-4 w-4" />חזרה לדפים</Button>}
           </div>
-          <div className="mx-auto grid max-w-md grid-cols-2 gap-2">
-            {([1, 2] as const).map((pageSide) => (
-              <Button
-                key={pageSide}
-                type="button"
-                variant={selectionConfirmed && masechta === expandedMasechta && daf === expandedDaf && amud === pageSide ? "default" : "outline"}
-                className={cn(
-                  "h-11 text-base transition-all",
-                  selectionConfirmed && masechta === expandedMasechta && daf === expandedDaf && amud === pageSide && "bg-gradient-navy text-primary-foreground",
-                  dragOverAmud === pageSide && "scale-[1.02] border-gold bg-gold/20 ring-4 ring-gold/25",
-                )}
-                aria-pressed={selectionConfirmed && masechta === expandedMasechta && daf === expandedDaf && amud === pageSide}
-                data-testid={`inline-amud-${pageSide}`}
-                onClick={() => applyInlineAmudSelection(pageSide)}
-                onDragEnter={(event) => {
-                  event.preventDefault();
-                  setDragOverAmud(pageSide);
-                }}
-                onDragOver={(event) => {
-                  event.preventDefault();
-                  event.dataTransfer.dropEffect = "move";
-                }}
-                onDragLeave={(event) => {
-                  if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragOverAmud(null);
-                }}
-                onDrop={(event) => {
-                  event.preventDefault();
-                  const cardId = event.dataTransfer.getData("application/x-study-card-id") || event.dataTransfer.getData("text/plain");
-                  if (cardId) classifyDraggedQuestion(cardId, pageSide);
-                  else setDragOverAmud(null);
-                }}
-              >
-                <span>עמוד {pageSide === 1 ? "א׳" : "ב׳"}</span>
-                <span
-                  className="inline-flex h-6 min-w-6 items-center justify-center rounded-full border border-gold/70 bg-white px-1.5 text-xs font-bold tabular-nums text-gold shadow-sm"
-                  data-testid={`inline-amud-${pageSide}-count`}
-                  title={`מספר השאלות המשויכות לעמוד ${pageSide === 1 ? "א׳" : "ב׳"}`}
+          <div className="mx-auto grid max-w-xl grid-cols-3 gap-2">
+            {([1, 2, 0] as const).map((pageSide) => {
+              const isCurrent = selectionConfirmed && masechta === expandedMasechta && daf === expandedDaf;
+              const pressed = isCurrent && (pageSide === 0 ? wholeDaf : !wholeDaf && amud === pageSide);
+              const key = String(pageSide) as "1" | "2" | "0";
+              return (
+                <Button
+                  key={pageSide}
+                  type="button"
+                  variant={pressed ? "default" : "outline"}
+                  className={cn("h-11 text-base transition-all", pressed && "bg-gradient-navy text-primary-foreground", amudDropStyle(key))}
+                  aria-pressed={pressed}
+                  data-testid={pageSide === 0 ? "inline-amud-all" : `inline-amud-${pageSide}`}
+                  data-drop-amud={key}
+                  onClick={() => {
+                    applyInlineAmudSelection(pageSide === 0 ? amud : pageSide);
+                    setWholeDaf(pageSide === 0);
+                  }}
                 >
-                  {pageSide === 1 ? expandedAmudCounts.a : expandedAmudCounts.b}
-                </span>
-              </Button>
-            ))}
+                  <span>{pageSide === 0 ? "כל הדף" : `עמוד ${pageSide === 1 ? "א׳" : "ב׳"}`}</span>
+                  <span
+                    className="inline-flex h-6 min-w-6 items-center justify-center rounded-full border border-gold/70 bg-white px-1.5 text-xs font-bold tabular-nums text-gold shadow-sm"
+                    data-testid={pageSide === 0 ? "inline-amud-all-count" : `inline-amud-${pageSide}-count`}
+                    title={pageSide === 0 ? "כל השאלות של הדף (שני העמודים)" : `מספר השאלות המשויכות לעמוד ${pageSide === 1 ? "א׳" : "ב׳"}`}
+                  >
+                    {pageSide === 0 ? expandedAmudCounts.all : pageSide === 1 ? expandedAmudCounts.a : expandedAmudCounts.b}
+                  </span>
+                </Button>
+              );
+            })}
           </div>
+          {selectionConfirmed && <p className="mt-2 text-center text-xs text-muted-foreground">אפשר לגרור שאלה (בידית ⋮⋮) אל עמוד א׳, עמוד ב׳ או כל הדף, או בין השאלות כדי לסדר אותן</p>}
         </div>
       )}
 
@@ -935,6 +956,44 @@ export function DafLearningTabInner({ isVisible }: { isVisible: boolean }) {
     ? state.cards.find((card) => card.id === editingPracticeCard.id) ?? editingPracticeCard
     : null;
 
+  /** שורת שאלה ברשימה: ידית גרירה, וקו זהב במקום שבו השאלה תיכנס. group: "1"/"2" — עמוד, "0" — ברמת הדף. */
+  const questionRow = (c: StudyCardType, i: number, group: "1" | "2" | "0") => {
+    const over = questionDrag.overRow?.id === c.id ? questionDrag.overRow : null;
+    const dragging = questionDrag.draggingId === c.id;
+    return (
+      <div
+        key={c.id}
+        {...touchHold(isMobile && canEditPracticeQuestions, () => setEditingPracticeCard(c))}
+        data-card-row={c.id}
+        data-card-amud={group}
+        className={cn(
+          "group relative rounded-lg border p-3 transition-colors",
+          group === "0" ? "border-border/70 bg-muted/20 hover:border-gold/50" : "border-gold/30 bg-card hover:border-gold/60",
+          dragging && "opacity-40",
+        )}
+        style={questionTypography.questionCardStyle}
+      >
+        {over && <div className={cn("pointer-events-none absolute inset-x-1 h-1 rounded-full bg-gold", over.after ? "-bottom-1.5" : "-top-1.5")} />}
+        <div className="flex items-start gap-2">
+          <span className="-m-1 shrink-0 rounded p-1 hover:bg-gold/10" {...questionDrag.handleProps(c.id, c.question)}>
+            <GripVertical className="mt-0.5 h-4 w-4 text-gold/70 opacity-60 group-hover:opacity-100" />
+          </span>
+          <span className={cn("text-xs font-bold shrink-0 mt-0.5", group === "0" ? "text-muted-foreground" : "text-gold")}>{i + 1}.</span>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-medium text-foreground" style={questionTypography.questionTextStyle}>{c.question}</div>
+            <div className="text-xs text-muted-foreground mt-1 capitalize">
+              {c.type === "flashcard" && "פתוחה"}
+              {c.type === "multiple" && "אמריקאית"}
+              {c.type === "boolean" && "נכון/לא נכון"}
+              {c.type === "combo" && "משולבת"}
+            </div>
+          </div>
+          {questionEditButton(c)}
+        </div>
+      </div>
+    );
+  };
+
   const questionEditButton = (card: StudyCardType) => canEditPracticeQuestions && !isMobile ? (
     <Button
       type="button"
@@ -1036,34 +1095,19 @@ export function DafLearningTabInner({ isVisible }: { isVisible: boolean }) {
             <span className="text-xs">תוכל להוסיף שאלות בלשונית &quot;שאלות חזרה&quot; ולשייך אותן לקטגוריית &quot;{masechta} › דף {toGematria(daf)} › {amud === 1 ? 'ע"א' : 'ע"ב'}&quot;.</span>
           </div>
         ) : (<>
-          {amudCards.map((c, i) => (
-            <div
-              key={c.id}
-              {...touchHold(isMobile && canEditPracticeQuestions, () => setEditingPracticeCard(c))}
-              draggable={!isMobile}
-              onDragStart={(event) => {
-                event.dataTransfer.effectAllowed = "move";
-                event.dataTransfer.setData("application/x-study-card-id", c.id);
-                event.dataTransfer.setData("text/plain", c.id);
-              }}
-              onDragEnd={() => setDragOverAmud(null)}
-              className="group rounded-lg border border-gold/30 bg-card p-3 transition-colors hover:border-gold/60"
-              style={questionTypography.questionCardStyle}
-            >
-              <div className="flex items-start gap-2">
-                <GripVertical className="mt-0.5 h-4 w-4 shrink-0 cursor-grab text-gold/70 opacity-60 group-hover:opacity-100 active:cursor-grabbing" aria-label="גרור לסיווג בעמוד א׳ או ב׳" />
-                <span className="text-xs text-gold font-bold shrink-0 mt-0.5">{i + 1}.</span>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-foreground" style={questionTypography.questionTextStyle}>{c.question}</div>
-                  <div className="text-xs text-muted-foreground mt-1 capitalize">
-                    {c.type === "flashcard" && "פתוחה"}
-                    {c.type === "multiple" && "אמריקאית"}
-                    {c.type === "boolean" && "נכון/לא נכון"}
-                    {c.type === "combo" && "משולבת"}
-                  </div>
+          {groups.amudGroups.map((g) => (
+            <div key={g.amud} className="space-y-2">
+              {wholeDaf && (
+                <div className="sticky top-0 z-10 rounded-lg border border-gold/40 bg-gold/10 px-3 py-2 text-xs font-semibold text-foreground" data-card-row-group={g.amud}>
+                  עמוד {g.amud === 1 ? "א׳" : "ב׳"} ({g.cards.length})
                 </div>
-                {questionEditButton(c)}
-              </div>
+              )}
+              {g.cards.map((c, i) => questionRow(c, i, String(g.amud) as "1" | "2"))}
+              {wholeDaf && g.cards.length === 0 && (
+                <div className="rounded-lg border border-dashed border-gold/40 p-3 text-center text-xs text-muted-foreground" data-drop-amud={String(g.amud)}>
+                  אין עדיין שאלות בעמוד {g.amud === 1 ? "א׳" : "ב׳"} — אפשר לגרור לכאן
+                </div>
+              )}
             </div>
           ))}
           {dafOnlyCards.length > 0 && (
@@ -1071,36 +1115,7 @@ export function DafLearningTabInner({ isVisible }: { isVisible: boolean }) {
               שאלות ברמת הדף — זמינות לתרגול בעמוד א׳ ובעמוד ב׳ עד לסיווג ({dafOnlyCards.length})
             </div>
           )}
-          {dafOnlyCards.map((c, i) => (
-            <div
-              key={c.id}
-              {...touchHold(isMobile && canEditPracticeQuestions, () => setEditingPracticeCard(c))}
-              draggable={!isMobile}
-              onDragStart={(event) => {
-                event.dataTransfer.effectAllowed = "move";
-                event.dataTransfer.setData("application/x-study-card-id", c.id);
-                event.dataTransfer.setData("text/plain", c.id);
-              }}
-              onDragEnd={() => setDragOverAmud(null)}
-              className="group rounded-lg border border-border/70 bg-muted/20 p-3 transition-colors hover:border-gold/50"
-              style={questionTypography.questionCardStyle}
-            >
-              <div className="flex items-start gap-2">
-                <GripVertical className="mt-0.5 h-4 w-4 shrink-0 cursor-grab text-gold/70 opacity-60 group-hover:opacity-100 active:cursor-grabbing" aria-label="גרור לסיווג בעמוד א׳ או ב׳" />
-                <span className="text-xs text-muted-foreground font-bold shrink-0 mt-0.5">{i + 1}.</span>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-foreground" style={questionTypography.questionTextStyle}>{c.question}</div>
-                  <div className="text-xs text-muted-foreground mt-1 capitalize">
-                    {c.type === "flashcard" && "פתוחה"}
-                    {c.type === "multiple" && "אמריקאית"}
-                    {c.type === "boolean" && "נכון/לא נכון"}
-                    {c.type === "combo" && "משולבת"}
-                  </div>
-                </div>
-                {questionEditButton(c)}
-              </div>
-            </div>
-          ))}
+          {dafOnlyCards.map((c, i) => questionRow(c, i, "0"))}
         </>)}
       </div>
     </Card>

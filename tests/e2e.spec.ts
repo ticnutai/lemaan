@@ -496,3 +496,63 @@ test("T28 — פריסה מקורית: כפתור בהגדרות מחליף את
   await expect(page.getByText("שאלות במאגר").first()).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText("ערוך פריסה")).toHaveCount(0);
 });
+
+test("T29 — פריסה מקורית: גרירה עם טקסט צף — סיווג לעמוד ב׳, סידור בין השאלות, וחזרה ל'כל הדף'", async () => {
+  const size = page.viewportSize();
+  await page.setViewportSize({ width: 1280, height: 1500 }); // מסך גבוה: הכפתורים והשאלות נראים יחד
+  await page.goto("/#/settings");
+  await page.getByRole("radio", { name: /הפריסה המקורית/ }).click();
+  await page.goto("/#/study");
+  const root = page.locator(".classic-layout");
+  await root.getByRole("button", { name: /^תרגול כללי/ }).click();
+  await root.getByRole("button", { name: /^מועד/ }).first().click();
+  await root.getByRole("button", { name: /^חגיגה/ }).first().click();
+  await root.getByRole("button", { name: /^ב\s*\d/ }).first().click();
+  await root.getByTestId("inline-amud-all").click();
+  await expect(root.getByTestId("inline-amud-all")).toHaveAttribute("aria-pressed", "true");
+
+  const rows = root.locator("[data-card-row]");
+  await expect(rows.first()).toBeVisible({ timeout: 15_000 });
+  const total = await rows.count();
+  const countB0 = Number(await root.getByTestId("inline-amud-2-count").innerText());
+  const countA0 = Number(await root.getByTestId("inline-amud-1-count").innerText());
+
+  const drag = async (from: import("@playwright/test").Locator, to: import("@playwright/test").Locator, below = false) => {
+    await to.evaluate((el) => el.scrollIntoView({ block: "center" }));
+    const a = (await from.boundingBox())!;
+    const b = (await to.boundingBox())!;
+    await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(a.x + a.width / 2 + 10, a.y + a.height / 2 + 10, { steps: 3 });
+    await expect(page.locator("[data-question-drag-ghost]")).toBeVisible();
+    await page.mouse.move(b.x + b.width / 2, b.y + (below ? b.height * 0.8 : b.height * 0.2), { steps: 12 });
+    await page.mouse.up();
+    await expect(page.locator("[data-question-drag-ghost]")).toHaveCount(0);
+  };
+  const grip = (row: import("@playwright/test").Locator) => row.locator("[role=button][aria-label^='גרירה']");
+
+  // 1. סיווג לעמוד ב׳: השאלה עוברת לקבוצת עמוד ב׳ ויוצאת מעמוד א׳
+  const first = rows.first();
+  const firstId = await first.getAttribute("data-card-row");
+  await drag(grip(first), root.getByTestId("inline-amud-2"));
+  await expect(root.locator(`[data-card-row="${firstId}"]`)).toHaveAttribute("data-card-amud", "2");
+  await expect(root.getByTestId("inline-amud-1-count")).toHaveText(String(countA0 - 1));
+  await expect(root.getByTestId("inline-amud-2-count")).toHaveText(String(countB0));
+  await expect(rows).toHaveCount(total);
+
+  // 2. סידור: השאלה האחרונה ברמת הדף עוברת לראש הקבוצה שלה
+  const dafRows = root.locator("[data-card-row][data-card-amud='0']");
+  const lastId = await dafRows.last().getAttribute("data-card-row");
+  await drag(grip(dafRows.last()), dafRows.first());
+  await expect(dafRows.first()).toHaveAttribute("data-card-row", lastId!);
+
+  // 3. חזרה ל"כל הדף": השאלה לא משויכת יותר לעמוד
+  await drag(grip(root.locator(`[data-card-row="${firstId}"]`)), root.getByTestId("inline-amud-all"));
+  await expect(root.locator(`[data-card-row="${firstId}"]`)).toHaveAttribute("data-card-amud", "0");
+  await expect(root.getByTestId("inline-amud-1-count")).toHaveText(String(countA0));
+  await page.screenshot({ path: "test-results/classic-drag.png", fullPage: true });
+
+  await page.goto("/#/settings");
+  await page.getByRole("radio", { name: /הפריסה הנוכחית/ }).click();
+  if (size) await page.setViewportSize(size);
+});

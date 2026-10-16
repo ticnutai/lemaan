@@ -32,6 +32,16 @@ export async function setCardsAmud(cardIds: string[], amud: Amud): Promise<void>
   void flushAmudSorts();
 }
 
+/** רישום שיוכים שכבר נשמרו במאגר (למשל מהפריסה המקורית) בתור לשליחה — כדי שיגיעו לכל המכשירים. */
+export async function queueAmudSorts(changes: Record<string, Amud>): Promise<void> {
+  const ids = Object.keys(changes);
+  if (!ids.length) return;
+  const pending = await readPending();
+  for (const id of ids) pending[id] = changes[id];
+  await setSetting(PENDING_KEY, JSON.stringify(pending));
+  void flushAmudSorts();
+}
+
 export type FlushResult = "sent" | "nothing" | "not-admin" | "offline" | "no-table";
 
 /** שליחת כל השינויים הממתינים לטבלה המרכזית. מצליח רק למנהל מחובר. */

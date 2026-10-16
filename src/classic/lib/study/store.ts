@@ -19,6 +19,7 @@ import { applyReview, defaultSrs, getSrsAlgorithm, getRetentionTarget } from "./
 import { UNCATEGORIZED_NAME, UNCATEGORIZED_TAG, findUncategorized, isUncategorized } from "./uncategorized";
 import { db } from "../../../db";
 import { supabase as appSupabase } from "../../../db/supabase";
+import { queueAmudSorts } from "../../../db/amudSort";
 import type {
   Card as AppCard, Category as AppCategory, Deck as AppDeck, Goal as AppGoal, ReviewLog as AppLog,
 } from "../../../features/study/types";
@@ -264,6 +265,13 @@ function persist(prev: StudyState, next: StudyState) {
       const m = decksByCard();
       const cats = next.categories ?? [];
       const rows = changed.map((c) => toAppCard(c, m.get(c.id) ?? (c.deckId ? [c.deckId] : []), cats));
+      // שיוך לעמוד א'/ב' שהשתנה — גם לתור המשותף לכל המכשירים (כמו בפריסה הנוכחית)
+      const amudChanges: Record<string, AppCard["amud"]> = {};
+      for (const r of rows) {
+        const before = raw.cards.get(r.id);
+        if (before && (before.amud ?? null) !== (r.amud ?? null)) amudChanges[r.id] = r.amud ?? null;
+      }
+      void queueAmudSorts(amudChanges as Record<string, "1" | "2" | null>);
       rows.forEach((r) => raw.cards.set(r.id, r));
       void db.cards.bulkPut(rows);
     }
