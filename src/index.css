@@ -427,3 +427,30 @@
 .lemaan-print .daf-print-side big { font-family: Vilna, "Frank Ruhl Libre", serif; font-weight: 700; font-size: 1.75em; line-height: 0; -webkit-text-stroke: 0.035em currentColor; }
 .lemaan-print .daf-print-tosafot b big { font-size: 1.367em; }
 .lemaan-print .daf-pline.daf-hanging { text-align: left; width: 100%; }
+
+/* סרגלי חלון העיצוב: מילוי כהה מהצד הימני עד הידית, כמו במקור */
+.typo-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 10px;
+  border-radius: 9999px;
+  direction: rtl;
+  background: linear-gradient(to left, hsl(var(--primary)) var(--fill, 0%), hsl(var(--secondary)) var(--fill, 0%));
+  cursor: pointer;
+}
+.typo-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  height: 22px;
+  width: 22px;
+  border-radius: 9999px;
+  background: hsl(var(--card));
+  border: 2px solid hsl(var(--primary));
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.2);
+}
+.typo-range::-moz-range-thumb {
+  height: 18px;
+  width: 18px;
+  border-radius: 9999px;
+  background: hsl(var(--card));
+  border: 2px solid hsl(var(--primary));
+}

@@ -14,10 +14,12 @@ import { AMUD_LABELS, SEDARIM, hebrewDaf } from "../features/study/shas";
 import { useStudySession, type SessionPath } from "../features/study/activeSession";
 import { dafStatus, emptyDafEntry, sederOf, STATUS_DOT, STATUS_LABEL, useShasCounts, type DafStatus } from "../features/study/shasCounts";
 import {
-  isPlacePinned, saveFontScale, saveInstant, togglePinnedCard, togglePinnedPlace,
+  isPlacePinned, saveInstant, togglePinnedCard, togglePinnedPlace,
   usePinnedCardIds, usePinnedPlaces, useStudyToolbarPrefs, type PinnedPlace,
 } from "../features/study/studyPrefs";
 import QuestionCard, { hasOptions, isSelectionCorrect } from "../components/QuestionCard";
+import TypographyDialog from "../components/TypographyDialog";
+import { isCustom, useTypography } from "../features/study/typography";
 import AmudSorter from "../components/AmudSorter";
 import { cn } from "../lib/utils";
 import type { Card, Deck } from "../features/study/types";
@@ -105,6 +107,8 @@ export default function StudyPage() {
   const prefs = useStudyToolbarPrefs();
   const instant = prefs?.instant ?? true;
   const fontScale = prefs?.fontScale ?? 1;
+  const typography = useTypography();
+  const [typoOpen, setTypoOpen] = useState(false);
 
   const pinnedIds = usePinnedCardIds();
   const pinnedPlaces = usePinnedPlaces();
@@ -367,6 +371,7 @@ export default function StudyPage() {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const t = e.target instanceof Element ? e.target : null;
       if (t?.closest("input, textarea, select, [contenteditable='true']")) return;
+      if (document.querySelector("[role='dialog'][aria-modal='true']")) return; // חלון פתוח (למשל עיצוב הטקסט)
       const s = useStudySession.getState();
       const cur = s.queue?.[s.index];
       if (!cur) return;
@@ -821,11 +826,12 @@ export default function StudyPage() {
           <Zap className="h-3.5 w-3.5" /> מיידי
         </button>
         <button
-          className="btn-outline h-8 rounded-full"
-          title="גודל גופן"
-          onClick={() => void saveFontScale(fontScale >= 1.4 ? 1 : +(fontScale + 0.2).toFixed(1))}
+          className={`btn-outline h-8 rounded-full relative ${isCustom(typography.question) || isCustom(typography.answer) ? "border-gold text-gold bg-gold/10" : ""}`}
+          title="עיצוב הטקסט של השאלות והתשובות: גופן, גודל, צבעים ועוד"
+          aria-label="עיצוב טיפוגרפיה"
+          onClick={() => setTypoOpen(true)}
         >
-          <Type className="h-3.5 w-3.5" /> {fontScale !== 1 && `×${fontScale}`}
+          <Type className="h-3.5 w-3.5" /> עיצוב
         </button>
         <button
           className={`btn-outline h-8 rounded-full ${isPinned ? "border-gold text-gold bg-gold/10" : ""}`}
@@ -859,6 +865,14 @@ export default function StudyPage() {
         onSelect={selectOption}
         breadcrumb={breadcrumb}
         fontScale={fontScale}
+        typography={typography}
+      />
+      <TypographyDialog
+        open={typoOpen}
+        onClose={() => setTypoOpen(false)}
+        question={typography.question}
+        answer={typography.answer}
+        onChange={typography.update}
       />
       <div className="flex items-center justify-between gap-2 flex-wrap text-xs">
         <button

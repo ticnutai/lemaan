@@ -389,3 +389,65 @@ test("T26 — הדגשה בדפוס המדויק תואמת לחיפוש: ניק
   await expect(page.locator(".lemaan-print mark.daf-hit")).toHaveCount(5);
   await expect(page.getByText("5 מופעים")).toBeVisible();
 });
+
+test("T27 — חלון עיצוב טיפוגרפיה בתרגול: שאלות ותשובות, כל האפשרויות, נשמר", async () => {
+  await openStudyCenter();
+  await page.getByRole("button", { name: /^מועד/ }).click();
+  await page.getByRole("button", { name: /^חגיגה/ }).click();
+  await page.locator(".grid button.card-panel").first().click();
+  await page.getByRole("button", { name: /כל הדף/ }).click();
+  await expect(page.getByText(/1 \/ \d+ · תרגול חופשי/)).toBeVisible({ timeout: 15_000 });
+
+  const questionText = page.locator(".gold-frame p.font-medium").first();
+  await expect(questionText).toHaveCSS("font-size", "18px");
+
+  await page.getByRole("button", { name: "עיצוב טיפוגרפיה" }).click();
+  const dialog = page.getByRole("dialog", { name: "עיצוב טיפוגרפיה" });
+  await expect(dialog).toBeVisible();
+  for (const label of ["גופן", "גודל גופן", "עובי גופן", "גובה שורה", "רווח בין אותיות", "יישור", "צבע טקסט", "רקע", "עיגול פינות"]) {
+    await expect(dialog.getByText(label, { exact: true }).first()).toBeVisible();
+  }
+
+  // שאלות: גודל +2, מודגש, יישור למרכז — משתנה מיד בכרטיס
+  await dialog.getByRole("button", { name: "הגדלה" }).click();
+  await dialog.getByRole("button", { name: "הגדלה" }).click();
+  await dialog.getByRole("button", { name: "מודגש", exact: true }).click();
+  await dialog.getByRole("button", { name: "מרכז" }).click();
+  await expect(questionText).toHaveCSS("font-size", "20px");
+  await expect(questionText).toHaveCSS("font-weight", "700");
+  await expect(questionText).toHaveCSS("text-align", "center");
+  await dialog.screenshot({ path: "test-results/typography-question.png" });
+
+  // מקש "1" כשהחלון פתוח לא בוחר תשובה
+  await page.keyboard.press("1");
+  await expect(page.locator("[data-result]")).toHaveCount(0);
+
+  // תשובות: לשונית נפרדת, ההגדלה חלה רק על האפשרויות
+  await dialog.getByRole("tab", { name: "תשובות" }).click();
+  await expect(dialog.getByText("עיצוב טקסט תשובות")).toBeVisible();
+  await dialog.getByRole("button", { name: "הגדלה" }).click();
+  const optionText = page.locator("button[class*='rounded-lg'] span.flex-1").first();
+  if (await optionText.count()) await expect(optionText).toHaveCSS("font-size", "15px");
+  await dialog.screenshot({ path: "test-results/typography-answer.png" });
+
+  // נשמר אחרי טעינה מחדש
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await page.waitForTimeout(500);
+  await page.reload();
+  await openStudyCenter();
+  await page.getByRole("button", { name: /^מועד/ }).click();
+  await page.getByRole("button", { name: /^חגיגה/ }).click();
+  await page.locator(".grid button.card-panel").first().click();
+  await page.getByRole("button", { name: /כל הדף/ }).click();
+  await expect(page.locator(".gold-frame p.font-medium").first()).toHaveCSS("font-size", "20px", { timeout: 15_000 });
+
+  // איפוס בשתי הלשוניות — חוזר לברירת המחדל
+  await page.getByRole("button", { name: "עיצוב טיפוגרפיה" }).click();
+  await dialog.getByRole("button", { name: /איפוס/ }).click();
+  await dialog.getByRole("tab", { name: "תשובות" }).click();
+  await dialog.getByRole("button", { name: /איפוס/ }).click();
+  await dialog.getByRole("button", { name: "סגירה" }).click();
+  await expect(page.locator(".gold-frame p.font-medium").first()).toHaveCSS("font-size", "18px");
+  await page.waitForTimeout(500);
+});

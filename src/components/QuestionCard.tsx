@@ -1,6 +1,7 @@
 import { Check, X } from "lucide-react";
 import { cn } from "../lib/utils";
 import type { Card } from "../features/study/types";
+import { BASE_SIZE, DEFAULT_TYPOGRAPHY, typographyToBoxStyle, typographyToStyle, type Typography } from "../features/study/typography";
 
 export function hasOptions(card: Card): boolean {
   return card.options.length > 1 && card.correctIndices.length > 0;
@@ -28,6 +29,8 @@ interface Props {
   breadcrumb?: string;
   /** הגדלת גופן השאלה (כפתור T בסרגל) */
   fontScale?: number;
+  /** עיצוב הטקסט מחלון "עיצוב טיפוגרפיה" */
+  typography?: { question: Typography; answer: Typography };
 }
 
 /**
@@ -37,7 +40,9 @@ interface Props {
 /** השוואה בלי רווחים וסימני פיסוק — כדי לזהות "הסבר" שהוא רק העתק של התשובה הנכונה. */
 const normalize = (s: string) => s.replace(/[\s.,:;!?״"'׳()\-–]/g, "");
 
-export default function QuestionCard({ card, revealed, selected, onSelect, breadcrumb, fontScale = 1 }: Props) {
+export default function QuestionCard({ card, revealed, selected, onSelect, breadcrumb, fontScale = 1, typography }: Props) {
+  const q = typography?.question ?? DEFAULT_TYPOGRAPHY;
+  const a = typography?.answer ?? DEFAULT_TYPOGRAPHY;
   const withOptions = hasOptions(card);
   // הסבר שזהה לנוסח התשובה הנכונה לא מוסיף מידע — לא מציגים אותו
   const answerIsJustOption =
@@ -46,20 +51,20 @@ export default function QuestionCard({ card, revealed, selected, onSelect, bread
 
   return (
     <div className="space-y-3">
-      <div className="card-panel gold-frame min-h-[180px] flex flex-col gap-3">
+      <div className="card-panel gold-frame min-h-[180px] flex flex-col gap-3" style={typographyToBoxStyle(q)}>
         <div className="flex items-center justify-between gap-2 text-xs">
           <span className="rounded-full bg-secondary border px-2.5 py-0.5 font-medium text-muted-foreground">
             {TYPE_LABELS[card.type] ?? "שאלה"}
           </span>
           {breadcrumb && <span className="text-muted-foreground">{breadcrumb}</span>}
         </div>
-        <p className="font-medium leading-relaxed" style={{ fontSize: `${1.125 * fontScale}rem` }}>
+        <p className="font-medium leading-relaxed" style={typographyToStyle(q, BASE_SIZE.question, fontScale)}>
           {card.question}
         </p>
         {showAnswer && (
           <div className="pt-3 border-t animate-slide-in-down mt-auto">
             <p className="text-sm text-muted-foreground mb-1">{withOptions ? "הסבר:" : "תשובה:"}</p>
-            <p className="leading-relaxed">{card.answer}</p>
+            <p className="leading-relaxed" style={typographyToStyle(a, 16, fontScale)}>{card.answer}</p>
           </div>
         )}
       </div>
@@ -82,7 +87,8 @@ export default function QuestionCard({ card, revealed, selected, onSelect, bread
                   revealed && isSelected && !isCorrect && "border-2 border-red-500 bg-red-50 dark:bg-red-500/15",
                   revealed && !isSelected && !isCorrect && "opacity-60"
                 )}
-                style={{ fontSize: `${0.875 * fontScale}rem` }}
+                // הרקע שנבחר בחלון העיצוב — רק לפני החשיפה, כדי לא להסתיר את הירוק/האדום
+                style={{ ...typographyToBoxStyle(a), ...(revealed && (isCorrect || isSelected) ? { backgroundColor: undefined } : {}) }}
                 data-result={revealed ? (isCorrect ? "correct" : isSelected ? "wrong" : undefined) : undefined}
               >
                 <span
@@ -93,7 +99,7 @@ export default function QuestionCard({ card, revealed, selected, onSelect, bread
                 >
                   {OPTION_LETTERS[i] ?? i + 1}
                 </span>
-                <span className="flex-1 leading-snug">{option}</span>
+                <span className="flex-1 leading-snug" style={typographyToStyle(a, BASE_SIZE.answer, fontScale)}>{option}</span>
                 {revealed && isCorrect && <Check className="h-5 w-5 shrink-0 text-green-600" aria-label="תשובה נכונה" />}
                 {revealed && isSelected && !isCorrect && <X className="h-5 w-5 shrink-0 text-red-600" aria-label="תשובה שגויה" />}
               </button>
