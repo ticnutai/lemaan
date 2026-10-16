@@ -374,3 +374,18 @@ test("T25 — חיפוש בכל הש\"ס: מחיקת החיפוש בזמן טע�
   await box.fill("בשוליא דנגרי");
   await expect(page.locator("ul.divide-y li button").first()).toBeVisible({ timeout: 15_000 });
 });
+
+test("T26 — הדגשה בדפוס המדויק תואמת לחיפוש: ניקוד, גרש וביטוי שחוצה שורה", async () => {
+  // 'קוֹרִין' עם ניקוד בברכות ב. — קודם 0 הדגשות, עכשיו 7 (כמו החיפוש בכל הש"ס)
+  await page.goto(`/#/shas?m=Berakhot&a=2a&v=daf&q=${encodeURIComponent("קוֹרִין")}`);
+  await expect(page.locator(".lemaan-print .daf-pline").first()).toBeAttached({ timeout: 20_000 });
+  await expect(page.locator(".lemaan-print mark.daf-hit")).toHaveCount(7);
+  await expect(page.getByText("7 מופעים")).toBeVisible();
+  // מילה אחרת באותו עמוד (דרך מסך אחר, כדי שהעמוד ייטען מחדש עם החיפוש החדש)
+  await page.goto("/#/");
+  await page.goto(`/#/shas?m=Berakhot&a=2a&v=daf&q=${encodeURIComponent("מאימתי")}`);
+  await expect(page.locator(".lemaan-print .daf-pline").first()).toBeAttached({ timeout: 20_000 });
+  // 5 הדגשות, כולל המילה הפותחת בתיבה המעוטרת — והמונה שווה למספר ההדגשות
+  await expect(page.locator(".lemaan-print mark.daf-hit")).toHaveCount(5);
+  await expect(page.getByText("5 מופעים")).toBeVisible();
+});

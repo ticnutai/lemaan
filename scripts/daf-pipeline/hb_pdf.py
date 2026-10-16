@@ -296,6 +296,20 @@ def make_refs(shas, ws, keys, key, slug=None):
         i = keys.index(key)
         ptok = lambda k: side_tokens(ws_commentary.page(he, k, pre) or [])
         carry = [t for k in keys[max(0, i - 2):i] for t in ptok(k)][-2500:]
+        # FLOW_AFTER_SHOWN=<קובץ פריסות קיים>: הגלישה מתחילה רק אחרי מה שכבר מוצג בעמוד הקודם. בלי זה
+        # עמוד יכול להציג שוב את כל הפירוש של העמוד הקודם (נדרים עב. הציג את כל הר"ן של עא:).
+        prev_file = os.environ.get("FLOW_AFTER_SHOWN")
+        if prev_file and i > 0:
+            prev_lay = json.loads(gzip.decompress(open(prev_file, "rb").read())).get(keys[i - 1])
+            if prev_lay:
+                shown = [fold(norm_token(w)) for sl in prev_lay.get("slabs", []) if sl.get("s") == "tosafot"
+                         for l in sl.get("lines") or [] for w in TAGS.sub(" ", l.get("t", "")).split()]
+                shown = [w for w in shown if w]
+                ck = [fold(norm_token(t.replace("", ""))) for t in carry]
+                tail = shown[-8:]
+                cut = max((j + len(tail) for j in range(len(ck) - len(tail) + 1) if ck[j:j + len(tail)] == tail), default=None) if len(tail) == 8 else None
+                if cut is not None:
+                    carry = carry[cut:]
         flow = carry + ptok(key) + side_tokens(com_(key, "tosafot"))
         refs["tosafot"] = refs["tosafot"] + ((flow, 0, len(flow)),)
     return refs

@@ -15,16 +15,19 @@ for (const slug of printIndex()) fromSearchFile(slug, searchFile(slug), seqs);
 const metaOf = new Map<string, Meta>(shasIndex().masechtot.map((m) => [m.slug.toLowerCase(), { slug: m.slug, he: m.he }]));
 const count = (q: string, only: "all" | "gemara" | "rashi" | "tosafot" = "all") => searchSeqs(seqs, q, only, metaOf)?.total;
 
+// 14.10: הוסרו כפילויות בגבולות בין עמודים — כל מופע שירד היה בתוך טקסט כפול, והוא עדיין קיים בראש העמוד
+// הבא, במקומו: 'אמר רבא' 3162→3160 (תמורה כח:, נדרים כד:), 'בראשית' 739→738 (יבמות קג.), "מתני'" 3572→3571 (סנהדרין מג.)
 describe("חיפוש בכל הש\"ס — ערכי זהב", () => {
   it("גודל המאגר", () => {
-    expect(seqs.length).toBe(15503);
+    // 15,503 עד 14.10; פחות 8 (רש"י ותוספות של ארבעת עמודי זבחים שהוצאו מהדפוס המדויק)
+    expect(seqs.length).toBe(15495);
   });
 
   it("'אמר רבא' — בכל הזרמים ובכל זרם לחוד", () => {
-    expect(count("אמר רבא")).toBe(3162);
-    expect(count("אמר רבא", "gemara")).toBe(2347);
+    expect(count("אמר רבא")).toBe(3160);
+    expect(count("אמר רבא", "gemara")).toBe(2346);
     expect(count("אמר רבא", "rashi")).toBe(327);
-    expect(count("אמר רבא", "tosafot")).toBe(488);
+    expect(count("אמר רבא", "tosafot")).toBe(487);
   });
 
   it("התוצאה הראשונה, והגבלת התוצאות המוצגות", () => {
@@ -35,14 +38,14 @@ describe("חיפוש בכל הש\"ס — ערכי זהב", () => {
 
   it("שאילתות נוספות", () => {
     expect(count("תנו רבנן")).toBe(750);
-    expect(count("בראשית")).toBe(739);
+    expect(count("בראשית")).toBe(738);
     expect(count("הדרן עלך", "gemara")).toBe(54);
   });
 
   it("הנרמול: ניקוד, גרש עברי וגרש רגיל נותנים אותה תוצאה", () => {
     expect(count("בְּרֵאשִׁית")).toBe(count("בראשית"));
-    expect(count("מתני'", "gemara")).toBe(3572);
-    expect(count("מתני׳", "gemara")).toBe(3572);
+    expect(count("מתני'", "gemara")).toBe(3571);
+    expect(count("מתני׳", "gemara")).toBe(3571);
   });
 
   it("ביטוי שעובר משורה לשורה נמצא", () => {

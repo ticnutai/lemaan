@@ -16,7 +16,7 @@ const escapeText = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 /** ישויות HTML נפוצות בטקסט המקור → תווים. */
-const unescapeEntities = (s: string) =>
+export const unescapeEntities = (s: string) =>
   s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#x27;|&#39;|&apos;/g, "'").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&");
 
 /**
@@ -45,6 +45,44 @@ export function sanitizeSegment(raw: string, query = ""): string {
     if (tag === "br") out += " ";
     else if (ALLOWED[tag]) out += closing ? `</${ALLOWED[tag]}>` : `<${ALLOWED[tag]}>`;
     // img / a / כל תגית אחרת — מוסרת לחלוטין
+  }
+  out += text(src.slice(last));
+  return out;
+}
+
+/**
+ * כמו sanitizeSegment, אבל ההדגשה לפי טווחים בטקסט הגלוי (מ-printHighlight.streamHighlights) ולא לפי
+ * מחרוזת מדויקת. בלי טווחים — הפלט זהה תו בתו ל-sanitizeSegment(raw) (נבדק על כל שורות הדפוס).
+ * הטקסט הגלוי כאן הוא בדיוק זה של printHighlight.visible: בלי תגיות, <br> = רווח אחד.
+ */
+export function sanitizeSegmentRanges(raw: string, ranges: [number, number][]): string {
+  if (!ranges.length) return sanitizeSegment(raw);
+  const src = unescapeEntities(raw);
+  let offset = 0; // מקום בטקסט הגלוי
+  const text = (t: string) => {
+    if (!t) return "";
+    let out = "", at = 0;
+    for (const [a, b] of ranges) {
+      const s = Math.max(a - offset, at), e = Math.min(b - offset, t.length);
+      if (e <= s) continue;
+      out += escapeText(t.slice(at, s)) + `<mark class="daf-hit">${escapeText(t.slice(s, e))}</mark>`;
+      at = e;
+    }
+    out += escapeText(t.slice(at));
+    offset += t.length;
+    return out;
+  };
+  let out = "";
+  const re = /<\s*(\/?)\s*([a-zA-Z0-9]+)[^>]*>/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(src))) {
+    out += text(src.slice(last, m.index));
+    last = re.lastIndex;
+    const closing = m[1] === "/";
+    const tag = m[2].toLowerCase();
+    if (tag === "br") { out += " "; offset += 1; }
+    else if (ALLOWED[tag]) out += closing ? `</${ALLOWED[tag]}>` : `<${ALLOWED[tag]}>`;
   }
   out += text(src.slice(last));
   return out;

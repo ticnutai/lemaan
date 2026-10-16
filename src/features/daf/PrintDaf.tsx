@@ -1,5 +1,6 @@
 import { useId, useLayoutEffect, useMemo, useRef } from "react";
-import { sanitizeSegment } from "./buildHtml";
+import { sanitizeSegment, sanitizeSegmentRanges } from "./buildHtml";
+import { streamHighlights, type Ranges } from "./printHighlight";
 import { FONT_FAMILY, type DafStyle } from "./dafStyle";
 
 /** גיאומטריית עמוד דפוס: גושי טקסט במיקום/רוחב מדויקים (נמדדו מהדפוס). */
@@ -77,6 +78,21 @@ export default function PrintDaf({ layout, width, style, query }: Props) {
   // הגוש האחרון של הגמרא בעמוד: השורה האחרונה שלו, אם היא מילה-שתיים "תלויות",
   // מיושרת לשמאל — כך בדפוס וילנא (העין ממשיכה לעמוד הבא).
   const lastGemara = [...layout.slabs].reverse().find((sl) => sl.s === "gemara");
+  // הדגשת חיפוש לפי הזרם כולו ובהשוואה מנורמלת — כמו החיפוש בכל הש"ס (printHighlight). בלי חיפוש: null,
+  // והשורות נבנות בדיוק כמו קודם
+  const highlights = useMemo(() => {
+    if (!query.trim()) return null;
+    const out = new Map<PrintSlab, Ranges[]>();
+    for (const s of ["gemara", "rashi", "tosafot"] as const) {
+      const of = layout.slabs.filter((sl) => sl.s === s && sl.lines?.length);
+      const { ranges } = streamHighlights(of.flatMap((sl) => sl.lines!.map((l) => l.t)), query);
+      let at = 0;
+      for (const sl of of) { out.set(sl, ranges.slice(at, at + sl.lines!.length)); at += sl.lines!.length; }
+    }
+    return out;
+  }, [layout, query]);
+  const mark = (text: string) =>
+    query.trim() ? sanitizeSegmentRanges(text, streamHighlights([text], query).ranges[0]) : sanitizeSegment(text, query);
   const slabs = useMemo(
     () =>
       layout.slabs.map((slab) => ({
@@ -92,12 +108,12 @@ export default function PrintDaf({ layout, width, style, query }: Props) {
                 // והסטייה הצטברה לאורך העמודה
                 const fixedH = `;height:${(slab.lh * k).toFixed(3)}px`;
                 const stream = slab.s === "gemara" ? "main" : slab.s === "rashi" ? "inner" : "outer";
-                return `<span class="daf-seg daf-pline${hanging ? " daf-hanging" : ""}" data-stream="${stream}" data-i="${i}" style="${justify}${width}${indent}${fixedH}">${sanitizeSegment(line.t, query) || "&nbsp;"}</span>`;
+                return `<span class="daf-seg daf-pline${hanging ? " daf-hanging" : ""}" data-stream="${stream}" data-i="${i}" style="${justify}${width}${indent}${fixedH}">${(highlights ? sanitizeSegmentRanges(line.t, highlights.get(slab)?.[i] ?? []) : sanitizeSegment(line.t, query)) || "&nbsp;"}</span>`;
               })
               .join("")
           : `<span class="daf-seg" data-stream="${slab.s === "rashi" ? "inner" : "outer"}">${sideHtml(slab.text ?? "", query)}</span>`,
       })),
-    [layout, query, k, lastGemara]
+    [layout, query, k, lastGemara, highlights]
   );
 
   return (
@@ -124,7 +140,7 @@ export default function PrintDaf({ layout, width, style, query }: Props) {
           }}
         >
           <OrnateFrame w={layout.box.w * k} h={layout.box.h * k} color={style.colors.main} />
-          <span className="daf-seg relative" data-stream="main" dangerouslySetInnerHTML={{ __html: sanitizeSegment(layout.box.text, query) }} />
+          <span className="daf-seg relative" data-stream="main" dangerouslySetInnerHTML={{ __html: mark(layout.box.text) }} />
         </div>
       )}
       {(layout.catch ?? []).map((c, i) => (
@@ -137,7 +153,7 @@ export default function PrintDaf({ layout, width, style, query }: Props) {
             fontFamily: c.s === "gemara" ? FONT_FAMILY.Vilna : FONT_FAMILY.Rashi, fontWeight: c.s === "gemara" ? 600 : 400,
             color: colorOf(c.s),
           }}
-          dangerouslySetInnerHTML={{ __html: sanitizeSegment(c.text, query) }}
+          dangerouslySetInnerHTML={{ __html: mark(c.text) }}
         />
       ))}
       {layout.header.map((hl, i) => (

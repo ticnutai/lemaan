@@ -7,8 +7,9 @@
 import { describe, it, expect } from "vitest";
 import { printIndex, layouts, lineText } from "./tzurat/data";
 
-// עמודים עם פריסת דפוס בלי אף שורת גמרא (במאגר הטקסט יש להם גמרא — פגם ותיק, לתיקון בצינור)
-const NO_GEMARA = ["zevachim:67b", "zevachim:72a", "zevachim:76b", "zevachim:78a"];
+// עמודים עם פריסת דפוס בלי אף שורת גמרא — אין (ארבעת עמודי זבחים שהיו כאלה הוצאו מהדפוס המדויק ב-14.10,
+// ומוצגים בצורת דף מהטקסט עם כל הגמרא; daf-work/overrides.json _retire)
+const NO_GEMARA: string[] = [];
 
 // עמודים בלי שורת כותרת
 const NO_HEADER = [
@@ -19,10 +20,10 @@ const NO_HEADER = [
 // שורות עם תווים זרים: אות לטינית, #, |, מחבר בלתי נראה, מקף ארוך, אותיות בצורת הצגה (מסכת:עמוד:זרם:התווים)
 const ODD = /[A-Za-z#|\u2013\u2014\uFB1D-\uFB4F]|\u200D/g;
 const ODD_LINES = [
-  "bava_batra:15b:tosafot:#", "bava_batra:163a:rashi:#", "bava_batra:169a:rashi:#", "bava_metzia:28a:rashi:#",
-  "eruvin:27b:rashi:\uFB35", "eruvin:28a:rashi:\uFB2A\uFB35\uFB3B", "eruvin:58a:rashi:\uFB35", "gittin:20b:tosafot:#", "gittin:2a:tosafot:u",
-  "ketubot:111a:gemara:\u200D", "ketubot:25b:tosafot:#", "megillah:15a:gemara:\u200D", "megillah:31a:rashi:#",
-  "menachot:100a:gemara:\u2013", "shabbat:14a:tosafot:#", "shabbat:79b:tosafot:#", "sukkah:8a:gemara:bhmtu|", "taanit:2a:tosafot:n",
+  // שאר החריגים אחרי תיקוני הטקסט של 14.10 (daf-work/text_fixes.json): אותיות בצורת הצגה בעירובין,
+  // מחבר בלתי נראה ב'ירושל‍ם', ומקף ארוך במנחות — לבדיקה נפרדת
+  "eruvin:27b:rashi:\uFB35", "eruvin:28a:rashi:\uFB2A\uFB35\uFB3B", "eruvin:58a:rashi:\uFB35",
+  "ketubot:111a:gemara:\u200D", "megillah:15a:gemara:\u200D", "menachot:100a:gemara:\u2013",
 ];
 
 const noGem: string[] = [], noHeader: string[] = [], odd = new Set<string>();
@@ -43,7 +44,7 @@ for (const slug of printIndex()) {
 }
 
 describe("תוכן כל עמוד", () => {
-  it("עמודים בלי גמרא — רק הארבעה הידועים בזבחים", () => {
+  it("אין עמוד דפוס בלי גמרא", () => {
     expect(noGem.sort()).toEqual([...NO_GEMARA].sort());
   });
 
