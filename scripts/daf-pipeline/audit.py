@@ -17,7 +17,7 @@ sys.path.insert(0, HERE)
 import hb_pdf as H
 from align import norm_token, fold
 
-OUT = os.path.join(os.path.expanduser("~"), "lemaan-data", "review")
+OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "review-out")
 STREAMS = ("gemara", "rashi", "tosafot")
 
 
@@ -50,6 +50,77 @@ def strip_hadran(seq, keys_, names):
     return out, outk
 
 
+ORDS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "ששי", "שביעי", "שמיני", "תשיעי", "עשירי", "אחד עשר",
+        "שנים עשר", "שלשה עשר", "ארבעה עשר", "חמשה עשר", "ששה עשר", "שבעה עשר", "שמונה עשר", "תשעה עשר", "עשרים",
+        "עשרים ואחד", "עשרים ושנים", "עשרים ושלשה", "עשרים וארבעה"]
+HEAD_RX = re.compile(r"פרק (" + "|".join(sorted(ORDS, key=len, reverse=True)) + r") ?- ?(.{2,60}?)(?= מתני|:|$)")
+
+
+def heading_names(ws):
+    """שמות הפרקים שבכותרות "פרק <מספר> - <שם>" של טקסט המקור (מנורמלים)."""
+    out = set()
+    for segs in ws.values():
+        for m in HEAD_RX.finditer(" ".join(segs or [])):
+            out.add(tuple(norm(t) for t in m.group(2).split() if norm(t)))
+    return out
+
+
+def heading_spans(seq, names):
+    """כותרות "פרק <מספר> <שם> [מתני']" ברצף מילים מנורמל: [(i, j, glue)] — המילים i..j-1 הן כותרת;
+    glue=True: המילה j מתחילה ב"מתני'" דבוק למילה הבאה ("מתני'כל") — רק התחילית שייכת לכותרת."""
+    ords = sorted((tuple(norm(t) for t in o.split()) for o in ORDS), key=len, reverse=True)
+    PRK, MTN, MTNF = norm("פרק"), norm("מתני"), norm("מתניתין")
+    spans, i = [], 0
+    while i < len(seq):
+        # כותרת חלקית (המנוע השמיט את "פרק" או את "פרק <מספר>"): [מספר] <שם> מתני' — ואחריה מיד המילים
+        # הפותחות של המשנה, שמתחילות בשם הפרק ("בהמה המקשה מתני' בהמה המקשה לילד")
+        if seq[i] != PRK:
+            o = next((o for o in ords if tuple(seq[i: i + len(o)]) == o), ())
+            j = i + len(o)
+            nm = max((n for n in names if tuple(seq[j: j + len(n)]) == n), key=len, default=None)
+            if nm and j + len(nm) + 1 < len(seq) and seq[j + len(nm)] in (MTN, MTNF) and seq[j + len(nm) + 1] == nm[0]                     and (o or i == 0 or seq[i - 1] != nm[-1]):
+                spans.append((i, j + len(nm) + 1, False))
+                i = j + len(nm) + 1
+                continue
+        if seq[i] == PRK:
+            o = next((o for o in ords if tuple(seq[i + 1: i + 1 + len(o)]) == o), None)
+            if o:
+                j = i + 1 + len(o)
+                nm = max((n for n in names if tuple(seq[j: j + len(n)]) == n), key=len, default=None)
+                if nm is None:
+                    nxt = next((j + d for d in range(0, 7) if j + d < len(seq) and seq[j + d].startswith(MTN)), None)
+                    nm = tuple(seq[j:nxt]) if nxt is not None else None
+                if nm is not None:
+                    j += len(nm)
+                    glue = False
+                    if j < len(seq) and seq[j] in (MTN, MTNF):
+                        j += 1
+                    elif j < len(seq) and seq[j].startswith(MTN) and len(seq[j]) > len(MTN):
+                        glue = True
+                    spans.append((i, j, glue))
+                    i = j
+                    continue
+        i += 1
+    return spans
+
+
+def strip_heading(seq, keys_, names):
+    """כותרות "פרק <מספר> <שם> [מתני']" (מהמקור; בדפוס וילנא אינן מודפסות — רק ההדרן והמילים הפותחות):
+    מוציאים אותן משני הצדדים, כמו את ההדרן."""
+    MTN = norm("מתני")
+    drop, trim = set(), set()
+    for i, j, glue in heading_spans(seq, names):
+        drop.update(range(i, j))
+        if glue:
+            trim.add(j)
+    out, outk = [], []
+    for n, (t, k) in enumerate(zip(seq, keys_)):
+        if n in drop:
+            continue
+        out.append(t[len(MTN):] if n in trim else t); outk.append(k)
+    return out, outk
+
+
 def audit(tractate, only=None, path=None, save=True):
     slug = tractate.lower()
     lays = json.loads(gzip.decompress(open(path or f"{H.ROOT}/tzurat/print/{slug}.json.gz", "rb").read()))
@@ -73,6 +144,7 @@ def audit(tractate, only=None, path=None, save=True):
     for k in allk:
         for m in re.finditer(r"הדרן עלך ([^<:]+)", " ".join(ws.get(k) or [])):
             names.add(tuple(norm(t) for t in m.group(1).split() if norm(t)))
+    hnames = heading_names(ws)
     res = {"tractate": tractate, "amudim": len(keys), "streams": {}, "pages": {k: [] for k in keys}}
     for s in STREAMS:
         tot_ref = tot_ok = 0
@@ -89,6 +161,9 @@ def audit(tractate, only=None, path=None, save=True):
                         D.append(norm(t)); Dk.append(k)
             R, Rk = strip_hadran(R, Rk, names)
             D, Dk = strip_hadran(D, Dk, names)
+            if s == "gemara":  # כותרות פרק רק בגמרא (במפרשים "פרק שני" הוא הפניה בתוך הטקסט — הר"ן בנדרים)
+                R, Rk = strip_heading(R, Rk, hnames)
+                D, Dk = strip_heading(D, Dk, hnames)
             sm = difflib.SequenceMatcher(None, R, D, autojunk=False)
             ops = [o for o in sm.get_opcodes()]
             tot_ref += len(R)

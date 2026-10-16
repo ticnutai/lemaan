@@ -1,8 +1,7 @@
 // גשר: הקוד המקורי פונה לענן של האתר הבסיסי (מסד נתונים אחר). בפריסה המקורית אצלנו כל הנתונים
 // באים מהמסד של האתר שלנו (lib/study/store), ולכן כאן "ענן ריק": כל שאילתה מחזירה תשובה ריקה בלי שגיאה,
 // ופעולות שדורשות את הענן ההוא (סיווג אוטומטי, שיתוף) מחזירות הודעה שהן לא זמינות כאן.
-// דפי הגמרא לצפייה (gemara-pages) ציבוריים — הקישור אליהם נשאר כמו במקור.
-const ORIGINAL_STORAGE = "https://elfxevuxhffxskooppca.supabase.co/storage/v1/object/public";
+// אין שום חיבור לאתר הבסיסי: גם קובצי צילום הגמרא שלו לא נטענים (הכפתור מציג "אין", כמו כשאין קובץ).
 const unavailable = { message: "לא זמין בפריסה הזו" };
 
 type Result = { data: unknown; error: unknown; count?: number | null };
@@ -30,8 +29,8 @@ export const supabase: any = {
   removeChannel: () => {},
   functions: { invoke: async () => ({ data: null, error: unavailable }) },
   storage: {
-    from: (bucket: string) => ({
-      getPublicUrl: (path: string) => ({ data: { publicUrl: `${ORIGINAL_STORAGE}/${bucket}/${path}` } }),
+    from: (_bucket: string) => ({
+      getPublicUrl: (_path: string) => ({ data: { publicUrl: "" } }),
       download: async () => ({ data: null, error: unavailable }),
       upload: async () => ({ data: null, error: unavailable }),
       list: async () => ({ data: [], error: null }),

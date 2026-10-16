@@ -22,7 +22,7 @@ const ODD = /[A-Za-z#|\u2013\u2014\uFB1D-\uFB4F]|\u200D/g;
 const ODD_LINES = [
   // שאר החריגים אחרי תיקוני הטקסט של 14.10 (daf-work/text_fixes.json): אותיות בצורת הצגה בעירובין,
   // מחבר בלתי נראה ב'ירושל‍ם', ומקף ארוך במנחות — לבדיקה נפרדת
-  "eruvin:27b:rashi:\uFB35", "eruvin:28a:rashi:\uFB2A\uFB35\uFB3B", "eruvin:58a:rashi:\uFB35",
+  // (האותיות בצורת הצגה בעירובין כז: כח. נח. היו בתוך הוספות עורך ברש"י — ירדו איתן ב-16.10, daf-work/complete/notefix.py)
   "ketubot:111a:gemara:\u200D", "megillah:15a:gemara:\u200D", "menachot:100a:gemara:\u2013",
 ];
 
@@ -54,5 +54,23 @@ describe("תוכן כל עמוד", () => {
 
   it("שורות עם תווים זרים — רק הידועות", () => {
     expect([...odd].sort()).toEqual([...ODD_LINES].sort());
+  });
+
+  it('כותרות "הדרן" — נוסח "הדרן עלך" מלא (בלי שגיאות זיהוי כמו "הדק עלך", "הדרן לך")', () => {
+    // כותרת שנראית כמו הדרן: המילה השנייה היא עלך או קריאה משובשת שלה, או שהראשונה מתחילה ב"הד"
+    const LIKE = /^(\S+) (עלך|לך|עלן|קלך|כלך|ערך|עליך|מלך|הלך|על|ןלך) \S/;
+    const bad: string[] = [];
+    for (const slug of printIndex()) {
+      for (const [amud, lay] of Object.entries(layouts(slug))) {
+        for (const h of (lay.header ?? []).slice(2)) {
+          const m = h.text.match(LIKE);
+          if (m && /^ה[דר]/.test(m[1]) && !h.text.startsWith("הדרן עלך ")) bad.push(`${slug}:${amud}:${h.text}`);
+        }
+      }
+    }
+    // 14.10, daf-work/complete/hadranfix.py: 140 כותרות תוקנו; נשארה אחת שהקריאה שלה משובשת מדי לתיקון אוטומטי.
+    // 16.10, daf-work/complete/hadranfix2.py: גם היא תוקנה ("הדרן עלך חטאת העוף", נבדק בצילום), ועוד 64 שורות הדרן
+    // שאותיותיהן היו משובשות ("הבל חייבין", "רני אליעזר") — כל אחת נקראה בעין (complete/close/hadran_decisions.json)
+    expect(bad.sort()).toEqual([]);
   });
 });
