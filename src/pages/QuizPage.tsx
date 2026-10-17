@@ -5,6 +5,7 @@ import {
   BookOpen, ChevronLeft, ChevronRight, ListChecks, Play, Plus, Save, Scroll, Timer, Trash2, X,
 } from "lucide-react";
 import { db } from "../db";
+import { useAllCards } from "../db/cardsStore";
 import PageBanner from "../components/PageBanner";
 import { cardsForDeck, matchesFilter } from "../features/study/deckCards";
 import { AMUD_LABELS, AMUD_SHORT, SEDARIM, hebrewDaf } from "../features/study/shas";
@@ -45,7 +46,7 @@ export default function QuizPage() {
 
   const categories = useLiveQuery(() => db.categories.toArray(), []);
   const decks = useLiveQuery(() => db.decks.toArray(), []);
-  const allCards = useLiveQuery(() => db.cards.toArray(), []);
+  const allCards = useAllCards(); // מהזיכרון המשותף — לא קורא שוב את כל המסד בכל שינוי
 
   /** מוני שאלות לפי מסכת/דף/עמוד. */
   const counts = useMemo(() => {

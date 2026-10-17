@@ -36,7 +36,7 @@ export default function StatsPage() {
   }, []);
 
   const perMasechta = useLiveQuery(async () => {
-    const cards = await db.cards.toArray();
+    const cards = await db.cards.toArray(); // נשאר: חישוב חד־פעמי במסך הזה
     const map = new Map<string, { total: number; reviewed: number; correct: number; reviews: number }>();
     for (const c of cards) {
       const key = c.masechta ?? "ללא מסכת";

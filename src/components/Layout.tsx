@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { flushAmudSorts, pullAmudSorts } from "../db/amudSort";
+import { startAutoSync } from "../db/sync";
 import { useStudySession } from "../features/study/activeSession";
 import ShasNavigator from "./ShasNavigator";
 import { useTheme } from "../theme/ThemeProvider";
@@ -49,6 +50,8 @@ export default function Layout() {
   // מיון לעמודים שנעשה במכשירים אחרים — לכל המשתמשים, אחרי שהמאגר נטען
   useEffect(() => {
     if (!importing) void pullAmudSorts();
+    // סנכרון אוטומטי בין מכשירים (רק אחרי שהמאגר נטען)
+    if (!importing) startAutoSync();
   }, [importing]);
 
   // תפריט צדדי בטלפון: נפתח מכפתור בכותרת, נסגר במעבר עמוד
@@ -185,7 +188,10 @@ export default function Layout() {
         </aside>
 
         <main className="flex-1 min-w-0 p-3 pb-24 md:p-6 md:pb-24 overflow-auto">
-          <Outlet />
+          {/* כל מסך נטען רק כשנכנסים אליו — הכניסה לאתר קלה יותר */}
+          <Suspense fallback={<div className="py-16 text-center text-sm text-muted-foreground">טוען…</div>}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
 

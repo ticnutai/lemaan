@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useDeferredValue } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
-import Fuse from "fuse.js";
 import {
   ArrowDown, ArrowUp, BookOpen, Check, ChevronLeft, ChevronRight, FileSpreadsheet, FileText,
   HelpCircle, Pencil, Plus, Save, Scroll, Search, Trash2, X,
@@ -9,6 +8,8 @@ import {
 import PageBanner from "../components/PageBanner";
 import { exportQuestionsDocx, exportQuestionsXlsx } from "../lib/export";
 import { db } from "../db";
+import { useAllCards } from "../db/cardsStore";
+import { searchCards } from "../lib/textSearch";
 import { submitToReview } from "../db/admin";
 import { useSession } from "../db/useSession";
 import { defaultSrs } from "../features/study/srs";
@@ -79,23 +80,18 @@ export default function QuestionsPage() {
 
   const categories = useLiveQuery(() => db.categories.toArray(), []);
   const options = useMemo(() => (categories ? selectableCategories(categories) : []), [categories]);
-  const cards = useLiveQuery(async () => {
-    if (categoryFilter && categories) {
-      const ids = collectDescendantIds(categoryFilter, buildChildrenMap(categories));
-      return db.cards.where("categoryId").anyOf([...ids]).toArray();
-    }
-    return db.cards.toArray();
-  }, [categoryFilter, categories]);
+  // השאלות מהזיכרון המשותף (בלי לקרוא שוב את כל המסד בכל שינוי); סינון לפי קטגוריה בזיכרון
+  const allCards = useAllCards();
+  const cards = useMemo(() => {
+    if (!allCards) return undefined;
+    if (!categoryFilter || !categories) return allCards;
+    const ids = collectDescendantIds(categoryFilter, buildChildrenMap(categories));
+    return allCards.filter((c) => c.categoryId != null && ids.has(c.categoryId));
+  }, [allCards, categoryFilter, categories]);
 
-  const fuse = useMemo(
-    () => (cards ? new Fuse(cards, { keys: ["question", "answer", "masechta"], threshold: 0.35, ignoreLocation: true }) : null),
-    [cards]
-  );
-  const filtered = useMemo(() => {
-    if (!cards) return [];
-    if (!search.trim() || !fuse) return cards;
-    return fuse.search(search.trim()).map((r) => r.item);
-  }, [cards, search, fuse]);
+  // חיפוש מהיר בעברית (מתעלם מניקוד וגרשיים); בזמן הקלדה מהירה המסך לא נתקע
+  const deferredSearch = useDeferredValue(search);
+  const filtered = useMemo(() => (cards ? searchCards(cards, deferredSearch) : []), [cards, deferredSearch]);
   const visible = filtered.slice(0, (page + 1) * PAGE_SIZE);
   const exportTitle = categoryFilter
     ? `שאלות-${options.find((c) => c.id === categoryFilter)?.name ?? ""}`

@@ -3,6 +3,7 @@
 // בהתקדמות של מי שכבר תרגל. המזהים בחבילה קבועים — אין כפילויות גם אחרי עדכון גרסה.
 import { db } from "./index";
 import type { Card, Category } from "../features/study/types";
+import { markNoSync } from "./sync";
 
 interface PackCategory { id: string; name: string; parentId: string | null; sortOrder?: number }
 interface PackCard { id: string; type: Card["type"]; question: string; answer: string; categoryId: string; tags?: string[] }
@@ -28,7 +29,8 @@ export function installPacks(): Promise<number> {
         if (!res.ok) continue;
         const pack = (await res.json()) as Pack;
         const now = Date.now();
-        await db.transaction("rw", db.cards, db.categories, db.settings, async () => {
+        await db.transaction("rw", db.cards, db.categories, db.settings, async (tx) => {
+          markNoSync(tx); // תוכן משותף — לא מידע אישי לסנכרון
           const haveCats = new Set(await db.categories.bulkGet(pack.categories.map((c) => c.id)).then((r) => r.filter(Boolean).map((c) => c!.id)));
           const newCats: Category[] = pack.categories
             .filter((c) => !haveCats.has(c.id))

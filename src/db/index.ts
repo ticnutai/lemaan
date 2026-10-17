@@ -2,6 +2,13 @@ import Dexie, { type Table } from "dexie";
 import type { Card, Category, Deck, ReviewLog, Goal, Setting, StudyPlan } from "../features/study/types";
 import type { ShasAmud, ShasLogRow } from "../features/study/shasBoard";
 
+/** מעקב סנכרון לפריט אישי: key = "סוג:מזהה", changedAt — זמן השינוי האחרון, pending — 1 עד שנשלח לענן. */
+export interface SyncItem {
+  key: string;
+  changedAt: number;
+  pending: 0 | 1;
+}
+
 /**
  * Single local data layer for the whole app (IndexedDB via Dexie).
  * All persistence goes through here — no localStorage state, no polling.
@@ -18,6 +25,7 @@ class LemaanDB extends Dexie {
   shasProgress!: Table<ShasAmud, string>;
   shasLog!: Table<ShasLogRow, number>;
   studyPlans!: Table<StudyPlan, string>;
+  syncItems!: Table<SyncItem, string>;
 
   constructor() {
     super("lemaan");
@@ -41,6 +49,10 @@ class LemaanDB extends Dexie {
     // אינדקס לפי שם קטגוריה — מציאת שורש (למשל "טור" לשולחן ערוך) בלי לעבור על כל הקטגוריות
     this.version(4).stores({
       categories: "id, parentId, sortOrder, name",
+    });
+    // סנכרון מדורג: לכל פריט אישי — זמן השינוי האחרון, והאם הוא עוד לא נשלח לענן
+    this.version(5).stores({
+      syncItems: "key, pending",
     });
   }
 }

@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { AlertTriangle, Brain, Check, Cloud, CloudDownload, CloudUpload, Copy, Download, Heart, LayoutTemplate, Settings, Upload } from "lucide-react";
 import { db, setSetting } from "../db";
-import { getSyncCode, pullSnapshot, pushSnapshot } from "../db/sync";
+import { reloadCards } from "../db/cardsStore";
+import { connectToCode, getSyncCode, onSyncStatus, syncNow } from "../db/sync";
 import PageBanner from "../components/PageBanner";
 import ThemeStudio from "../components/ThemeStudio";
 import AccountSection from "../components/AccountSection";
@@ -49,30 +50,31 @@ export default function SettingsPage() {
   const dedication = useLiveQuery(async () => (await db.settings.get("dedication"))?.value ?? "", []);
   const [dedDraft, setDedDraft] = useState<string | null>(null);
 
-  const doPush = async () => {
+  // סנכרון מדורג: נשלחים רק פריטים אישיים שהשתנו, ושני מכשירים מתמזגים (שום דבר לא נמחק)
+  const [syncState, setSyncState] = useState<{ state: string; at?: number; message?: string }>({ state: "off" });
+  useEffect(() => onSyncStatus(setSyncState), []);
+  const doSync = async () => {
     setBusy(true);
     setSyncMsg("");
     try {
       await getSyncCode();
-      const { sizeKb } = await pushSnapshot();
-      setSyncMsg(`הנתונים הועלו לענן (${sizeKb.toLocaleString()}KB).`);
+      const { sent, received } = await syncNow();
+      setSyncMsg(`הנתונים הועלו לענן ומוזגו: נשלחו ${sent.toLocaleString()} פריטים, התקבלו ${received.toLocaleString()}.`);
     } catch (e) {
-      setSyncMsg(e instanceof Error ? e.message : "שגיאה בהעלאה");
+      setSyncMsg(e instanceof Error ? e.message : "שגיאה בסנכרון");
     } finally {
       setBusy(false);
     }
   };
-
-  const doPull = async () => {
-    if (!confirm("משיכה מהענן תחליף את כל הנתונים במכשיר הזה. להמשיך?")) return;
+  const doConnect = async () => {
     setBusy(true);
     setSyncMsg("");
     try {
-      const { updatedAt } = await pullSnapshot(codeInput || undefined);
-      setSyncMsg(`הנתונים נמשכו מהענן (עדכון אחרון: ${new Date(updatedAt).toLocaleString("he-IL")}).`);
+      const { received } = await connectToCode(codeInput);
+      setSyncMsg(`המכשיר חובר וּמוזג: התקבלו ${received.toLocaleString()} פריטים. שום דבר לא נמחק.`);
       setCodeInput("");
     } catch (e) {
-      setSyncMsg(e instanceof Error ? e.message : "שגיאה במשיכה");
+      setSyncMsg(e instanceof Error ? e.message : "שגיאה בחיבור");
     } finally {
       setBusy(false);
     }
@@ -131,6 +133,7 @@ export default function SettingsPage() {
     await db.transaction("rw", db.tables, async () => {
       await Promise.all(db.tables.map((t) => t.clear()));
     });
+    await reloadCards(); // הזיכרון המשותף של השאלות
   };
 
   return (
@@ -193,7 +196,14 @@ export default function SettingsPage() {
       <div className="card-panel space-y-3">
         <h3 className="font-semibold flex items-center gap-2"><Cloud className="h-4 w-4 text-gold" /> סנכרון ענן בין מכשירים</h3>
         <p className="text-sm text-muted-foreground">
-          העלה את הנתונים מהמכשיר הזה, ובמכשיר השני הדבק את קוד הסנכרון ומשוך. המשיכה מחליפה את הנתונים המקומיים.
+          אחרי ההפעלה הסנכרון אוטומטי: רק מה שהשתנה נשלח, ושני מכשירים מתמזגים בלי למחוק כלום.
+          כדי לחבר מכשיר נוסף — הדבק בו את קוד הסנכרון (או התחבר לאותו חשבון).
+        </p>
+        <p className="text-xs text-muted-foreground" data-testid="sync-status">
+          {syncState.state === "syncing" ? "מסנכרן…"
+            : syncState.state === "error" ? `שגיאה בסנכרון האחרון: ${syncState.message ?? ""}`
+            : syncState.state === "idle" && syncState.at ? `סונכרן לאחרונה: ${new Date(syncState.at).toLocaleTimeString("he-IL")}`
+            : "הסנכרון האוטומטי עוד לא הופעל במכשיר הזה."}
         </p>
         {syncCode && (
           <div className="flex items-center gap-2 text-xs">
@@ -206,13 +216,13 @@ export default function SettingsPage() {
           </div>
         )}
         <div className="flex flex-wrap gap-2 items-center">
-          <button className="btn-primary" onClick={doPush} disabled={busy}>
-            <CloudUpload className="h-4 w-4" /> העלאה לענן
+          <button className="btn-primary" onClick={doSync} disabled={busy}>
+            <CloudUpload className="h-4 w-4" /> סנכרון עכשיו
           </button>
-          <input className="input w-72" dir="ltr" placeholder="קוד סנכרון ממכשיר אחר (רשות)"
-            value={codeInput} onChange={(e) => setCodeInput(e.target.value)} />
-          <button className="btn-outline" onClick={doPull} disabled={busy}>
-            <CloudDownload className="h-4 w-4" /> משיכה מהענן
+          <input className="input w-72" dir="ltr" placeholder="קוד סנכרון ממכשיר אחר"
+            value={codeInput} onChange={(e) => setCodeInput(e.target.value)} aria-label="קוד סנכרון ממכשיר אחר" />
+          <button className="btn-outline" onClick={doConnect} disabled={busy || codeInput.trim().length < 32}>
+            <CloudDownload className="h-4 w-4" /> חיבור ומיזוג
           </button>
         </div>
         {syncMsg && <p className="text-sm font-medium">{syncMsg}</p>}

@@ -3,22 +3,23 @@ import { HashRouter, Navigate, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "./theme/ThemeProvider";
 import Layout from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
-import StudyPage from "./pages/StudyPage";
-import CalendarPage from "./pages/CalendarPage";
-import GoalsPage from "./pages/GoalsPage";
-import QuestionsPage from "./pages/QuestionsPage";
-import CategoriesPage from "./pages/CategoriesPage";
-import QuizPage from "./pages/QuizPage";
-import ShasPage from "./pages/ShasPage";
-import StatsPage from "./pages/StatsPage";
-import SettingsPage from "./pages/SettingsPage";
-import LoginPage from "./pages/LoginPage";
-import ShasBoardPage from "./pages/ShasBoardPage";
-import AdminPage from "./pages/AdminPage";
-import DafLabPage from "./pages/DafLabPage";
 import LayoutSwitch from "./components/LayoutSwitch";
 
+// המסכים נטענים רק כשנכנסים אליהם (עמוד הבית — מיד, כי הוא הראשון)
 // הפריסה המקורית (אחד לאחד כמו באתר הבסיסי) — נטענת רק למי שבחר בה בהגדרות
+const StudyPage = lazy(() => import("./pages/StudyPage"));
+const CalendarPage = lazy(() => import("./pages/CalendarPage"));
+const GoalsPage = lazy(() => import("./pages/GoalsPage"));
+const QuestionsPage = lazy(() => import("./pages/QuestionsPage"));
+const CategoriesPage = lazy(() => import("./pages/CategoriesPage"));
+const QuizPage = lazy(() => import("./pages/QuizPage"));
+const ShasPage = lazy(() => import("./pages/ShasPage"));
+const StatsPage = lazy(() => import("./pages/StatsPage"));
+const SettingsPage = lazy(() => import("./pages/SettingsPage"));
+const LoginPage = lazy(() => import("./pages/LoginPage"));
+const ShasBoardPage = lazy(() => import("./pages/ShasBoardPage"));
+const AdminPage = lazy(() => import("./pages/AdminPage"));
+const DafLabPage = lazy(() => import("./pages/DafLabPage"));
 const ClassicHome = lazy(() => import("classic-pages/ClassicHome"));
 const ClassicStudy = lazy(() => import("classic-pages/ClassicStudy"));
 const ClassicSplitView = lazy(() => import("classic-pages/ClassicSplitView"));

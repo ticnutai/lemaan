@@ -1,5 +1,6 @@
 import { db } from "./index";
 import { uid } from "../lib/utils";
+import { markNoSync } from "./sync";
 import type { Card, CardType, Category, Deck } from "../features/study/types";
 
 /**
@@ -189,7 +190,8 @@ export async function importLibrary(onProgress?: (p: ImportProgress) => void): P
 
   onProgress?.({ total, done: total });
 
-  await db.transaction("rw", db.cards, db.categories, db.decks, db.settings, async () => {
+  await db.transaction("rw", db.cards, db.categories, db.decks, db.settings, async (tx) => {
+    markNoSync(tx); // המאגר המשותף — לא מידע אישי לסנכרון
     await db.categories.bulkPut(prunedCategories);
     await db.decks.bulkPut(decks);
     await db.cards.bulkPut(cards);

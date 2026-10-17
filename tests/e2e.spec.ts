@@ -105,6 +105,25 @@ test("T05 — תרגול כללי: סדר ← מסכת ← דף ← עמוד ←
     }
     await expect(page.getByText(/2 \/ \d+/)).toBeVisible();
   });
+  // זמן העיבוד בפועל (בלי ההשהיה המכוונת של מצב "מיידי": 0.9 שנייה בתשובה נכונה, 1.8 בשגויה)
+  const work = await page.evaluate(async () => {
+    const opt = document.querySelector<HTMLButtonElement>("button.w-full.text-right");
+    if (!opt) return -1;
+    opt.click();
+    await new Promise((r) => setTimeout(r, 50));
+    const delay = document.querySelector("[data-result='wrong']") ? 1800 : 900;
+    const t0 = performance.now();
+    await new Promise<void>((res) => {
+      const c = () => (document.body.innerText.includes("3 / ") ? res() : requestAnimationFrame(c));
+      c();
+    });
+    return Math.round(performance.now() - t0 + 50 - delay);
+  });
+  if (work >= 0) {
+    perf.T05_answer_work_ms = work;
+    console.log(`⏱ T05_answer_work_ms: ${work}ms (תקציב 250ms)`);
+    expect(work, "עיבוד תשובה איטי").toBeLessThan(250);
+  }
 });
 
 test("T06 — סייר הקטגוריות מציג ספירות", async () => {
@@ -167,7 +186,7 @@ test("T13 — הש\"ס המקומי: טעינת דף גמרא עם מפרשים"
 test("T12 — סנכרון ענן: העלאה אמיתית (מהירות עליית נתונים לענן)", async () => {
   await page.goto("/#/settings");
   await timed("T12_cloud_push_ms", 60_000, async () => {
-    await page.getByRole("button", { name: "העלאה לענן" }).click();
+    await page.getByRole("button", { name: "סנכרון עכשיו" }).click();
     await expect(page.getByText(/הנתונים הועלו לענן/)).toBeVisible({ timeout: 55_000 });
   });
 });

@@ -1,8 +1,7 @@
 // מוני שאלות ומצב תרגול לכל מסכת/דף — חישוב אחד מהמאגר, משותף למסך התרגול
 // ולחלון הניווט הצף (בלי כפילות).
 import { useMemo } from "react";
-import { useLiveQuery } from "dexie-react-hooks";
-import { db } from "../../db";
+import { useAllCards } from "../../db/cardsStore";
 import { SEDARIM } from "./shas";
 import type { Card } from "./types";
 
@@ -71,7 +70,7 @@ export function masechtaSummary(counts: Map<string, DafCounts>, name: string) {
 
 /** כל השאלות + המונים, מתעדכנים חי. undefined עד שהמאגר נטען. */
 export function useShasCounts(): { cards: Card[] | undefined; counts: Map<string, DafCounts> } {
-  const cards = useLiveQuery(() => db.cards.toArray(), []);
+  const cards = useAllCards();
   const counts = useMemo(() => computeShasCounts(cards), [cards]);
   return { cards, counts };
 }
