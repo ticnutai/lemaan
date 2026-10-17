@@ -51,7 +51,7 @@ begin
   if not public.lemaan_sync_allowed(p_code) then
     raise exception 'אין הרשאה' using errcode = '42501';
   end if;
-  return query select s.payload::text, s.updated_at from public.lemaan_sync s where s.sync_code = p_code;
+  return query select s.payload::text, s.updated_at from public.lemaan_sync s where s.sync_code::text = p_code;
 end;
 $$;
 
