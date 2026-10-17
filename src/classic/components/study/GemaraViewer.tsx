@@ -11,8 +11,11 @@ import { toGematria } from "@/lib/study/shasGen";
 import { supabase } from "@/integrations/supabase/client";
 import { useStudy } from "@/lib/study/store";
 import { cn } from "@/lib/utils";
+import TzuratDafPanel from "../../../features/daf/TzuratDafPanel";
+import { saveGemaraView, useGemaraView } from "../../../features/daf/gemaraView";
 
-type Source = "pdf" | "text";
+// (אצלנו) "tzurat" — צורת הדף מהדפוס המדויק של האתר, אותו רכיב כמו בפריסה הנוכחית
+type Source = "pdf" | "text" | "tzurat";
 
 interface Props {
   masechta: string;
@@ -48,7 +51,14 @@ const DEFAULT_SOURCE: Source = IS_ELECTRON ? "text" : "pdf";
 
 export function GemaraViewer({ masechta, daf, amud, className, isActive = true, onPrev, onNext, canPrev, canNext, onTogglePin, isPinned }: Props) {
   const { state, setUiPref } = useStudy();
-  const [source, setSource] = useState<Source>(DEFAULT_SOURCE);
+  const [source, setSourceState] = useState<Source>(DEFAULT_SOURCE);
+  // (אצלנו) הבחירה בין צורת הדף לטקסט משותפת לשתי הפריסות ונשמרת
+  const sharedView = useGemaraView();
+  useEffect(() => { if (sharedView) setSourceState(sharedView); }, [sharedView]);
+  const setSource = (v: Source) => {
+    setSourceState(v);
+    if (v !== "pdf") void saveGemaraView(v);
+  };
   const [pdfCheck, setPdfCheck] = useState<{ url: string; exists: boolean } | null>(null);
   const [text, setText] = useState<string[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -98,8 +108,9 @@ export function GemaraViewer({ masechta, daf, amud, className, isActive = true, 
 
   // אם PDF לא קיים — עבור אוטומטית לטקסט
   useEffect(() => {
-    if (pdfExists === false && source === "pdf") setSource("text");
-  }, [pdfExists, source]);
+    // (אצלנו) מעבר אוטומטי — לבחירה השמורה, בלי לשמור מחדש (אחרת הוא היה דורס את הבחירה)
+    if (pdfExists === false && source === "pdf") setSourceState(sharedView ?? "text");
+  }, [pdfExists, source, sharedView]);
 
   // טען טקסט מ-Sefaria
   useEffect(() => {
@@ -214,6 +225,9 @@ export function GemaraViewer({ masechta, daf, amud, className, isActive = true, 
             <ToggleGroupItem value="pdf" disabled={pdfExists === false} className="h-7 px-2 text-xs">
               PDF{pdfExists === false ? " (אין)" : ""}
             </ToggleGroupItem>
+            <ToggleGroupItem value="tzurat" className="h-7 px-2 text-xs" title="צורת הדף — גמרא במרכז, רש״י ותוספות מסביב">
+              <BookOpen className="h-3 w-3" /> צורת הדף
+            </ToggleGroupItem>
             <ToggleGroupItem value="text" className="h-7 px-2 text-xs">
               <FileText className="h-3 w-3" /> טקסט
             </ToggleGroupItem>
@@ -240,6 +254,11 @@ export function GemaraViewer({ masechta, daf, amud, className, isActive = true, 
             className="w-full h-full border-0"
             title={`גמרא ${masechta} ${dafLabel}${amudLabel}`}
           />
+        )}
+        {source === "tzurat" && (
+          <div className="h-full overflow-y-auto p-2">
+            <TzuratDafPanel masechta={masechta} daf={daf} amud={amud} />
+          </div>
         )}
         {source === "text" && (
           <div className="h-full overflow-y-auto p-4">

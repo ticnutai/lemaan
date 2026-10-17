@@ -38,6 +38,10 @@ class LemaanDB extends Dexie {
     this.version(3).stores({
       studyPlans: "id, name",
     });
+    // אינדקס לפי שם קטגוריה — מציאת שורש (למשל "טור" לשולחן ערוך) בלי לעבור על כל הקטגוריות
+    this.version(4).stores({
+      categories: "id, parentId, sortOrder, name",
+    });
   }
 }
 

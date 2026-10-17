@@ -653,3 +653,128 @@ test("T31 — שאלות פתוחות: בחירה בין רשימה נפתחת �
   await page.goto("/#/settings");
   await page.getByRole("radio", { name: /הפריסה הנוכחית/ }).click();
 });
+
+test("T32 — גמרא מתחת לשאלות: צורת הדף או טקסט, בשתי הפריסות, ומהיר (מהירות)", async () => {
+  // הפריסה הנוכחית: סשן תרגול בחגיגה ב.
+  await openStudyCenter();
+  await page.getByRole("button", { name: /^מועד/ }).click();
+  await page.getByRole("button", { name: /^חגיגה/ }).click();
+  await page.locator(".grid button.card-panel").first().click();
+  await page.getByRole("button", { name: /כל הדף/ }).click();
+  await expect(page.getByText(/1 \/ \d+ · תרגול חופשי/)).toBeVisible({ timeout: 15_000 });
+
+  const panel = page.getByTestId("gemara-panel");
+  await expect(panel).toBeVisible();
+  await timed("T32_tzurat_first_ms", 4_000, async () => {
+    await expect(panel.locator(".lemaan-print, .daf-page, [data-testid='tzurat-daf-panel'] canvas, [data-testid='tzurat-daf-panel'] svg").first()).toBeAttached({ timeout: 4_000 });
+  });
+  await panel.screenshot({ path: "test-results/gemara-panel-tzurat.png" });
+
+  // שאלה הבאה באותה מסכת — הקבצים כבר בזיכרון
+  const opt = page.locator("button[data-result], .space-y-2 > button").first();
+  if (await opt.count()) await opt.click();
+  await page.keyboard.press("Enter");
+  await timed("T32_tzurat_next_ms", 1_500, async () => {
+    await expect(page.getByTestId("tzurat-daf-panel")).toBeVisible({ timeout: 1_500 });
+  });
+
+  // טקסט רגיל
+  await panel.getByRole("radio", { name: "טקסט" }).click();
+  await expect(panel.getByTestId("gemara-text")).toBeVisible({ timeout: 5_000 });
+  await expect(panel).toHaveAttribute("data-view", "text");
+  await panel.getByRole("radio", { name: "צורת הדף" }).click();
+  await expect(page.getByTestId("tzurat-daf-panel")).toBeVisible();
+  await page.getByRole("button", { name: /^חזרה$/ }).click();
+
+  // הפריסה המקורית: מסגרת "צורת הדף" בתצוגת הגמרא של העמוד
+  await page.goto("/#/settings");
+  await page.getByRole("radio", { name: /הפריסה המקורית/ }).click();
+  await page.goto("/#/study");
+  const root = page.locator(".classic-layout");
+  await root.getByRole("button", { name: /^תרגול כללי/ }).click();
+  await root.getByRole("button", { name: /^מועד/ }).first().click();
+  await root.getByRole("button", { name: /^חגיגה/ }).first().click();
+  await root.getByRole("button", { name: /^ב\s*\d/ }).first().click();
+  await root.getByTestId("inline-amud-1").click();
+  await expect(root.getByRole("radio", { name: /צורת הדף/ })).toBeVisible({ timeout: 15_000 });
+  await expect(root.getByRole("radio", { name: /צורת הדף/ })).toHaveAttribute("data-state", "on");
+  await expect(root.getByTestId("tzurat-daf-panel")).toBeVisible({ timeout: 6_000 });
+  await root.getByRole("radio", { name: /טקסט/ }).click();
+  await expect(root.getByTestId("tzurat-daf-panel")).toHaveCount(0);
+  await root.getByRole("radio", { name: /צורת הדף/ }).click();
+
+  await page.goto("/#/settings");
+  await page.getByRole("radio", { name: /הפריסה הנוכחית/ }).click();
+});
+
+test("T33 — שולחן ערוך בתרגול: כל שלב נפתח מהר (מהירות)", async () => {
+  await openStudyCenter();
+  const box = page.getByTestId("category-drilldown");
+  // פתיחת הלשונית בפעם הראשונה (בלי זיכרון) — מדידה בתוך הדף
+  const tab = await page.evaluate(async () => {
+    const btn = [...document.querySelectorAll<HTMLElement>("button")].find((b) => b.textContent?.trim() === "שולחן ערוך");
+    const t0 = performance.now();
+    btn!.click();
+    await new Promise<void>((res) => {
+      const check = () => (document.body.innerText.includes("תרגול כל השאלות כאן") ? res() : requestAnimationFrame(check));
+      check();
+    });
+    return Math.round(performance.now() - t0);
+  });
+  perf.T33_sa_tab_ms = tab;
+  console.log(`⏱ T33_sa_tab_ms: ${tab}ms (תקציב 500ms)`);
+  expect(tab, "פתיחת הלשונית איטית").toBeLessThan(500);
+  const rootCrumb = box.getByRole("navigation", { name: "מיקום" }).getByRole("button", { name: "שולחן ערוך" });
+  if (await rootCrumb.count()) await rootCrumb.click();
+  // מדידה בתוך הדף: מהלחיצה ועד שהתיבות של השלב הבא מצוירות (בלי זמן ההמתנה של כלי הבדיקה)
+  for (const [name, key] of [["אורח חיים", "T33_level_helek_ms"], ["הלכות שבת", "T33_level_halachot_ms"], ["סימן שא", "T33_level_simanim_ms"], ["סעיף", "T33_level_seif_ms"]] as const) {
+    await expect(box.getByTestId("drilldown-tile").filter({ hasText: name }).first()).toBeVisible();
+    const ms = await page.evaluate(async (label) => {
+      const tile = [...document.querySelectorAll<HTMLElement>("[data-testid='drilldown-tile']")].find((b) => b.textContent?.includes(label));
+      const t0 = performance.now();
+      tile!.click();
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      return Math.round(performance.now() - t0);
+    }, name);
+    perf[key] = ms;
+    console.log(`⏱ ${key}: ${ms}ms (תקציב 300ms)`);
+    expect(ms, `${key} איטי`).toBeLessThan(300);
+  }
+  await expect(box.getByTestId("open-question-list")).toBeVisible({ timeout: 1_000 });
+  // חזרה בפירורי הלחם לרמת הסימנים — מדידה בתוך הדף
+  const crumb = await page.evaluate(async () => {
+    const btn = [...document.querySelectorAll<HTMLElement>("nav[aria-label='מיקום'] button")].find((b) => b.textContent?.trim() === "הלכות שבת");
+    const t0 = performance.now();
+    btn!.click();
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    return Math.round(performance.now() - t0);
+  });
+  perf.T33_crumb_back_ms = crumb;
+  console.log(`⏱ T33_crumb_back_ms: ${crumb}ms (תקציב 300ms)`);
+  expect(crumb, "חזרה בפירורי הלחם איטית").toBeLessThan(300);
+  await expect(box.getByTestId("drilldown-tile").first()).toBeVisible();
+
+  // תרגול כל הלכות שבת (652 שאלות) — מדידה בתוך הדף: מהלחיצה עד שמסך התרגול מוצג
+  const inPage = (selectorText: string, clickText: string) => page.evaluate(async ([want, label]) => {
+    const all = [...document.querySelectorAll<HTMLElement>("button")];
+    const btn = all.find((b) => b.textContent?.trim() === label) ?? all.find((b) => b.textContent?.includes(label));
+    const t0 = performance.now();
+    btn!.click();
+    await new Promise<void>((res) => {
+      const check = () => (document.body.innerText.includes(want) ? res() : requestAnimationFrame(check));
+      check();
+    });
+    return Math.round(performance.now() - t0);
+  }, [selectorText, clickText] as const);
+  const start = await inPage("· תרגול חופשי", "תרגול כל השאלות כאן (652)");
+  perf.T33_practice_all_ms = start;
+  console.log(`⏱ T33_practice_all_ms: ${start}ms (תקציב 300ms)`);
+  expect(start, "התחלת תרגול איטית").toBeLessThan(300);
+  await expect(page.getByText(/1 \/ 652 · תרגול חופשי/)).toBeVisible();
+  // חזרה מהתרגול — אותו מקום בעץ
+  const back = await inPage("תרגול כל השאלות כאן (652)", "חזרה");
+  perf.T33_return_ms = back;
+  console.log(`⏱ T33_return_ms: ${back}ms (תקציב 200ms)`);
+  expect(back, "חזרה מתרגול איטית").toBeLessThan(200);
+  await expect(box.locator("h3")).toHaveText("הלכות שבת");
+});

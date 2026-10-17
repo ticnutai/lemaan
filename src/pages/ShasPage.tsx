@@ -1,4 +1,3 @@
-import { fetchGzJson } from "../lib/gzJson";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { BookOpen, ChevronLeft, ChevronRight, Landmark } from "lucide-react";
@@ -6,6 +5,7 @@ import PageBanner from "../components/PageBanner";
 import DafPage from "../features/daf/DafPage";
 import { sanitizeSegment } from "../features/daf/buildHtml";
 import type { PrintLayout } from "../features/daf/PrintDaf";
+import { loadMasechet, loadPrintLayouts, loadShasIndex, PRINT_CREDIT, type MasechetMeta, type ShasAmud, type ShasIndex } from "../features/daf/shasData";
 import PrintSearch from "../features/daf/PrintSearch";
 import EinMishpatPanel from "../components/EinMishpatPanel";
 import { innerSegments, outerSegments } from "../features/daf/streams";
@@ -14,64 +14,7 @@ import { hebrewDaf } from "../features/study/shas";
 
 /** מאגר הש"ס המקומי (מהדורת וילנא, ספריא) — 37 מסכתות, עובד אופליין מלא. */
 
-interface Commentary {
-  key: string;
-  he: string;
-  en: string;
-  segments: string[];
-}
-interface Amud {
-  id: string;
-  masechet: string;
-  daf: string;
-  amud: string;
-  gemara: string[];
-  commentaries: Commentary[];
-}
-interface MasechetMeta {
-  he: string;
-  en: string;
-  slug: string;
-  seder_he: string;
-  daf_count: number;
-}
-interface ShasIndex {
-  masechtot: MasechetMeta[];
-}
-
-const fileCache = new Map<string, Record<string, Amud>>();
-
-async function loadMasechet(slug: string): Promise<Record<string, Amud>> {
-  const cached = fileCache.get(slug);
-  if (cached) return cached;
-  let data: { amudim: Record<string, Amud> };
-  try {
-    data = await fetchGzJson(`${import.meta.env.BASE_URL}shas/${slug}.json.gz`);
-  } catch {
-    throw new Error(`טעינת ${slug} נכשלה`);
-  }
-  fileCache.set(slug, data.amudim);
-  return data.amudim;
-}
-
-/**
- * ציון מקור לדפוס המדויק — נוסח זהה לאתר הגמרא. בנידה מיקום השורות נמדד ממהדורה שהזכויות
- * עליה שמורות; השורה מוצגת מתחת לעמוד עד שתיבנה מסריקת וילנא חופשית.
- */
-const PRINT_CREDIT: Record<string, string> = {
-  Niddah: "מיקום השורות בצורת הדף של מסכת נידה נמדד ממהדורת נהרדעא החדשה של הוצאת ח. וגשל. כל הזכויות על המהדורה שמורות להוצאה.",
-};
-
-/** מסכתות שקיימת להן צורת הדף המלאה (HTML וילנא, ללא פרסומות) בקבצים מקומיים. */
-// מסכתות עם דפוס מדויק — הרשימה נכתבת ע"י scripts/daf-pipeline/hb_pdf.py
-let printIndex: Promise<Set<string>> | null = null;
-function loadPrintIndex(): Promise<Set<string>> {
-  printIndex ??= fetch(`${import.meta.env.BASE_URL}tzurat/print/index.json`)
-    .then((r) => (r.ok ? r.json() : []))
-    .then((l: string[]) => new Set(l))
-    .catch(() => new Set<string>());
-  return printIndex;
-}
+type Amud = ShasAmud;
 
 export default function ShasPage() {
   const [params, setParams] = useSearchParams();
@@ -102,8 +45,7 @@ export default function ShasPage() {
   }, [params, index, setParams]);
 
   useEffect(() => {
-    fetch(`${import.meta.env.BASE_URL}shas/index.json`)
-      .then((r) => r.json())
+    loadShasIndex()
       .then(setIndex)
       .catch(() => setError("אינדקס הש\"ס לא נטען"));
   }, []);
@@ -113,9 +55,7 @@ export default function ShasPage() {
     setPrintLayouts(null);
     if (!slug) return;
     let cancelled = false;
-    const file = slug.toLowerCase();
-    loadPrintIndex()
-      .then((have) => (have.has(file) ? fetchGzJson<Record<string, PrintLayout>>(`${import.meta.env.BASE_URL}tzurat/print/${file}.json.gz`) : null))
+    loadPrintLayouts(slug)
       .then((d) => { if (!cancelled) setPrintLayouts(d); })
       .catch(() => { if (!cancelled) setPrintLayouts(null); });
     return () => { cancelled = true; };

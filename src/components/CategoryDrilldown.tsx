@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { BookOpen, ChevronLeft, Play } from "lucide-react";
 import { db } from "../db";
@@ -24,47 +24,70 @@ const shortName = (name: string) => name.split(" · ").pop() ?? name;
 // המקום האחרון בעץ — כדי שחזרה מתרגול תחזיר לאותו מקום
 const lastPath = new Map<string, string[]>();
 
+interface Tree {
+  root: Category | null;
+  children: Map<string, Category[]>;
+  total: Map<string, number>;
+  byId: Map<string, Category>;
+}
+const treeCache = new Map<string, Tree | null>();
+const rootIdCache = new Map<string, string | null>();
+
+/** טוען רק את הענף של השורש: קטגוריות לפי רמות (אינדקס ההורה), ומונה שאלות לפי אינדקס הקטגוריה. */
+async function loadTree(rootName: string): Promise<Tree | null> {
+  let rootId = rootIdCache.get(rootName);
+  if (rootId === undefined) {
+    // לפי אינדקס השם (מיידי), ושומרים בזיכרון
+    rootId = (await db.categories.where("name").equals(rootName).filter((c) => c.parentId === null).first())?.id ?? null;
+    rootIdCache.set(rootName, rootId);
+  }
+  if (!rootId) return null;
+  const root = (await db.categories.get(rootId)) ?? null;
+  if (!root) return null;
+  const all: Category[] = [root];
+  let level = [rootId];
+  while (level.length) {
+    const kids = await db.categories.where("parentId").anyOf(level).toArray();
+    all.push(...kids);
+    level = kids.map((k) => k.id);
+  }
+  const children = new Map<string, Category[]>();
+  for (const c of all) {
+    if (!c.parentId) continue;
+    const list = children.get(c.parentId) ?? [];
+    list.push(c);
+    children.set(c.parentId, list);
+  }
+  for (const list of children.values()) list.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name, "he"));
+  // ספירה נפרדת לכל קטגוריה, במקביל (מהיר בהרבה משאילתה אחת על מאות מזהים)
+  const direct = new Map<string, number>();
+  const counts = await Promise.all(all.map((c) => db.cards.where("categoryId").equals(c.id).count()));
+  all.forEach((c, i) => { if (counts[i]) direct.set(c.id, counts[i]); });
+  const total = new Map<string, number>();
+  const sum = (id: string): number => {
+    let n = direct.get(id) ?? 0;
+    for (const k of children.get(id) ?? []) n += sum(k.id);
+    total.set(id, n);
+    return n;
+  };
+  sum(rootId);
+  return { root, children, total, byId: new Map(all.map((c) => [c.id, c])) };
+}
+
 export default function CategoryDrilldown({ rootName, rootLabel, onPractice }: Props) {
-  const categories = useLiveQuery(() => db.categories.toArray(), []);
-  // כמה שאלות בכל קטגוריה (לפי המפתח בלבד — מהיר גם עם עשרות אלפי שאלות)
-  const direct = useLiveQuery(async () => {
-    const m = new Map<string, number>();
-    await db.cards.orderBy("categoryId").eachKey((k) => {
-      const id = String(k);
-      m.set(id, (m.get(id) ?? 0) + 1);
-    });
-    return m;
-  }, []);
+  // רק הענף של השורש (למשל 751 קטגוריות ו־652 שאלות) — לא כל עשרות אלפי השאלות במאגר.
+  // התוצאה נשמרת בזיכרון, ולכן חזרה מתרגול מציגה את העץ מיד (והבדיקה מחדש קורית ברקע).
+  const live = useLiveQuery(() => loadTree(rootName), [rootName]);
+  if (live !== undefined) treeCache.set(rootName, live);
+  const tree = live ?? treeCache.get(rootName);
   const [path, setPathState] = useState<string[]>(() => lastPath.get(rootName) ?? []);
   const setPath = (p: string[]) => {
     lastPath.set(rootName, p);
     setPathState(p);
   };
 
-  const tree = useMemo(() => {
-    if (!categories || !direct) return null;
-    const children = new Map<string | null, Category[]>();
-    for (const c of categories) {
-      const list = children.get(c.parentId) ?? [];
-      list.push(c);
-      children.set(c.parentId, list);
-    }
-    for (const list of children.values()) list.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name, "he"));
-    const total = new Map<string, number>();
-    const sum = (id: string): number => {
-      if (total.has(id)) return total.get(id)!;
-      let n = direct.get(id) ?? 0;
-      for (const k of children.get(id) ?? []) n += sum(k.id);
-      total.set(id, n);
-      return n;
-    };
-    const root = (children.get(null) ?? []).find((c) => c.name === rootName) ?? null;
-    if (root) sum(root.id);
-    return { children, total, root, byId: new Map(categories.map((c) => [c.id, c])) };
-  }, [categories, direct, rootName]);
-
-  if (!tree) return <p className="text-center text-sm text-muted-foreground py-8">טוען…</p>;
-  if (!tree.root || !tree.total.get(tree.root.id)) {
+  if (tree === undefined) return <p className="text-center text-sm text-muted-foreground py-8">טוען…</p>;
+  if (!tree || !tree.root || !tree.total.get(tree.root.id)) {
     return <div className="card-panel border-dashed text-center text-muted-foreground py-10">עדיין אין שאלות ב{rootLabel}.</div>;
   }
 
@@ -82,7 +105,8 @@ export default function CategoryDrilldown({ rootName, rootLabel, onPractice }: P
       for (const k of tree.children.get(cid) ?? []) walk(k.id);
     };
     walk(id);
-    const cards = await db.cards.where("categoryId").anyOf(ids).toArray();
+    // שאילתה לכל קטגוריה, במקביל (מהיר בהרבה משאילתה אחת על מאות מזהים)
+    const cards = (await Promise.all(ids.map((cid) => db.cards.where("categoryId").equals(cid).toArray()))).flat();
     onPractice(cards, names);
   };
 

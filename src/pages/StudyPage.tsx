@@ -22,6 +22,7 @@ import TypographyDialog from "../components/TypographyDialog";
 import { isCustom, useTypography } from "../features/study/typography";
 import AmudSorter from "../components/AmudSorter";
 import CategoryDrilldown from "../components/CategoryDrilldown";
+import GemaraPanel from "../components/GemaraPanel";
 import { cn } from "../lib/utils";
 import type { Card, Deck } from "../features/study/types";
 
@@ -993,6 +994,11 @@ export default function StudyPage() {
           מקשים: {withOptions ? "1–4 או א–ד לבחירה · אנטר או רווח להמשך" : "אנטר או רווח להצגת התשובה · 1–4 לדירוג"} · פ להצמדה · מחיקה אחורה לשאלה הקודמת
         </p>
       </div>
+
+      {/* הגמרא של העמוד מתחת לשאלות: צורת הדף או טקסט (רכיב משותף לשתי הפריסות) */}
+      {current.masechta && Number.isFinite(dafNum) && (
+        <GemaraPanel masechta={current.masechta} daf={dafNum} amud={current.amud === "2" ? 2 : 1} />
+      )}
     </div>
   );
 }
