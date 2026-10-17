@@ -185,9 +185,11 @@ test("T13 — הש\"ס המקומי: טעינת דף גמרא עם מפרשים"
 
 test("T12 — סנכרון ענן: העלאה אמיתית (מהירות עליית נתונים לענן)", async () => {
   await page.goto("/#/settings");
+  // קוד בדיקה קבוע — כל הרצה דורסת את אותם פריטים בענן במקום ליצור בעלים חדש בכל פעם
+  await page.getByPlaceholder("קוד סנכרון ממכשיר אחר").fill("e2e-test-lemaan-0000-0000-000000000000");
   await timed("T12_cloud_push_ms", 60_000, async () => {
-    await page.getByRole("button", { name: "סנכרון עכשיו" }).click();
-    await expect(page.getByText(/הנתונים הועלו לענן/)).toBeVisible({ timeout: 55_000 });
+    await page.getByRole("button", { name: "חיבור ומיזוג" }).click();
+    await expect(page.getByText(/המכשיר חובר/)).toBeVisible({ timeout: 55_000 });
   });
 });
 
